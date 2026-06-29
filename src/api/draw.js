@@ -29,7 +29,7 @@ export function cleanupBackdrops() {
   _backdrops.length = 0;
 }
 
-class DrawTarget {
+export class DrawTarget {
   #z;
   #gc;
 

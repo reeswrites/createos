@@ -11,29 +11,35 @@ import { deriveParamHints } from '../runtime/api-registry.js';
 // their descriptor. Derivation is live (per lookup) so run-scoped registerAPI()
 // signatures appear without an import-time snapshot.
 export function resolveParamHint(path) {
-  return PARAM_HINTS[path] ?? deriveParamHints()[path] ?? null;
+  // PARAM_HINTS (manual) → API Descriptor (registered globals) → Canvas instance
+  // method. The last covers `c.circle(...)` / `canvas.rect(...)` etc., which can't
+  // be keyed by a fixed path because the object is a per-sketch variable (ADR 040).
+  return PARAM_HINTS[path] ?? deriveParamHints()[path]
+    ?? CANVAS_METHOD_HINTS[path.includes('.') ? path.slice(path.lastIndexOf('.') + 1) : ''] ?? null;
 }
+
+// 2D draw methods live on a `Canvas` instance (the var name varies), so they are
+// matched by method name as a last resort. Names are draw-distinctive to limit
+// false matches on unrelated objects.
+const CANVAS_METHOD_HINTS = {
+  rect:       ['x', 'y', 'w', 'h', 'color'],
+  rectStroke: ['x', 'y', 'w', 'h', 'color', 'thickness'],
+  circle:     ['x', 'y', 'r', 'color'],
+  ring:       ['x', 'y', 'r', 'color', 'thickness'],
+  arc:        ['x', 'y', 'r', 'start', 'end', 'color'],
+  arcStroke:  ['x', 'y', 'r', 'start', 'end', 'color', 'thickness'],
+  line:       ['x1', 'y1', 'x2', 'y2', 'color', 'thickness'],
+  poly:       ['points', 'color'],
+  bg:         ['color'],
+  backdrop:   ['source', 'opts?'],
+  pixelate:   ['source', 'blockSize', 'x?', 'y?', 'w?', 'h?'],
+};
 
 // ── Param tables ──────────────────────────────────────────────────────────────
 
 export const PARAM_HINTS = {
-  // Draw
-  'draw.rect':          ['x', 'y', 'w', 'h', 'color'],
-  'draw.rectStroke':    ['x', 'y', 'w', 'h', 'color', 'thickness'],
-  'draw.circle':        ['x', 'y', 'r', 'color'],
-  'draw.ring':          ['x', 'y', 'r', 'color', 'thickness'],
-  'draw.arc':           ['x', 'y', 'r', 'start', 'end', 'color'],
-  'draw.arcStroke':     ['x', 'y', 'r', 'start', 'end', 'color', 'thickness'],
-  'draw.line':          ['x1', 'y1', 'x2', 'y2', 'color', 'thickness'],
-  'draw.text':          ['str', 'x', 'y', 'size', 'color', 'opts?'],
-  'draw.image':         ['img', 'x', 'y', 'w?', 'h?'],
-  'draw.poly':          ['points', 'color'],
-  'draw.bg':            ['color'],
-  'draw.alpha':         ['opacity'],
-  'draw.blend':         ['mode'],
-  'draw.translate':     ['x', 'y'],
-  'draw.scale':         ['sx', 'sy?'],
-  'draw.rotate':        ['angle'],
+  // Draw — 2D methods are on a Canvas instance; see CANVAS_METHOD_HINTS (ADR 040).
+  'Canvas':             ['opts?'],
   // Shader / GLShader
   'Shader':             ['fragmentBody', 'opts?'],
   'GLShader':           ['fragmentBody', 'opts?'],
@@ -83,9 +89,6 @@ export const PARAM_HINTS = {
   // Vision
   'vision.onGesture':   ['name', 'fn'],
   'vision.onExpression':['name', 'fn'],
-  // Layer
-  'getLayer':           ['z'],
-  'getCanvas':          ['z'],
   // captureWindow
   'captureWindow':      ['target', 'fps?'],
   // AudioFile

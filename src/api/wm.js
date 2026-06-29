@@ -6,12 +6,13 @@
 import * as Tone from 'tone';
 import { WidgetEvents } from './widget-events.js';
 import { onReset } from '../runtime/reset-registry.js';
-import { notify, registerCommand, tween } from '../events/index.js';
+import { notify, registerCommand, tween, hasSubscribers } from '../events/index.js';
 import { recordStream, compositeCanvasStream } from './recorder.js';
 import { acquireCamera, acquireMic } from './media-lease.js';
 import { acquireStrip, releaseStrip } from './mixer.js';
 import { TextLayer } from './text-layer.js';
 import { liveOutput } from '../runtime/keep-alive.js';
+import { mountLayerCanvas } from './layer.js';
 
 // ── Paint-overlay WidgetEvents registry (for cleanupPaintOverlays) ────────────
 
@@ -442,6 +443,25 @@ export function initWM(onContentResize) {
     onContentResize?.();
   }
 
+  // Master-audio taskbar chip (ADR 040): audio control no longer lives on an
+  // output window (there isn't one) — it lives in the desktop chrome. The chip
+  // appears once a sketch uses audio; clicking it opens the full mixer panel.
+  function ensureAudioChip() {
+    if (taskbar.querySelector('.wm-audio-chip')) return;
+    const chip = document.createElement('div');
+    chip.className = 'wm-taskbar-chip wm-audio-chip';
+    chip.title = 'Audio — open mixer';
+    const icon = document.createElement('span');
+    icon.innerHTML = '<i class="fa-solid fa-volume-high"></i>';
+    const label = document.createElement('span');
+    label.textContent = 'Audio';
+    chip.appendChild(icon);
+    chip.appendChild(label);
+    chip.addEventListener('click', () => { window.mixer?.show?.(); });
+    taskbar.appendChild(chip);
+    taskbar.style.display = 'flex';
+  }
+
   // Per-window mixer Strip (ADR 032) — window audio flows through the Mixer.
   // _winStrips: winId → Strip. wm.channel(id) exposes the strip's Tone.Channel
   // so Tone sources routed into it are mixable; window media is rebridged into
@@ -512,12 +532,19 @@ export function initWM(onContentResize) {
   // no frames, no undo, no onion skin.  Snapshot composites the live visual
   // frame + overlay into a PNG desktop icon; "Edit in Paint" opens the full
   // Paint editor with that composite as a backdrop.
+  // All <canvas> planes of a window body, z-sorted (ADR 040). Replaces the old
+  // base→overlay→text filter dance: every plane (draw@0, pixi@25, shader@30,
+  // overlay@50, text@51) composites in zIndex order through one mechanism.
+  function _zSortedCanvases(body) {
+    return [...body.querySelectorAll('canvas')]
+      .map(c => [c, parseInt(getComputedStyle(c).zIndex, 10) || 0])
+      .sort((a, b) => a[1] - b[1])
+      .map(e => e[0]);
+  }
+
   // ── Snapshot visual to persistent desktop PNG ──────────────────────────────
   function _snapshotVisual(win, body, visualEl, { name, download = false } = {}) {
-    const overlay    = win._getOverlay?.();
-    const textCanvas = win._getTextCanvas?.();
-    // Composite all non-overlay, non-text canvases (multi-layer output windows)
-    const canvases = [...body.querySelectorAll('canvas')].filter(c => c !== overlay && c !== textCanvas);
+    const canvases = _zSortedCanvases(body);
     let w, h;
     if (canvases.length > 0) {
       w = canvases[0].width || 320;
@@ -534,8 +561,6 @@ export function initWM(onContentResize) {
     } else {
       try { ctx.drawImage(visualEl, 0, 0, w, h); } catch (_) {}
     }
-    if (overlay)    { try { ctx.drawImage(overlay,    0, 0, w, h); } catch (_) {} }
-    if (textCanvas) { try { ctx.drawImage(textCanvas, 0, 0, w, h); } catch (_) {} }
     const snapName = name ?? (win.querySelector('.wm-title')?.textContent?.trim() || 'snapshot') + '.png';
     c.toBlob(blob => {
       if (!blob) return;
@@ -545,16 +570,8 @@ export function initWM(onContentResize) {
 
   // ── Start recording a visual window → desktop WebM ─────────────────────────
   function _recordVisual(win, body, visualEl, { fps = 30, name } = {}) {
-    const overlay    = win._getOverlay?.();
-    const textCanvas = win._getTextCanvas?.();
-    // Base canvases exclude overlay (paint strokes) and text; we composite them on top.
-    const baseCanvases = [...body.querySelectorAll('canvas')].filter(c => c !== overlay && c !== textCanvas);
-    // Final composite order: base → paint overlay → text
-    const all = [
-      ...baseCanvases,
-      ...(overlay    ? [overlay]    : []),
-      ...(textCanvas ? [textCanvas] : []),
-    ];
+    // All canvases, z-sorted → composite order (base → … → overlay → text).
+    const all = _zSortedCanvases(body);
     let stream, stopCompositor = null;
     if (all.length > 1) {
       const comp = compositeCanvasStream(all, fps);
@@ -1200,6 +1217,18 @@ export function initWM(onContentResize) {
     }
   }
 
+  // Does the running sketch claim the pointer for this window? If user code
+  // subscribes to mouse events (globally or scoped to this window), body drags
+  // belong to the sketch — the window moves from the titlebar instead.
+  const _mouseClaimed = (winId) =>
+    hasSubscribers('window:mouse:down', { runScopedOnly: true }) ||
+    hasSubscribers('window:mouse:move', { runScopedOnly: true }) ||
+    hasSubscribers('window:mouse:up',   { runScopedOnly: true }) ||
+    (winId && (
+      hasSubscribers(`wm:${winId}:mouse:down`, { runScopedOnly: true }) ||
+      hasSubscribers(`wm:${winId}:mouse:move`, { runScopedOnly: true }) ||
+      hasSubscribers(`wm:${winId}:mouse:up`,   { runScopedOnly: true })));
+
   // Drag via titlebar, hover-strip, or body of content-only windows
   desktop.addEventListener('mousedown', e => {
     const tb = e.target.closest('.wm-titlebar');
@@ -1213,6 +1242,9 @@ export function initWM(onContentResize) {
     if (e.target.closest('[contenteditable="true"]')) return;
     if (bd && e.target.closest('select, input, button, a, textarea')) return;
     const win = (tb || hs || bd).closest('.wm-win');
+    // Body drag yields to an interactive sketch that's listening to the mouse;
+    // titlebar/hover-strip drags always move the window.
+    if (bd && _mouseClaimed(win.id)) return;
     bringToFront(win);
     const ox = e.clientX - win.offsetLeft;
     const oy = e.clientY - win.offsetTop;
@@ -1318,6 +1350,13 @@ export function initWM(onContentResize) {
   function _destroyWin(win, { animate = true } = {}) {
     if (!win || !spawnedIds.has(win.id)) return false;
     _releaseWin(win);
+    // Tear down any layer-stack planes (ADR 040) — disconnect DPR observers.
+    if (win._layerStack) {
+      for (const c of win._layerStack.values()) {
+        try { c._ar_resizeObserver?.disconnect(); } catch (_) {}
+      }
+      win._layerStack.clear();
+    }
     win._wmCleanup?.();
     win._wmRescueContent?.();
     _disposeChannel(win.id);
@@ -2192,6 +2231,74 @@ export function initWM(onContentResize) {
       return s;
     },
 
+    // ── Per-window layer compositor (ADR 040) ──────────────────────────────────
+    // A window owns a z-ordered stack of <canvas> planes in its body. This is the
+    // single registry of every plane (draw@0, pixi@25, shader@30, overlay@50,
+    // text@51). Lazy — a window grows a stack only when something mounts into it.
+    //
+    // wm.layer(id, z, opts):
+    //   - opts.adopt: register a caller-made <canvas> at z (used for Canvas's
+    //     fixed-logical z=0 plane, which must NOT get mountLayerCanvas's DPR
+    //     native-resize). The caller owns appending/styling it.
+    //   - else: create a managed plane via mountLayerCanvas (DPR-resized; right
+    //     for resolution-independent shaders / pixi). opts: {opacity, webgpu, onResize}.
+    // Returns the raw <canvas>. WM owns the element + stack position + teardown;
+    // it does NOT own styling (the Layer CSS-wrapper in layer.js stays a decorator).
+    layer(id, z = 0, opts = {}) {
+      const win = getWin(id);
+      if (!win) return null;
+      const body = win.querySelector('.wm-body');
+      if (!body) return null;
+      const stack = (win._layerStack ??= new Map());
+      if (stack.has(z)) return stack.get(z);
+      let canvas;
+      if (opts.adopt) {
+        // Register a caller-made canvas (Canvas's fixed-logical z=0 plane).
+        canvas = opts.adopt;
+      } else if (opts.raster) {
+        // Fixed-logical 2D sibling sized to the base plane — for extra draw
+        // layers (old getLayer(z) at editor-instance.js:272). No DPR observer.
+        canvas = document.createElement('canvas');
+        canvas.width  = opts.w ?? (stack.get(0)?.width  ?? 1600);
+        canvas.height = opts.h ?? (stack.get(0)?.height ?? 900);
+        Object.assign(canvas.style, {
+          position: 'absolute', top: '0', left: '0',
+          width: '100%', height: '100%', zIndex: String(z), pointerEvents: 'none',
+        });
+        if (getComputedStyle(body).position === 'static') body.style.position = 'relative';
+        body.appendChild(canvas);
+      } else {
+        // Managed GPU/pixi plane — DPR-resized (resolution-independent shaders).
+        const m = mountLayerCanvas({
+          z, opacity: opts.opacity ?? 1, container: body,
+          webgpu: !!opts.webgpu, onResize: opts.onResize ?? null,
+        });
+        canvas = m.canvas;
+        canvas._ar_resizeObserver = m.resizeObserver;
+      }
+      canvas._ar_z = z;
+      stack.set(z, canvas);
+      return canvas;
+    },
+
+    /** z-sorted array of a window's plane <canvas>es (for snapshot/record compositing). */
+    layers(id) {
+      const stack = getWin(id)?._layerStack;
+      if (!stack) return [];
+      return [...stack.entries()].sort((a, b) => a[0] - b[0]).map(e => e[1]);
+    },
+
+    /** Remove a plane at z (disconnect observer, detach canvas). Idempotent. */
+    removeLayer(id, z) {
+      const stack = getWin(id)?._layerStack;
+      const canvas = stack?.get(z);
+      if (!canvas) return api;
+      try { canvas._ar_resizeObserver?.disconnect(); } catch (_) {}
+      try { canvas.remove(); } catch (_) {}
+      stack.delete(z);
+      return api;
+    },
+
     /** Toggle visibility */
     toggle(id) {
       const win = getWin(id);
@@ -2782,6 +2889,9 @@ export function initWM(onContentResize) {
       if (!win || win.querySelector('.wm-audio-ctrl')) return;
       _addAudioControls(win, null);
     },
+
+    /** Idempotently show the master-audio chip in the taskbar (ADR 040). */
+    ensureAudioChip() { ensureAudioChip(); return api; },
 
     /** Snapshot a visual window → persistent PNG on the desktop */
     snapshot(winId, opts = {}) {

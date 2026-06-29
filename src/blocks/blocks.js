@@ -792,6 +792,75 @@ Blockly.defineBlocksWithJsonArray([
     nextStatement: null,
     colour: 60,
   },
+
+  // ── Windowed Canvas surface (ADR 038) ───────────────────────────────────────
+  {
+    type: 'canvas_new',
+    message0: 'new Canvas width %1 height %2 title %3',
+    args0: [
+      { type: 'field_number', name: 'W', value: 1600 },
+      { type: 'field_number', name: 'H', value: 900 },
+      { type: 'field_input',  name: 'TITLE', text: 'Sketch' },
+    ],
+    output: null,
+    colour: 200,
+    tooltip: 'Create a window-scoped drawing surface at its own size. Plug into a variable, then use the canvas background / circle / on-pointer blocks.',
+  },
+  {
+    type: 'canvas_surface_bg',
+    message0: 'canvas %1 background %2',
+    args0: [
+      { type: 'input_value', name: 'CANVAS' },
+      { type: 'field_input', name: 'COLOR', text: '#0a0a18' },
+    ],
+    inputsInline: true,
+    previousStatement: null,
+    nextStatement: null,
+    colour: 200,
+    tooltip: 'Fill a Canvas surface with a color.',
+  },
+  {
+    type: 'canvas_surface_circle',
+    message0: 'canvas %1 circle x %2 y %3 r %4 color %5',
+    args0: [
+      { type: 'input_value', name: 'CANVAS' },
+      { type: 'input_value', name: 'X', check: 'Number' },
+      { type: 'input_value', name: 'Y', check: 'Number' },
+      { type: 'field_number', name: 'R', value: 20 },
+      { type: 'field_input', name: 'COLOR', text: '#ffffff' },
+    ],
+    inputsInline: true,
+    previousStatement: null,
+    nextStatement: null,
+    colour: 200,
+    tooltip: 'Draw a filled circle on a Canvas surface.',
+  },
+  {
+    type: 'canvas_on',
+    message0: 'on canvas %1 pointer %2',
+    args0: [
+      { type: 'input_value', name: 'CANVAS' },
+      { type: 'field_dropdown', name: 'EVENT', options: [['down', 'down'], ['move', 'move'], ['up', 'up']] },
+    ],
+    message1: 'do %1',
+    args1: [{ type: 'input_statement', name: 'DO' }],
+    previousStatement: null,
+    nextStatement: null,
+    colour: 200,
+    tooltip: 'Run code on a Canvas pointer event. Read the live position with the canvas pointer block.',
+  },
+  {
+    type: 'canvas_pointer',
+    message0: 'canvas %1 pointer %2',
+    args0: [
+      { type: 'input_value', name: 'CANVAS' },
+      { type: 'field_dropdown', name: 'AXIS', options: [['x', 'x'], ['y', 'y']] },
+    ],
+    inputsInline: true,
+    output: 'Number',
+    colour: 200,
+    tooltip: 'Read the live pointer x or y, in canvas coordinates.',
+  },
   {
     type: 'canvas_blur',
     message0: 'blur layer %1 by %2 px',
@@ -1823,21 +1892,23 @@ javascriptGenerator.forBlock['vision_on_blink'] = (b, g) => {
 };
 
 // Draw
+// ADR 040: global `draw` is gone. These "quick draw" blocks emit against an
+// implicit default `canvas` (declared once by getWorkspaceCode when present).
 javascriptGenerator.forBlock['draw_bg'] = (b) => {
   const color = b.getFieldValue('COLOR');
-  return `draw.bg(${JSON.stringify(color)});\n`;
+  return `canvas.bg(${JSON.stringify(color)});\n`;
 };
 javascriptGenerator.forBlock['draw_line'] = (b) => {
   const [x1, y1, x2, y2] = ['X1', 'Y1', 'X2', 'Y2'].map(f => b.getFieldValue(f));
   const color = b.getFieldValue('COLOR');
   const t = b.getFieldValue('THICKNESS');
-  return `draw.line(${x1}, ${y1}, ${x2}, ${y2}, ${JSON.stringify(color)}, ${t});\n`;
+  return `canvas.line(${x1}, ${y1}, ${x2}, ${y2}, ${JSON.stringify(color)}, ${t});\n`;
 };
 javascriptGenerator.forBlock['draw_text'] = (b) => {
   const str = b.getFieldValue('STR');
   const [x, y, size] = ['X', 'Y', 'SIZE'].map(f => b.getFieldValue(f));
   const color = b.getFieldValue('COLOR');
-  return `draw.text(${JSON.stringify(str)}, ${x}, ${y}, ${size}, ${JSON.stringify(color)});\n`;
+  return `canvas.text(${JSON.stringify(str)}, ${x}, ${y}, ${size}, ${JSON.stringify(color)});\n`;
 };
 javascriptGenerator.forBlock['draw_text_rich'] = (b) => {
   const str    = b.getFieldValue('STR');
@@ -1846,11 +1917,11 @@ javascriptGenerator.forBlock['draw_text_rich'] = (b) => {
   const stroke = b.getFieldValue('STROKE') === 'TRUE';
   const shadow = b.getFieldValue('SHADOW') === 'TRUE';
   const opts   = { stroke, shadow };
-  return `draw.text(${JSON.stringify(str)}, ${x}, ${y}, ${size}, ${JSON.stringify(color)}, ${JSON.stringify(opts)});\n`;
+  return `canvas.text(${JSON.stringify(str)}, ${x}, ${y}, ${size}, ${JSON.stringify(color)}, ${JSON.stringify(opts)});\n`;
 };
 javascriptGenerator.forBlock['draw_alpha'] = (b) =>
-  `draw.alpha(${b.getFieldValue('ALPHA')});\n`;
-javascriptGenerator.forBlock['draw_reset'] = () => `draw.reset();\n`;
+  `canvas.alpha(${b.getFieldValue('ALPHA')});\n`;
+javascriptGenerator.forBlock['draw_reset'] = () => `canvas.reset();\n`;
 
 // Camera / video shader creators (value blocks)
 javascriptGenerator.forBlock['shader_camera_effect'] = (b, g) => {
@@ -1878,23 +1949,51 @@ javascriptGenerator.forBlock['shader_set_uniform'] = (b, g) => {
 javascriptGenerator.forBlock['canvas_fill_rect'] = (b) => {
   const [x, y, w, h] = ['X', 'Y', 'W', 'H'].map(f => b.getFieldValue(f));
   const color = b.getFieldValue('COLOR');
-  return `draw.rect(${x}, ${y}, ${w}, ${h}, ${JSON.stringify(color)});\n`;
+  return `canvas.rect(${x}, ${y}, ${w}, ${h}, ${JSON.stringify(color)});\n`;
 };
 javascriptGenerator.forBlock['canvas_fill_circle'] = (b) => {
   const [x, y, r] = ['X', 'Y', 'R'].map(f => b.getFieldValue(f));
   const color = b.getFieldValue('COLOR');
-  return `draw.circle(${x}, ${y}, ${r}, ${JSON.stringify(color)});\n`;
+  return `canvas.circle(${x}, ${y}, ${r}, ${JSON.stringify(color)});\n`;
+};
+
+// ── Windowed Canvas surface (ADR 038) ─────────────────────────────────────────
+javascriptGenerator.forBlock['canvas_new'] = (b) => {
+  const w = b.getFieldValue('W'), h = b.getFieldValue('H');
+  const title = JSON.stringify(b.getFieldValue('TITLE'));
+  return [`new Canvas({ w: ${w}, h: ${h}, title: ${title} })`, Order.FUNCTION_CALL];
+};
+javascriptGenerator.forBlock['canvas_surface_bg'] = (b, g) => {
+  const c = g.valueToCode(b, 'CANVAS', Order.MEMBER) || 'null';
+  return `(${c}).bg(${JSON.stringify(b.getFieldValue('COLOR'))});\n`;
+};
+javascriptGenerator.forBlock['canvas_surface_circle'] = (b, g) => {
+  const c = g.valueToCode(b, 'CANVAS', Order.MEMBER) || 'null';
+  const x = g.valueToCode(b, 'X', Order.NONE) || '0';
+  const y = g.valueToCode(b, 'Y', Order.NONE) || '0';
+  const r = b.getFieldValue('R');
+  return `(${c}).circle(${x}, ${y}, ${r}, ${JSON.stringify(b.getFieldValue('COLOR'))});\n`;
+};
+javascriptGenerator.forBlock['canvas_on'] = (b, g) => {
+  const c = g.valueToCode(b, 'CANVAS', Order.MEMBER) || 'null';
+  const ev = JSON.stringify(b.getFieldValue('EVENT'));
+  const body = g.statementToCode(b, 'DO');
+  return `(${c}).on(${ev}, () => {\n${body}});\n`;
+};
+javascriptGenerator.forBlock['canvas_pointer'] = (b, g) => {
+  const c = g.valueToCode(b, 'CANVAS', Order.MEMBER) || 'null';
+  return [`(${c}).pointer.${b.getFieldValue('AXIS')}`, Order.MEMBER];
 };
 javascriptGenerator.forBlock['canvas_clear'] = () =>
-  `draw.clear();\n`;
+  `canvas.clear();\n`;
 javascriptGenerator.forBlock['canvas_blur'] = (b) =>
-  `getLayer(${b.getFieldValue('Z')}).blur(${b.getFieldValue('AMT')});\n`;
+  `canvas.fx(${b.getFieldValue('Z')}).blur(${b.getFieldValue('AMT')});\n`;
 javascriptGenerator.forBlock['canvas_layer_opacity'] = (b) =>
-  `getLayer(${b.getFieldValue('Z')}).opacity(${b.getFieldValue('OPACITY')});\n`;
+  `canvas.fx(${b.getFieldValue('Z')}).opacity(${b.getFieldValue('OPACITY')});\n`;
 javascriptGenerator.forBlock['canvas_blend_mode'] = (b) =>
-  `getLayer(${b.getFieldValue('Z')}).blendMode('${b.getFieldValue('MODE')}');\n`;
+  `canvas.fx(${b.getFieldValue('Z')}).blendMode('${b.getFieldValue('MODE')}');\n`;
 javascriptGenerator.forBlock['draw_pixelate'] = (b) =>
-  `draw.pixelate(getCanvas(${b.getFieldValue('Z')}), ${b.getFieldValue('BLOCK')});\n`;
+  `canvas.pixelate(canvas.el, ${b.getFieldValue('BLOCK')});\n`;
 
 // Media
 javascriptGenerator.forBlock['media_video'] = (b) => {
@@ -2137,11 +2236,11 @@ javascriptGenerator.forBlock['audio_release'] = (b, g) => {
 // Draw — ring / rectStroke
 javascriptGenerator.forBlock['draw_ring'] = (b) => {
   const [x, y, r] = ['X', 'Y', 'R'].map(f => b.getFieldValue(f));
-  return `draw.ring(${x}, ${y}, ${r}, ${JSON.stringify(b.getFieldValue('COLOR'))}, ${b.getFieldValue('T')});\n`;
+  return `canvas.ring(${x}, ${y}, ${r}, ${JSON.stringify(b.getFieldValue('COLOR'))}, ${b.getFieldValue('T')});\n`;
 };
 javascriptGenerator.forBlock['draw_rect_stroke'] = (b) => {
   const [x, y, w, h] = ['X', 'Y', 'W', 'H'].map(f => b.getFieldValue(f));
-  return `draw.rectStroke(${x}, ${y}, ${w}, ${h}, ${JSON.stringify(b.getFieldValue('COLOR'))}, ${b.getFieldValue('T')});\n`;
+  return `canvas.rectStroke(${x}, ${y}, ${w}, ${h}, ${JSON.stringify(b.getFieldValue('COLOR'))}, ${b.getFieldValue('T')});\n`;
 };
 
 // Control — key with down + up
@@ -2671,7 +2770,7 @@ javascriptGenerator.forBlock['draw_backdrop'] = (b) => {
   // If src looks like a URL or 'camera', emit as a string literal; otherwise treat as variable
   const isLiteral = /^https?:\/\/|^data:|^blob:|^camera$/.test(src.trim());
   const srcExpr   = isLiteral ? JSON.stringify(src) : src;
-  return `draw.backdrop(${srcExpr}, { fit: '${fit}' });\n`;
+  return `canvas.backdrop(${srcExpr}, { fit: '${fit}' });\n`;
 };
 
 // Paint Canvas
@@ -2998,6 +3097,22 @@ export const TOOLBOX = {
       ],
     },
     {
+      kind: 'category', name: 'Canvas (window)', colour: 200,
+      contents: [
+        { kind: 'block', type: 'canvas_new' },
+        { kind: 'block', type: 'canvas_surface_bg' },
+        {
+          kind: 'block', type: 'canvas_surface_circle',
+          inputs: {
+            X: { shadow: { type: 'math_number', fields: { NUM: 400 } } },
+            Y: { shadow: { type: 'math_number', fields: { NUM: 300 } } },
+          },
+        },
+        { kind: 'block', type: 'canvas_on' },
+        { kind: 'block', type: 'canvas_pointer' },
+      ],
+    },
+    {
       kind: 'category', name: 'Media', colour: 45,
       contents: [
         { kind: 'block', type: 'media_video' },
@@ -3183,7 +3298,13 @@ export function initBlockly(container) {
 }
 
 export function getWorkspaceCode(workspace) {
-  return javascriptGenerator.workspaceToCode(workspace);
+  const code = javascriptGenerator.workspaceToCode(workspace);
+  // ADR 040: the "quick draw" blocks emit against an implicit default `canvas`
+  // (global `draw` is gone). Declare it once when used and not already created.
+  if (/(^|[^.\w])canvas\./.test(code) && !/\bnew Canvas\b/.test(code)) {
+    return `const canvas = new Canvas();\n${code}`;
+  }
+  return code;
 }
 
 export function resizeBlockly(workspace) {

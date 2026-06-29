@@ -15,16 +15,12 @@ export function cleanupShaders() {
   _shaderRegistry.clear();
 }
 
-// Track mouse in canvas-space for shader uniforms (module-level, persists across runs)
+// Track the raw viewport pointer (module-level, persists across runs). Each shader
+// maps it against ITS OWN canvas rect when writing uniforms (ADR 040 — there is no
+// shared editor wrapper anymore, so mouse is per-shader-window). See
+// ShaderLayerBase._mouseXY().
 document.addEventListener("mousemove", (e) => {
-  const w = window.__ar_canvasWrapper ?? document.getElementById("canvasWrapper");
-  if (!w) return;
-  const r = w.getBoundingClientRect();
-  const ref = w.querySelector("canvas");
-  window.__ar_shaderMouse = {
-    x: ((e.clientX - r.left) / r.width) * (ref?.width ?? 1600),
-    y: ((e.clientY - r.top) / r.height) * (ref?.height ?? 900),
-  };
+  window.__ar_shaderMouseRaw = { clientX: e.clientX, clientY: e.clientY };
 });
 
 // ── Named preset bodies ──────────────────────────────────────────────────────
@@ -313,7 +309,7 @@ export class Shader extends ShaderLayerBase {
     this._packAudioCustom(); // auto-fill _custom[0..3] from bound signal/analyser (base)
 
     const c = this._canvas;
-    const mo = window.__ar_shaderMouse ?? { x: 0, y: 0 };
+    const mo = this._mouseXY();
     const data = new Float32Array(12);
     data[0] = c.width;
     data[1] = c.height;
@@ -397,6 +393,7 @@ export class Shader extends ShaderLayerBase {
   _destroy() {
     this.stop();
     this._releaseLive();
+    this._closeOwnWin();
     this._resizeObserver?.disconnect();
     this._resizeObserver = null;
     this._readable?.remove();
@@ -441,10 +438,10 @@ export class ShaderFX {
   }
 
   static windowShader(name = 'editor', effect = 'greyscale') {
+    // ADR 040: the global canvas is gone — 'canvas' source no longer resolves.
+    // To shade a Canvas, use `new Shader(body).mount(myCanvas)` instead.
     const SELECTORS = { editor: '.CodeMirror', console: '#console' };
-    let src;
-    if (name === 'canvas') src = window.getCanvas(0);
-    else src = window.captureWindow?.(SELECTORS[name] ?? SELECTORS.editor);
+    const src = window.captureWindow?.(SELECTORS[name] ?? SELECTORS.editor);
     return new Shader(CAMERA_PRESETS[effect] ?? CAMERA_PRESETS.greyscale, { video: src });
   }
 

@@ -2,6 +2,8 @@
 
 A live coding environment for creating audiovisual experiences in the browser — shaders, synthesizers, video, and computer vision, all from a single JavaScript editor.
 
+> **New here?** Read [`LEARN.md`](LEARN.md) first — the one mental model (source → transform → sink) the whole environment is built on. Plain language, no jargon.
+
 ## Project Principles
 
 This application is not the best of anything. We provide creative tools for people to play, create, and experiment, but at the end of the day, there are much more professional and powerful versions of each of the tools in here, and that's okay. We would highly encourage people to have their tools evolve with their processes.
@@ -17,7 +19,7 @@ This application is not the best of anything. We provide creative tools for peop
 - **GPU shaders** — full-screen WebGPU/WGSL fragment shaders (`Shader`) or WebGL/GLSL (`GLShader`, all browsers, ShaderToy paste-in) with `time`, `uv`, `mouse`, and custom uniforms
 - **3D scenes** — Three.js via `ThreeScene` + full `THREE` namespace; tick loop, z-layering, signal binding, opacity — composable with shaders and draw
 - **PIXI.js** — WebGL scene graph for sprites, particles, rich text, per-object filters, and hit-testing; layers cleanly with shaders and draw
-- **2D canvas** — draw on z-indexed layers with CSS filter effects; rich text with stroke, shadow, gradient, and web fonts (`draw.loadFont`); `draw.backdrop(source)` renders an image/video/camera/canvas on the layer below so all draw calls appear on top — accepts a URL, `'camera'`, any drawable element, or shader; returns `{ stop(), layer }`
+- **2D canvas** — draw on z-indexed layers with CSS filter effects; rich text with stroke, shadow, gradient, and web fonts (`canvas.loadFont`); `canvas.backdrop(source)` renders an image/video/camera/canvas on the layer below so all draw calls appear on top — accepts a URL, `'camera'`, any drawable element, or shader; returns `{ stop(), layer }`
 - **Cross-domain signal chain** — `route(source)` wires any input to any output as explicit data: `route(Source.mic).amplitude.scale(0,1,200,800).to(osc.frequency)` (sub-ms push path), `route('midi:cc').norm(0,127).to(shader,'uCustom.x')`, `route(Source.camera).tint('#4a0').wait(3).negative().loop().show()` (Berlin Horse optical printing). Bridges: `.amplitude`, `.brightness()`, `.motion()`, `.fft()`. Live mutation: `toggle/remove/clear`. Fan-in: `.mix()`. `signalGraph.show()` auto-populates.
 - **Render pipeline** — chain visual stages with `pipe(source).ascii().glshader().fx('hue-rotate(90deg)').subtitle(srt).show()`; sources: camera, canvas, video, shader; stages compose freely. New effects: `tint`, `negative`, `solarize`, `posterize`, `duotone`, `grain`, `strobe`.
 
@@ -120,6 +122,10 @@ const mesh = new THREE.Mesh(
 scene.add(mesh);
 scene.tick(({ time }) => { mesh.rotation.y = time; });
 
+// 2D drawing surface — owns a window; PIXI/draw composite into it (ADR 040)
+const canvas = new Canvas();
+pixi.mount(canvas);   // mount the PIXI view as the z=25 plane of canvas's window
+
 // PIXI — scene graph, sprites, particles, filters (WebGL, z=25)
 const g = new PIXI.Graphics();
 g.beginFill(0x4488ff);
@@ -133,24 +139,24 @@ pixi.tick(() => { g.rotation += 0.01; }); // cleaned up on Stop
 const sprite = PIXI.Sprite.from('https://example.com/hero.png');
 sprite.anchor.set(0.5);
 sprite.interactive = true;
-sprite.on('pointerdown', () => draw.bg(Color.random()));
+sprite.on('pointerdown', () => canvas.bg(Color.random()));
 Stage.addChild(sprite);
 
 // 2D draw (layer 0)
-draw.bg('#000').circle(400, 300, 50, 'red');
-draw.text('HELLO', 400, 300, 72, '#fff', {
+canvas.bg('#000').circle(400, 300, 50, 'red');
+canvas.text('HELLO', 400, 300, 72, '#fff', {
   stroke: true, strokeColor: '#f0f', strokeWidth: 3,
   shadow: true, shadowBlur: 20, shadowColor: '#f0f',
   gradient: ['#f0f', '#0ff'],
 });
-await draw.loadFont('Orbitron', 'https://fonts.gstatic.com/...');
-draw.text('SPACE', 400, 400, 48, '#0ff', { font: 'Orbitron' });
+await canvas.loadFont('Orbitron', 'https://fonts.gstatic.com/...');
+canvas.text('SPACE', 400, 400, 48, '#0ff', { font: 'Orbitron' });
 
 // Raw canvas layers
-const ctx = getCanvas(0).getContext('2d');
+const ctx = canvas.el.getContext('2d');
 ctx.fillStyle = 'red';
 ctx.fillRect(0, 0, 100, 100);
-getLayer(0).blur(5);
+canvas.fx(0).blur(5);
 
 // Render pipeline — chain visual stages
 const cam = await Camera.open();
@@ -177,7 +183,7 @@ audio.start();
 note("c e g b").fast(2).every(4, p => p.rev()).play();
 
 // Mic level trigger (enable mic in toolbar first)
-audio.onLevel(0.7, () => draw.bg('red'), () => draw.bg('black'));
+audio.onLevel(0.7, () => canvas.bg('red'), () => canvas.bg('black'));
 setInterval(() => console.log(audio.level.toFixed(3)), 100); // live 0–1 RMS
 
 // Audio visualization — fft signals usable as control values
@@ -190,8 +196,8 @@ midi.onCC(1, 74, v => shader.set(v)); // CC 74 → shader uniform
 const cutoff = midi.signal(1, 74);    // live 0–1 signal
 
 // Voice recognition (Chrome/Edge — Web Speech API)
-audio.onWord('red', () => draw.bg('red'));
-audio.onSpeech((text) => draw.text(text, 50, 50));
+audio.onWord('red', () => canvas.bg('red'));
+audio.onSpeech((text) => canvas.text(text, 50, 50));
 
 // Text to speech
 audio.say('hello world');
@@ -213,7 +219,7 @@ cam0.flip(true); // mirror horizontally
 
 // Computer vision — MediaPipe gestures, expressions, object detection
 vision.onGesture('Thumb_Up', () => { /* ... */ });
-vision.onExpression('smile', () => draw.bg('yellow'));
+vision.onExpression('smile', () => canvas.bg('yellow'));
 const face = vision.face(); // { expression, cx, cy, landmarks }
 ```
 
@@ -227,7 +233,7 @@ const keys  = hold('window:key:down');   // live Set of held keys
 const mouse = hold('window:mouse:move'); // live { x, y }
 
 tick(16).do(() => {
-  draw.circle(mouse.x, mouse.y, 10, 'white');
+  canvas.circle(mouse.x, mouse.y, 10, 'white');
   if (keys.has('ArrowLeft')) x -= 5;
 });
 
@@ -238,26 +244,26 @@ on('sensor:gamepad').do(({ axes, pressed }) => {
 });
 
 on('sensor:motion').do(({ magnitude, gamma, beta }) => console.log(magnitude));
-on('sensor:shake').when(d => d.magnitude > 20).do(() => draw.clear());
+on('sensor:shake').when(d => d.magnitude > 20).do(() => canvas.clear());
 
-on('sensor:geo').do(g => draw.text(`${g.lat?.toFixed(4)}, ${g.lon?.toFixed(4)}`, 50, 50));
+on('sensor:geo').do(g => canvas.text(`${g.lat?.toFixed(4)}, ${g.lon?.toFixed(4)}`, 50, 50));
 
 on('sensor:battery').do(({ level, charging }) => console.log(level, charging));
 
 // Video signals — sample canvas/camera region as live numeric signals
 const sig = video.signal('camera', { x: 0.5, y: 0.5, radius: 0.1 });
 sig.stream(s => console.log(s.brightness, s.motion, s.hue));
-video.onMotion('camera', 0.3, () => draw.bg('red'), () => draw.bg('black'));
+video.onMotion('camera', 0.3, () => canvas.bg('red'), () => canvas.bg('black'));
 
-const sig2 = video.signal(getCanvas(0), { x: 0.2, y: 0.8 });
+const sig2 = video.signal(canvas.el, { x: 0.2, y: 0.8 });
 sig2.stream(s => { /* s.brightness live every frame */ });
 
 // External data signals
 const wx = external.weather(37.77, -122.41);
-wx.stream(w => draw.text(`${w.temp}°C`, 50, 50));
+wx.stream(w => canvas.text(`${w.temp}°C`, 50, 50));
 
 const price = external.signal('https://api.example.com/btc', '.price');
-price.stream(v => draw.text(`$${v}`, 50, 100));
+price.stream(v => canvas.text(`$${v}`, 50, 100));
 ```
 
 ### Media

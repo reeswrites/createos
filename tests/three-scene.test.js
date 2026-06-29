@@ -67,9 +67,9 @@ describe('ThreeScene', () => {
     expect(s.canvas.style.zIndex).toBe('30');
   });
 
-  it('start() appends canvas to wrapper and registers keepAlive', () => {
+  it('mount(el) appends canvas to the target and registers keepAlive (ADR 040)', () => {
     const s = new ThreeScene();
-    s.start();
+    s.mount(wrapper);
     expect(wrapper.contains(s.canvas)).toBe(true);
     expect(keepAlive.has(s)).toBe(true);
     s.stop();
@@ -178,7 +178,7 @@ describe('ThreeScene', () => {
 
   it('cleanupThree() removes canvases from DOM', () => {
     const s = new ThreeScene();
-    s.start();
+    s.mount(wrapper);
     expect(wrapper.contains(s.canvas)).toBe(true);
     cleanupThree();
     expect(wrapper.contains(s.canvas)).toBe(false);

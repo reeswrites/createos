@@ -39,6 +39,12 @@ export function getLiveRoutes() { return _routes; }
 // ── SKIP sentinel — filter/debounce swallow values without writing ─────────────
 const SKIP = Symbol('route:skip');
 
+// ── STT tap events (ADR 039) ───────────────────────────────────────────────────
+// Tapping one of these auto-starts a shared Speech-to-Text engine on the route's
+// audio (camera/canvas have no audio → mic fallback). These taps are allowed on
+// non-frame sources too (e.g. mic-only routes), unlike ordinary frame taps.
+const STT_EVENTS = new Set(['audio:word:interim', 'audio:word:final', 'audio:transcript']);
+
 // ── Transform registry ────────────────────────────────────────────────────────
 // Each factory returns { name, args, stateful, step }.
 // stateful:true → forces whole-route RAF (single evaluation cadence).
@@ -383,8 +389,20 @@ class Route {
   // ── Frame-route display ───────────────────────────────────────────────────
 
   tap(event, fn) {
-    this._assertFrame('tap');
+    const isStt = STT_EVENTS.has(event);
+    // Ordinary (non-STT) taps remain frame-only. STT taps are allowed on any source
+    // (e.g. a mic-only route with no window). Subscribing to an audio:word:* / transcript
+    // event auto-starts the shared STT engine via audio.js's registerSource — Web Speech
+    // or the in-browser ML model per audio.speechEngine. Camera/canvas carry no audio, so
+    // that engine taps the mic (ADR 039). Nothing to acquire here — just subscribe.
+    if (!isStt) this._assertFrame('tap');
     this._taps.push({ event, fn });
+
+    // Non-frame STT routes have no .show() — subscribe now (winId null) to trigger start.
+    if (isStt && this._src.kind !== 'frame') {
+      const unsub = subscribe(event, payload => fn(payload, null));
+      this._subs.push(unsub);
+    }
     return this;
   }
 

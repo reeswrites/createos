@@ -40,5 +40,12 @@
     "desc": "Eye-tracking brush — calibrate gaze, then paint by looking; wink to burst, blink to flash",
     "file": "gaze-garden.vljson",
     "tags": ["vision", "gaze", "camera", "draw"]
+  },
+  {
+    "id": "billiards-pool",
+    "title": "Billiards",
+    "desc": "Fling the cue ball to break the rack — window-scoped Canvas with pre-mapped pointer, elastic ball + rail collisions, impact-scaled sounds",
+    "file": "billiards-pool.vljson",
+    "tags": ["canvas", "physics", "audio", "interactive"]
   }
 ]

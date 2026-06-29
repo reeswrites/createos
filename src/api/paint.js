@@ -1162,14 +1162,15 @@ export class Paint {
     // Composite backdrop + current frame for the exported code snippet
     const composed = this._compositeFrame(this._frames[this._fi]);
     const dataUrl  = composed.toDataURL('image/png');
+    // ADR 040: export against a `new Canvas()` (global draw is gone).
     let code;
     if (this._backdropEl) {
       const bdUrl  = this._backdropSnapshot();
       code = bdUrl
-        ? `draw.backdrop('${bdUrl}');\ndraw.image('${this._frames[this._fi].toDataURL('image/png')}', 0, 0);`
-        : `draw.image('${dataUrl}', 0, 0);`;
+        ? `const canvas = new Canvas();\ncanvas.backdrop('${bdUrl}');\ncanvas.image('${this._frames[this._fi].toDataURL('image/png')}', 0, 0);`
+        : `const canvas = new Canvas();\ncanvas.image('${dataUrl}', 0, 0);`;
     } else {
-      code = `draw.image('${dataUrl}', 0, 0);`;
+      code = `const canvas = new Canvas();\ncanvas.image('${dataUrl}', 0, 0);`;
     }
     insertSnippet(code);
   }

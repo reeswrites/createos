@@ -4,7 +4,7 @@ import { acquireStrip, renameStrip } from "./mixer.js";
 import { Drumpad } from "./drumpad.js";
 import { Piano } from "./piano.js";
 import { onReset } from '../runtime/reset-registry.js';
-import { notify, registerCommand, registerSource } from '../events/index.js';
+import { notify, registerCommand, registerSource, addBusTap } from '../events/index.js';
 import { acquireMicRunScoped } from './media-lease.js';
 import { readAnalyser } from './analyser-read.js';
 import { liveOutput } from '../runtime/keep-alive.js';
@@ -21,7 +21,14 @@ let _recognition = null;
 const _wordHandlers = new Map();
 const _speechHandlers = [];
 const _wordStreamHandlers = [];
-let _utteranceId = 0;
+let _speechWordIndex = 0;          // global running word position (ADR 039 payload index)
+
+// Speech engine selection (ADR 039): 'auto' = Web Speech if present, else ML;
+// 'ml' = force the in-browser ML model (works on Brave/Firefox + Chrome opt-in);
+// 'webspeech' = browser API only (no ML fallback).
+let _speechEngine = 'auto';
+let _mlSpeechHandle = null;        // run-scoped STT-engine handle when on the ML path
+let _wordDispatchReady = false;    // one-time bus-tap fan-out to onWord/onSpeech handlers
 
 // ── Beat ticker ───────────────────────────────────────────────────────────────
 // Fires beat:tick / beat:bar / beat:phrase whenever the Tone.js transport runs.
@@ -67,6 +74,62 @@ function _makeAnalyser(source, bins) {
   return a;
 }
 
+// One-time bus fan-out: drive onWord / onSpeech / onWordStream handlers from the
+// canonical bus events, so BOTH the Web Speech path and the ML engine feed them.
+// A bus TAP (not a subscription) so it never trips registerSource's subscriber count
+// (which would start the engine with no real listener). ADR 039.
+function _ensureWordDispatch() {
+  if (_wordDispatchReady) return;
+  _wordDispatchReady = true;
+  addBusTap((event, p) => {
+    if (event === 'audio:word:final') {
+      _wordStreamHandlers.forEach(fn => fn(p));
+      const handlers = _wordHandlers.get(p.word);
+      if (handlers) { notify('audio:word', { word: p.word }); handlers.forEach(fn => fn()); }
+    } else if (event === 'audio:word:interim') {
+      _wordStreamHandlers.forEach(fn => fn(p));
+    } else if (event === 'audio:transcript' && p.isFinal) {
+      notify('audio:speech', { text: p.text });
+      _speechHandlers.forEach(fn => fn(p.text));
+    }
+  });
+}
+
+// Choose and start the speech source. Web Speech when present (unless forced ML);
+// the in-browser ML engine on Brave/Firefox or when the user opts in (ADR 039).
+function _startSpeechSource() {
+  _ensureWordDispatch();
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const useML = _speechEngine === 'ml' || (!SR && _speechEngine !== 'webspeech');
+  if (useML) { _ensureMlSpeech(); return; }
+  if (!SR) { console.warn('Web Speech API not supported; set audio.speechEngine = "ml" for the ML model.'); return; }
+  _ensureRecognition();
+}
+
+function _stopSpeechSource() {
+  if (_recognition) {
+    _recognition.onend = null;
+    try { _recognition.stop(); } catch (_) {}
+    _recognition = null;
+  }
+  if (_mlSpeechHandle) { try { _mlSpeechHandle.dispose?.(); } catch (_) {} _mlSpeechHandle = null; }
+  _speechWordIndex = 0;
+}
+
+// Start the shared ML STT engine on the mic. Dynamic import keeps transformers out
+// of the main bundle until transcription is used. The engine emits the same bus
+// events Web Speech does, so _ensureWordDispatch fans them to handlers unchanged.
+function _ensureMlSpeech() {
+  if (_mlSpeechHandle) return;
+  _mlSpeechHandle = {}; // placeholder so concurrent calls don't double-start
+  import('../stt/stt-engine.js')
+    .then(({ acquireStt }) => {
+      if (_mlSpeechHandle == null) return; // stopped before load resolved
+      _mlSpeechHandle = acquireStt('mic', { backend: 'ctc' });
+    })
+    .catch(e => { _mlSpeechHandle = null; console.warn('[audio] ML speech start failed:', e?.message ?? e); });
+}
+
 function _ensureRecognition() {
   if (_recognition) return _recognition;
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -80,24 +143,12 @@ function _ensureRecognition() {
     const text = res[0].transcript.trim().toLowerCase();
     const words = text.split(/\s+/).filter(Boolean);
 
-    if (isFinal) {
-      // existing final-utterance behaviour
-      notify('audio:speech', { text });
-      _speechHandlers.forEach(fn => fn(text));
-      words.forEach(word => {
-        const handlers = _wordHandlers.get(word);
-        if (handlers) { notify('audio:word', { word }); handlers.forEach(fn => fn()); }
-      });
-    }
-
-    // word stream — fires for both interim and final
+    // Canonical payload { word, final, index } — index is the global running-transcript
+    // position (ADR 039). Handler fan-out happens centrally in _ensureWordDispatch.
     const eventName = isFinal ? 'audio:word:final' : 'audio:word:interim';
-    const uid = isFinal ? ++_utteranceId : _utteranceId;
-    words.forEach((word, wordIndex) => {
-      const payload = { word, utteranceId: uid, wordIndex, final: isFinal };
-      notify(eventName, payload);
-      _wordStreamHandlers.forEach(fn => fn(payload));
-    });
+    words.forEach((word, i) => notify(eventName, { word, final: isFinal, index: _speechWordIndex + i }));
+    notify('audio:transcript', { text, isFinal });
+    if (isFinal) _speechWordIndex += words.length;
   };
   r.onerror = (e) => { if (e.error !== 'no-speech') console.warn('Speech recognition error:', e.error); };
   r.onend = () => { if (_recognition === r) { try { r.start(); } catch (_) {} } };
@@ -135,11 +186,7 @@ export function cleanupAudio() {
   _masterFftSignal = null;
   _micLeased = false; // allow re-acquire on next run
   _noteHooks.length = 0;
-  if (_recognition) {
-    _recognition.onend = null;
-    try { _recognition.stop(); } catch (_) {}
-    _recognition = null;
-  }
+  _stopSpeechSource();
   _wordHandlers.clear();
   _speechHandlers.length = 0;
   _wordStreamHandlers.length = 0;
@@ -640,26 +687,36 @@ class AudioAPI {
   }
 
   // ── Speech ───────────────────────────────────────────────────────────────
-  // Fires fn when the spoken word matches. Uses Web Speech API (Chrome/Edge only).
+  // Engine selection: 'auto' (Web Speech if present, else ML) | 'ml' (force the
+  // in-browser model — works on Brave/Firefox, Chrome opt-in) | 'webspeech'. ADR 039.
+  get speechEngine() { return _speechEngine; }
+  set speechEngine(mode) {
+    if (mode !== _speechEngine) { _speechEngine = mode; _stopSpeechSource(); } // re-pick on next subscribe
+  }
+
+  // Fires fn when the spoken word matches. Auto-uses Web Speech or the ML engine.
   onWord(word, fn) {
     const key = word.toLowerCase();
     if (!_wordHandlers.has(key)) _wordHandlers.set(key, []);
     _wordHandlers.get(key).push(fn);
-    _ensureRecognition();
+    _ensureWordDispatch();
+    _startSpeechSource();
     return this;
   }
 
   // Fires fn with full transcript string on every recognized utterance.
   onSpeech(fn) {
     _speechHandlers.push(fn);
-    _ensureRecognition();
+    _ensureWordDispatch();
+    _startSpeechSource();
     return this;
   }
 
-  // Fires fn({ word, utteranceId, wordIndex, final }) for every interim and final word.
+  // Fires fn({ word, final, index }) for every interim and final word (ADR 039).
   onWordStream(fn) {
     _wordStreamHandlers.push(fn);
-    _ensureRecognition();
+    _ensureWordDispatch();
+    _startSpeechSource();
     return this;
   }
 
@@ -824,16 +881,11 @@ export const audio = new AudioAPI();
 // Register teardown with the reset registry (ADR 008).
 onReset(cleanupAudio);
 
-// Lazy speech recognition source — starts when anything subscribes to audio:word:* or audio:speech.
-registerSource(e => e.startsWith('audio:word') || e === 'audio:speech', {
-  start: () => { _ensureRecognition(); },
-  stop:  () => {
-    if (_recognition) {
-      _recognition.onend = null;
-      try { _recognition.stop(); } catch (_) {}
-      _recognition = null;
-    }
-  },
+// Lazy speech source — starts when anything subscribes to audio:word:* / audio:speech /
+// audio:transcript. Picks Web Speech or the ML engine per audio.speechEngine (ADR 039).
+registerSource(e => e.startsWith('audio:word') || e === 'audio:speech' || e === 'audio:transcript', {
+  start: _startSpeechSource,
+  stop:  _stopSpeechSource,
 });
 
 // ── Event bus command handlers ─────────────────────────────────────────────

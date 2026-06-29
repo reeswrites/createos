@@ -15,8 +15,8 @@ export const SIGNAL_SOURCES = [
   { label: 'audio.fft high',   code: 'audio.fft.high',       category: 'Audio' },
   { label: 'audio.fft value',  code: 'audio.fft.value',      category: 'Audio' },
   // Mouse — hold('window:mouse:move') for live position
-  { label: 'mouse.x',               code: 'hold(\'window:mouse:move\').x / draw.width',  category: 'Mouse' },
-  { label: 'mouse.y',               code: 'hold(\'window:mouse:move\').y / draw.height', category: 'Mouse' },
+  { label: 'mouse.x',               code: 'hold(\'window:mouse:move\').x / window.innerWidth',  category: 'Mouse' },
+  { label: 'mouse.y',               code: 'hold(\'window:mouse:move\').y / window.innerHeight', category: 'Mouse' },
   // Motion — hold('sensor:motion') for live device orientation
   { label: 'motion.magnitude',      code: 'hold(\'sensor:motion\').magnitude',           category: 'Motion' },
   { label: 'motion.az',             code: 'hold(\'sensor:motion\').az',                  category: 'Motion' },

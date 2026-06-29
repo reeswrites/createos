@@ -20,10 +20,10 @@ import * as esprima from 'esprima';
 // Update when a new window global is added or renamed.
 const KNOWN_GLOBALS = new Set([
   // Core API objects
-  'audio', 'draw', 'wm', 'midi', 'external', 'shell', 'desktop',
+  'audio', 'wm', 'midi', 'external', 'shell', 'desktop',
   'video', 'vision', 'pipe', 'route', 'timeline', 'ascii', 'monitor', 'signalGraph', 'library',
   // Constructors / classes
-  'Shader', 'GLShader', 'ShaderFX', 'GLSL_PRESETS',
+  'Shader', 'GLShader', 'ShaderFX', 'GLSL_PRESETS', 'Canvas',
   'Camera', 'Media', 'Source',
   'ThreeScene', 'THREE',
   'Sprite', 'SpriteEditor', 'spriteEditor',
@@ -43,8 +43,7 @@ const KNOWN_GLOBALS = new Set([
   'rand', 'rand2', 'perlin', 'irand', 'choose', 'wchoose', 'chooseCycles', 'randcat',
   'sine', 'cosine', 'saw', 'isaw', 'square', 'tri', 'signal', 'steady',
   'pure', 'reify', 'mini', 'samples', 'setcps', 'setcpm', 'hush',
-  // Layer/canvas helpers (registered in editor preamble)
-  'getCanvas', 'getLayer', 'getDraw',
+  // (ADR 040: global draw/getCanvas/getLayer/getDraw deleted — use new Canvas())
   // Other registered names
   'editImage', 'captureWindow', 'statusBar', 'registerAPI',
   'vec2', 'vec3', 'vec4',
@@ -78,6 +77,9 @@ const ALLOWED_SNIPPET_LOCALS = new Set([
   'p', 'c', 'm', 'g', 'b', 'f', 'e', 'd', 'l', 'a', 'u',
   // Params in callback bodies
   'pts', 'col', 'val', 'idx',
+  // ADR 040: the conventional example drawing surface (snippets use `canvas.*`
+  // against an implicit `const canvas = new Canvas()` the learner adds).
+  'canvas',
 ]);
 
 function extractLocalNames(ast) {
@@ -209,7 +211,7 @@ describe('completion snippet coherence — registry ↔ KNOWN_GLOBALS gate', () 
     const src = readFileSync(resolve(process.cwd(), 'src/runtime/app.js'), 'utf8');
     const registered = new Set([...src.matchAll(/_registerBuiltin\(\s*'([^']+)'/g)].map((m) => m[1]));
     // Preamble globals set directly on window (not via _registerBuiltin)
-    const PREAMBLE_GLOBALS = new Set(['getCanvas', 'getLayer', 'getDraw', 'draw']);
+    const PREAMBLE_GLOBALS = new Set();   // ADR 040: draw/getCanvas/getLayer/getDraw removed from preamble
     const stale = [...KNOWN_GLOBALS].filter((n) => !registered.has(n) && !PREAMBLE_GLOBALS.has(n));
     expect(
       stale,

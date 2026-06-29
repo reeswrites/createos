@@ -227,7 +227,7 @@ export class GLShader extends ShaderLayerBase {
 
     const gl = this._gl;
     const c  = this._canvas;
-    const mo = window.__ar_shaderMouse ?? { x: 0, y: 0 };
+    const mo = this._mouseXY();
     if (this._uResolution) gl.uniform2f(this._uResolution, c.width, c.height);
     if (this._uMouse)      gl.uniform2f(this._uMouse, mo.x / c.width, mo.y / c.height);
     if (this._uTime)       gl.uniform1f(this._uTime, time);
@@ -294,6 +294,7 @@ export class GLShader extends ShaderLayerBase {
   _destroy() {
     this.stop();
     this._releaseLive();
+    this._closeOwnWin();
     this._resizeObserver?.disconnect();
     this._resizeObserver = null;
     if (this._gl) {

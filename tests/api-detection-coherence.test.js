@@ -39,12 +39,16 @@ const META_RESULT_KEYS = ['shaderStartCalled', 'shaderConstructedOnly', 'parseEr
 // be read by execute() in editor-instance.js; the rest are detected-but-not-yet-
 // wired (informational / reserved) and explicitly listed here on purpose.
 const CONSUMED = [
-  'usesAudio', 'usesDraw', 'usesGetCanvas', 'usesGLShader', 'usesLayer',
-  'usesPixi', 'usesShader', 'usesShaderFX', 'usesThree',
+  'usesAudio',
 ];
+// ADR 040: the auto-opened output window is gone — visual APIs spawn their own
+// windows (new Canvas() / .show()), so execute() no longer reads these flags.
+// They remain detected for toolkit/other uses but are no longer consumed here.
 const DETECTED_UNCONSUMED = [
   'usesSensors', 'usesCamera', 'usesVideo', 'usesVision', 'usesDesktop', 'usesMedia',
-  'usesRoute',  // route() spawns its own wm windows; no separate canvas window needed
+  'usesRoute',   // route() spawns its own wm windows; no separate canvas window needed
+  'usesDraw', 'usesGetCanvas', 'usesGLShader', 'usesLayer',
+  'usesPixi', 'usesShader', 'usesShaderFX', 'usesThree',
 ];
 
 const patternKeys = Object.keys(API_PATTERNS).sort();

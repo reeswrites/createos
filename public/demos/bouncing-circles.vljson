@@ -20,19 +20,10 @@
         "muted": false,
         "volume": 1
       },
-      "code": "// Bouncing Circles \u2014 colorful physics balls using the draw API\nconst W = 640, H = 400;\n\nconst balls = Array.from({ length: 14 }, (_, i) => ({\n  x: 60 + Math.random() * (W - 120),\n  y: 60 + Math.random() * (H - 120),\n  vx: (Math.random() - 0.5) * 5,\n  vy: (Math.random() - 0.5) * 5,\n  r: 14 + Math.random() * 22,\n  hue: (i / 14) * 360,\n}));\n\nsetInterval(() => {\n  draw.bg('#0a0a1a');\n  for (const b of balls) {\n    b.x += b.vx;  b.y += b.vy;\n    if (b.x - b.r < 0 || b.x + b.r > W) b.vx *= -1;\n    if (b.y - b.r < 0 || b.y + b.r > H) b.vy *= -1;\n    b.x = Math.max(b.r, Math.min(W - b.r, b.x));\n    b.y = Math.max(b.r, Math.min(H - b.r, b.y));\n    draw.circle(b.x, b.y, b.r, `hsl(${b.hue | 0},80%,60%)`);\n    b.hue = (b.hue + 0.4) % 360;\n  }\n}, 16);\n",
+      "code": "// Bouncing Circles \u2014 colorful physics balls using the Canvas API\nconst W = 640, H = 400;\nconst c = new Canvas({ w: W, h: H, title: 'Bouncing Circles' });\n\nconst balls = Array.from({ length: 14 }, (_, i) => ({\n  x: 60 + Math.random() * (W - 120),\n  y: 60 + Math.random() * (H - 120),\n  vx: (Math.random() - 0.5) * 5,\n  vy: (Math.random() - 0.5) * 5,\n  r: 14 + Math.random() * 22,\n  hue: (i / 14) * 360,\n}));\n\nsetInterval(() => {\n  c.bg('#0a0a1a');\n  for (const b of balls) {\n    b.x += b.vx;  b.y += b.vy;\n    if (b.x - b.r < 0 || b.x + b.r > W) b.vx *= -1;\n    if (b.y - b.r < 0 || b.y + b.r > H) b.vy *= -1;\n    b.x = Math.max(b.r, Math.min(W - b.r, b.x));\n    b.y = Math.max(b.r, Math.min(H - b.r, b.y));\n    c.circle(b.x, b.y, b.r, `hsl(${b.hue | 0},80%,60%)`);\n    b.hue = (b.hue + 0.4) % 360;\n  }\n}, 16);\n",
       "mode": "text",
       "blocksJson": null,
       "executionState": "running"
-    },
-    {
-      "type": "output",
-      "editorId": 1,
-      "x": 590,
-      "y": 20,
-      "w": 640,
-      "h": 400,
-      "visible": false
     }
   ],
   "desktop": []

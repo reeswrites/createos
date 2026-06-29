@@ -4,54 +4,53 @@
 
 ---
 
-## Draw — `draw`
+## Draw — the `Canvas` 2D API
 
-Fluent 2D canvas API on z=0. All methods chainable.
+> **ADR 040**: the global `draw` / `getCanvas` / `getLayer` / `getDraw` are **deleted**. 2D drawing is done on a `new Canvas()` instance (see [Canvas](#canvas--new-canvasopts) below). Every method below is on a Canvas `c`. Methods are chainable.
 
 ```js
-draw.bg(color)                              // fill canvas
-draw.clear()                               // clear to transparent
-draw.rect(x, y, w, h, color)
-draw.circle(x, y, r, color)
-draw.arc(x, y, r, startRad, endRad, color)
-draw.poly([[x,y],...], color)              // filled polygon
-draw.rectStroke(x, y, w, h, color, thickness)
-draw.ring(x, y, r, color, thickness)
-draw.line(x1, y1, x2, y2, color, thickness)
-draw.text(str, x, y, size, color, {font, align, baseline, weight, style,
+const c = new Canvas();                     // the 2D surface (owns its window)
+c.bg(color)                                 // fill canvas
+c.clear()                                   // clear to transparent
+c.rect(x, y, w, h, color)
+c.circle(x, y, r, color)
+c.arc(x, y, r, startRad, endRad, color)
+c.poly([[x,y],...], color)                  // filled polygon
+c.rectStroke(x, y, w, h, color, thickness)
+c.ring(x, y, r, color, thickness)
+c.line(x1, y1, x2, y2, color, thickness)
+c.text(str, x, y, size, color, {font, align, baseline, weight, style,
           stroke, strokeColor, strokeWidth,
           shadow, shadowColor, shadowBlur, shadowX, shadowY,
           gradient}?)                         // gradient: array of CSS colors top→bottom
-draw.loadFont(name, url)                    // async — FontFace API, await before draw.text
-draw.image(img, x, y, w?, h?)
-draw.push() / draw.pop()                   // save/restore transform+alpha+blend
-draw.translate(x, y) / draw.rotate(rad) / draw.scale(x, y?)
-draw.resetTransform()
-draw.alpha(0–1) / draw.blend(mode)         // modes: 'screen' 'multiply' 'lighter' etc.
-draw.pixelate(source, blockSize, x?, y?, w?, h?)   // blocky pixelation of any canvas/video
-draw.toASCII(canvas, {cols, rows, charset, bg, color}) → { el: <pre>, update(canvas) }
-draw.backdrop(source, {z?, fit?, loop?})    // render image/video/camera below draw calls
+c.loadFont(name, url)                       // async — FontFace API, await before c.text
+c.image(img, x, y, w?, h?)
+c.push() / c.pop()                          // save/restore transform+alpha+blend
+c.translate(x, y) / c.rotate(rad) / c.scale(x, y?)
+c.resetTransform()
+c.alpha(0–1) / c.blend(mode)                // modes: 'screen' 'multiply' 'lighter' etc.
+c.pixelate(source, blockSize, x?, y?, w?, h?)   // blocky pixelation of any canvas/video
+c.toASCII(canvas, {cols, rows, charset, bg, color}) → { el: <pre>, update(canvas) }
+c.backdrop(source, {z?, fit?, loop?})       // render image/video/camera below draw calls
   // source: URL string | 'camera' | HTMLImageElement | HTMLVideoElement | CameraStream |
   //         HTMLCanvasElement | GLShader | Shader | Layer
   // fit: 'cover' (default) | 'contain' | 'stretch'
   // Returns { stop(), layer } — stop() cancels live video loop; auto-cleaned on reset.
-draw.at(z)                                 // switch to layer z (returns same API)
-draw.width  // 1600
-draw.height // 900
+c.width  // logical width   c.height // logical height   c.el // <canvas> element
 ```
 
-### Layers & CSS effects
+### Layers & CSS effects (per-Canvas)
 
 ```js
-getCanvas(z?)                         // HTMLCanvasElement at logical z (default 0)
-getLayer(z?)                          // Layer object
+c.layer(z)                            // a DrawTarget over a higher z-plane of c's window
+c.fx(z?)                              // CSS-effect wrapper over plane z of c's window:
   .blur(px) .hue(deg) .brightness(n) .saturate(n) .invert(n) .opacity(n)
   .blendMode(mode)                    // CSS mix-blend-mode: 'screen' 'multiply' 'overlay' etc.
   .rotate(deg) .rotateX(deg) .rotateY(deg) .scale(x, y?) .perspective(px)
   .clip('circle(50%)') .reset()
 ```
 
-Z-order: logical z → CSS z-index `20+z`. Media defaults to CSS 25, Shader to CSS 30.
+Planes are owned by the window (WM compositor, ADR 040): `wm.layer(winId, z)`. Z-order: logical z → CSS z-index `20+z`. Media defaults to CSS 25, Shader to CSS 30, paint overlay 50, text 51.
 
 ### Image editing
 
@@ -67,6 +66,37 @@ editImage(source)            // source: canvas | HTMLImageElement | HTMLVideoEle
   .draw(drawTarget, x, y, w?, h?)
   .width / .height           // current output dimensions
 ```
+
+---
+
+## Canvas — `new Canvas(opts?)`
+
+The **sole 2D drawing surface** (ADR 038/040 — there is no global `draw`). Spawns its own wm window with a 2D canvas at a chosen size and exposes the full fluent draw API (above) scoped to it. A `Canvas` owns its window — so its pointer coordinates arrive **already mapped into its own canvas space**, no `getBoundingClientRect()` math. A sketch that draws starts with `new Canvas()`; a sketch that doesn't (audio/events/MIDI) needs none.
+
+```js
+const c = new Canvas({ w: 800, h: 600, title: 'Sketch' });  // default w/h → 1600×900 (16:9)
+// opts: w, h, title, x, y, noChrome, transparent
+
+c.bg('#0a0a14').circle(400, 300, 40, '#fff');   // full draw API, chainable, scoped to this canvas
+c.rect(x, y, w, h, 'red');                       // …every draw method works on c
+
+c.layer(z)           // DrawTarget over a higher plane of this window
+c.fx(z?)             // CSS-effect wrapper (blur/opacity/blendMode/…) for plane z
+
+c.pointer            // live { x, y, down } in THIS canvas's coords (0..w / 0..h)
+c.on('down', ({ x, y, button }) => { … })        // pointer down  — coords pre-mapped
+c.on('move', ({ x, y }) => { … })                // pointer move
+c.on('up',   ({ x, y }) => { … })                // pointer up
+
+c.width / c.height   // logical size (the constructed w / h)
+c.winId              // the spawned window id
+c.el                 // underlying <canvas> element (for snapshot / compositing)
+c.remove()           // tear down (also happens on reset / window close)
+```
+
+**Coordinate model**: fixed logical backing store at `w×h`, CSS-stretched to fill the window. Coordinates are stable on resize — `c.circle(400, 300, …)` stays put at any window size. Open multiple `Canvas` surfaces, each its own size/aspect; windows cascade and **survive auto-exec by identity** (key = `{id}` or `title+w+h`), so live-coding doesn't flash-rebuild them.
+
+**Interaction**: while a `Canvas` is listening to its pointer, body-drag on its window is suppressed (the body drives the sketch); move the window from the **titlebar**. Run-scoped — cleared on reset; closing the window stops it.
 
 ---
 
@@ -348,8 +378,9 @@ audio.level                             // live 0–1 RMS (mic toolbar toggle mu
 audio.onLevel(threshold, onEnter, onExit?)   // edge-trigger
 audio.onWord(word, fn)        // fires when that specific word spoken (final only)
 audio.onSpeech(fn)            // fires with full transcript on every utterance (final only)
-audio.onWordStream(fn)        // fn({ word, utteranceId, wordIndex, final }) — every word as it streams
-                              // interim: final=false  committed: final=true  Chrome/Edge only
+audio.onWordStream(fn)        // fn({ word, final, index }) — every word as it streams
+                              // interim: final=false  committed: final=true  index=running position
+audio.speechEngine = 'auto'   // 'auto' (Web Speech, else ML) | 'ml' (in-browser model, any browser) | 'webspeech'
 audio.say(text, opts?)                       // speechSynthesis; opts: voice,rate,pitch,volume,lang
 audio.voices()                               // → SpeechSynthesisVoice[]
 ```
@@ -359,6 +390,8 @@ audio.voices()                               // → SpeechSynthesisVoice[]
 ## Route — `route`
 
 Cross-domain signal chain. Typed signal from a source, through composable transforms, to one or more sinks — as explicit data, not implicit code. Run-scoped (cleared on reset). Self-registers `liveOutput` keep-alive while a driver is active.
+
+> **Full inputs/transforms/outputs map:** [`docs/signal-map.md`](docs/signal-map.md) — every source, transform, sink, and bridge for `route()` + `pipe()`, keyed by signal kind.
 
 ```js
 // Mic amplitude → oscillator frequency (sub-ms push path)
@@ -494,7 +527,7 @@ Fluent visual pipeline. Each stage exposes a canvas the next stage samples — o
 ```js
 // Source types pipe() accepts:
 //   CameraStream  (from Camera.open())
-//   HTMLCanvasElement  (getCanvas(z), etc.)
+//   HTMLCanvasElement  (a Canvas .el, etc.)
 //   HTMLVideoElement
 //   GLShader / Shader instance  (.canvas property)
 //   Layer  (._canvas property)
@@ -517,7 +550,7 @@ pipe(cam)
 ```js
 .ascii({ cols, rows, charset, bg, color, cellW, cellH })
   // Render glyphs to canvas. Default charset: ' .:-=+*#%@'.
-  // Luma weights match draw.toASCII (0.299/0.587/0.114).
+  // Luma weights match canvas.toASCII (0.299/0.587/0.114).
 
 .pixelate({ blockSize })
   // Mosaic effect — downscale then upscale without smoothing.
@@ -806,7 +839,7 @@ vision.configure({ hands: { numHands: 2 } })   // default 1 — track both hands
 
 // Custom source — use any HTMLVideoElement or HTMLCanvasElement instead of the webcam
 vision.source(videoEl)   // e.g. from video.open() or a <video> element
-vision.source(canvasEl)  // e.g. from getCanvas() or a pipe output canvas
+vision.source(canvasEl)  // e.g. from a Canvas .el or a pipe output canvas
 vision.source(null)      // revert to webcam
 ```
 
@@ -887,7 +920,7 @@ on('sensor:serial:data').do(({ line }) => console.log(line));
 
 // GPIO read — fires when default parse matches "PIN:VALUE\n"
 on('gpio:pin').do(({ pin, value }) => {
-  if (pin === 0) draw.bg(`hsl(${value / 4}, 80%, 50%)`);
+  if (pin === 0) canvas.bg(`hsl(${value / 4}, 80%, 50%)`);
 });
 
 // GPIO write
@@ -1076,7 +1109,7 @@ const cancel = tween(duration, fn(t), { easing?, onDone? })
 // easing: optional function (t)=>t — default linear. Supply any curve:
 //   t => 1-(1-t)**3        // ease-out cubic
 //   t => t*t               // ease-in quadratic
-tween(2000, t => draw.bg(`hsl(0,100%,${t*50}%)`), { onDone: () => draw.clear() });
+tween(2000, t => canvas.bg(`hsl(0,100%,${t*50}%)`), { onDone: () => canvas.clear() });
 tween(6000, t => handle.setStyle({ color: `hsla(40,100%,70%,${1-t})` }), { onDone: () => handle.remove() });
 
 // ── Multiple events ───────────────────────────────────────────────────────────
@@ -1102,8 +1135,9 @@ emit('haptics:vibrate', { pattern: 200 }) // commandable: actuates navigator.vib
 |---|---|
 | `beat:*` | `tick` `bar` `phrase` |
 | `audio:*` | `start` `stop` `bpm-change` `level` `note-play` `speech` `say` |
-| `audio:word:interim` | `{word, utteranceId, wordIndex, final:false}` — fires per-word while speaking |
-| `audio:word:final` | `{word, utteranceId, wordIndex, final:true}` — fires per-word on utterance commit |
+| `audio:word:interim` | `{word, final:false, index}` — fires per-word while speaking |
+| `audio:word:final` | `{word, final:true, index}` — fires per-word on commit |
+| `audio:transcript` | `{text, isFinal}` — full running transcript |
 | `wm:*` | `spawn` `close` `focus` `move` `resize` `maximize` `restore` `show` `hide` |
 | `session:*` | `start` `stop` `reset` `error` |
 | `editor:*` | `change` `save` |
@@ -1209,7 +1243,7 @@ p.stop()
 // Backdrop toolbar (🖼): load image · load video (live) · 📷 Freeze frame · clear
 // Frame strip: add (＋) · duplicate (⧉) · clear · delete (🗑) · reorder (◀▶) · onion skin
 // Transport: ▶ play · ■ stop · fps input
-// Export: ⤓ Code → inserts draw.backdrop()+draw.image() into active editor (if backdrop active)
+// Export: ⤓ Code → inserts canvas.backdrop()+canvas.image() into active editor (if backdrop active)
 //         ⤓ PNG  → downloads current frame composited over backdrop
 //         ⤓ Sheet → all frames composited over backdrop as horizontal spritesheet
 // Undo/redo: Cmd/Ctrl+Z / Cmd/Ctrl+Shift+Z (also titlebar buttons)
@@ -1402,11 +1436,12 @@ console.log(...) / console.error(...) / console.clear()
 ### Animated draw loop
 
 ```js
-draw.bg('#111');
+const canvas = new Canvas();
+canvas.bg('#111');
 let t = 0;
 setInterval(() => {
-  draw.clear().bg('#111');
-  draw.circle(800 + Math.cos(t) * 300, 450 + Math.sin(t) * 200, 30, `hsl(${t*20%360},80%,60%)`);
+  canvas.clear().bg('#111');
+  canvas.circle(800 + Math.cos(t) * 300, 450 + Math.sin(t) * 200, 30, `hsl(${t*20%360},80%,60%)`);
   t += 0.04;
 }, 16);
 ```
@@ -1433,20 +1468,20 @@ setInterval(() => {
 ### Input-reactive particle system
 
 ```js
+const canvas = new Canvas();
 const keys = hold('window:key:down');
-const mouse = hold('window:mouse:move');
 let particles = [];
 
 tick(16).do(() => {
-  draw.alpha(0.1).bg('#000').alpha(1);
+  canvas.alpha(0.1).bg('#000').alpha(1);
   if (keys.has(' ')) {
-    particles.push({ x: mouse.x, y: mouse.y, vx: randUni(-4,4), vy: randUni(-6,-1), life: 1, hue: randUni(0,360) });
+    particles.push({ x: canvas.pointer.x, y: canvas.pointer.y, vx: randUni(-4,4), vy: randUni(-6,-1), life: 1, hue: randUni(0,360) });
   }
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
     p.x += p.vx; p.y += p.vy += 0.2; p.life -= 0.02;
     if (p.life <= 0) { particles.splice(i,1); continue; }
-    draw.alpha(p.life).circle(p.x, p.y, 5, `hsl(${p.hue},90%,65%)`).alpha(1);
+    canvas.alpha(p.life).circle(p.x, p.y, 5, `hsl(${p.hue},90%,65%)`).alpha(1);
   }
 });
 ```
@@ -1460,9 +1495,10 @@ setcps(0.42); // ~100 bpm
 vision.onGesture('Open_Palm', () => setcps(0.66));   // ~160 bpm
 vision.onGesture('Closed_Fist', () => setcps(0.33)); // ~80 bpm
 
+const canvas = new Canvas();
 setInterval(() => {
   const h = vision.hands()[0];
-  draw.clear().bg('#111');
-  if (h) draw.circle(h.cx + 800, 450 - h.cy, 20, 'lime');
+  canvas.clear().bg('#111');
+  if (h) canvas.circle(h.cx + 800, 450 - h.cy, 20, 'lime');
 }, 16);
 ```

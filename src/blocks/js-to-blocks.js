@@ -417,8 +417,10 @@ function translateOne(node, vars) {
 function translateStatements(stmts) {
   // First pass: collect variable bindings for 2-step patterns (const x = expr; x.method())
   const vars = new Map();
+  const consumed = new Set();   // VariableDeclarations stored in vars (inlined later, not emitted raw)
   for (const s of stmts) {
     if (s.type !== 'VariableDeclaration') continue;
+    const before = vars.size;
     for (const d of s.declarations) {
       const name = d.id?.name;
       if (!name || !d.init) continue;
@@ -440,13 +442,21 @@ function translateStatements(stmts) {
         if (vb) vars.set(name, { valueBlock: vb });
       }
     }
+    if (vars.size > before) consumed.add(s);
   }
 
-  // Second pass: translate to blocks, skip nulls
+  // Second pass: translate to blocks. Unrecognized statements are NOT dropped —
+  // they are wrapped verbatim in a js_raw passthrough block so text↔blocks
+  // round-trips losslessly (ADR 037). Declarations already consumed into `vars`
+  // (inlined into a later block) are the one exception — skip them to avoid
+  // double-emitting.
   const blocks = [];
   for (const s of stmts) {
     const b = translateOne(s, vars);
-    if (b) blocks.push(b);
+    if (b) { blocks.push(b); continue; }
+    if (s.type === 'VariableDeclaration' && consumed.has(s)) continue;
+    const raw = (_src && s.range) ? _src.slice(s.range[0], s.range[1]).trim() : '';
+    if (raw) blocks.push({ type: 'js_raw', fields: { CODE: raw } });
   }
 
   if (!blocks.length) return null;

@@ -22,7 +22,7 @@ This application is not the best of anything. We provide creative tools for peop
 - **Render pipeline** — chain visual stages with `pipe(source).ascii().glshader().fx('hue-rotate(90deg)').subtitle(srt).show()`; sources: camera, canvas, video, shader; stages compose freely. New effects: `tint`, `negative`, `solarize`, `posterize`, `duotone`, `grain`, `strobe`.
 
 ### Audio
-- **Synthesis** — synths, sequencers, effects chains via [Tone.js](https://tonejs.github.io/); pattern sequencing with a [Strudel](https://strudel.cc/) / [TidalCycles](https://tidalcycles.org/)-inspired mini-notation and composable `Pattern` algebra (`pat("bd*2 sd").fast(2).every(4, p => p.rev()).start()`)
+- **Synthesis** — synths, sequencers, effects chains via [Tone.js](https://tonejs.github.io/); pattern sequencing with the real [Strudel](https://strudel.cc/) / [TidalCycles](https://tidalcycles.org/) engine — explicit calls, full strudel.cc compatibility (`note("c e g").fast(2).every(4, p => p.rev()).play()`). Tempo is shared (Tone is master clock); all Strudel sound routes through one mixer **Strudel** strip. Samples are bring-your-own: `note(...)` works with no setup, `s("bd hh")` needs `samples('github:…')` first
 - **Drum machine** — `audio.drumpad()` or toolbar 🥁 button opens an 8-pad drum machine with 16-step sequencer; keyboard shortcuts q/w/e/r/a/s/d/f; programmatic `.pattern(vi, 'x . x .')` and `.bpm(128)`; event/signal API: `.onPad('kick', fn)`, `.onHit(fn)`, `.onStep(fn)`, `.signal('kick', {decay})→{value,stream}` — hooks are per-instance and cleared on reset
 - **Visualization** — live spectrogram, piano roll, and EQ widget (draggable frequency curve over live FFT); `audio.fft.bass/mid/high` as control signals; visualizer windows have customizable background and waveform colors persisted across reloads
 - **MIDI** — Web MIDI input: `midi.onNote(fn)`, `midi.onCC(ch, cc, fn)`, `midi.signal(ch, cc)` → live 0–1 signal wired to anything
@@ -173,8 +173,8 @@ s.play('C4', '8n');
 audio.bpm(120);
 audio.start();
 
-// Pattern sequencing — Strudel/TidalCycles-inspired mini-notation
-pat('bd*2 sd').fast(2).every(4, p => p.rev()).start();
+// Pattern sequencing — real Strudel (strudel.cc), explicit calls
+note("c e g b").fast(2).every(4, p => p.rev()).play();
 
 // Mic level trigger (enable mic in toolbar first)
 audio.onLevel(0.7, () => draw.bg('red'), () => draw.bg('black'));
@@ -321,3 +321,7 @@ npm run dev                               # dev server
 node node_modules/vite/bin/vite.js build  # production build
 npm test                                  # run all tests
 ```
+
+## License
+
+[AGPL-3.0-or-later](./LICENSE). createos bundles the [Strudel](https://strudel.cc/) pattern engine (AGPL-3.0), which makes the whole application AGPL — see [ADR 036](./docs/adr/036-agpl-adoption.md). If you run a modified version as a network service, you must offer your users its source.

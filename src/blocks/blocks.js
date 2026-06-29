@@ -335,126 +335,18 @@ Blockly.defineBlocksWithJsonArray([
     tooltip: 'Speak text using browser text-to-speech.',
   },
 
-  // ── Patterns ───────────────────────────────────────────────────────────────
+  // ── Raw JS passthrough (ADR 037) ─────────────────────────────────────────────
+  // Holds any statement that has no dedicated block — emitted verbatim by the
+  // generator. js-to-blocks wraps unrecognized statements (e.g. Strudel note()/s()
+  // calls) in this instead of dropping them, so text↔blocks round-trips losslessly.
   {
-    type: 'pat_create',
-    message0: 'pattern %1 on %2',
-    args0: [
-      { type: 'field_input', name: 'NOTES', text: 'C4 E4 G4 B4' },
-      { type: 'input_value', name: 'SYNTH' },
-    ],
-    output: null,
-    colour: 200,
-    tooltip: 'Create a pattern from mini-notation. Connect a synth. Chain modifiers, then plug into "start pattern".',
-  },
-  {
-    type: 'pat_chord',
-    message0: 'chord %1 on %2',
-    args0: [
-      { type: 'field_input', name: 'NOTES', text: 'C4 E4 G4' },
-      { type: 'input_value', name: 'SYNTH' },
-    ],
-    output: null,
-    colour: 200,
-    tooltip: 'Play multiple notes at the same time each cycle. Use a poly synth.',
-  },
-  {
-    type: 'pat_start',
-    message0: 'start %1 at BPM %2',
-    args0: [
-      { type: 'input_value', name: 'PAT' },
-      { type: 'field_number', name: 'BPM', value: 120, min: 20, max: 300 },
-    ],
+    type: 'js_raw',
+    message0: 'JS %1',
+    args0: [{ type: 'field_multilinetext', name: 'CODE', text: '' }],
     previousStatement: null,
     nextStatement: null,
-    colour: 200,
-    tooltip: 'Start a pattern looping. Also starts the audio transport.',
-  },
-  {
-    type: 'pat_stack',
-    message0: 'stack %1 and %2',
-    args0: [
-      { type: 'input_value', name: 'PAT1' },
-      { type: 'input_value', name: 'PAT2' },
-    ],
-    output: null,
-    colour: 200,
-    tooltip: 'Layer two patterns together, synced. Start the result with "start pattern".',
-  },
-  {
-    type: 'pat_speed',
-    message0: '%1 speed × %2',
-    args0: [
-      { type: 'input_value', name: 'PAT' },
-      { type: 'field_number', name: 'N', value: 2, min: 0.125 },
-    ],
-    output: null,
-    colour: 200,
-    tooltip: '.speed(n) — play n× faster (2 = double speed). Use <1 to slow down.',
-  },
-  {
-    type: 'pat_slow',
-    message0: '%1 slow × %2',
-    args0: [
-      { type: 'input_value', name: 'PAT' },
-      { type: 'field_number', name: 'N', value: 2, min: 0.125 },
-    ],
-    output: null,
-    colour: 200,
-    tooltip: '.slow(n) — play n× slower (2 = half speed).',
-  },
-  {
-    type: 'pat_reverse',
-    message0: 'reverse %1',
-    args0: [{ type: 'input_value', name: 'PAT' }],
-    output: null,
-    colour: 200,
-    tooltip: '.reverse() — play events in reverse order.',
-  },
-  {
-    type: 'pat_transpose',
-    message0: '%1 transpose %2 semitones',
-    args0: [
-      { type: 'input_value', name: 'PAT' },
-      { type: 'field_number', name: 'N', value: 7 },
-    ],
-    output: null,
-    colour: 200,
-    tooltip: '.transpose(n) — shift all notes up/down by semitones. 12 = one octave.',
-  },
-  {
-    type: 'pat_volume',
-    message0: '%1 volume %2',
-    args0: [
-      { type: 'input_value', name: 'PAT' },
-      { type: 'field_number', name: 'V', value: 0.5, min: 0, max: 1 },
-    ],
-    output: null,
-    colour: 200,
-    tooltip: '.volume(v) — scale note loudness 0–1.',
-  },
-  {
-    type: 'pat_dropout',
-    message0: 'dropout %1 by %2',
-    args0: [
-      { type: 'input_value', name: 'PAT' },
-      { type: 'field_number', name: 'P', value: 0.5, min: 0, max: 1 },
-    ],
-    output: null,
-    colour: 200,
-    tooltip: '.dropoutBy(p) — randomly drop notes with probability p each cycle.',
-  },
-  {
-    type: 'pat_rhythm',
-    message0: '%1 rhythm %2 hits in %3 steps',
-    args0: [
-      { type: 'input_value', name: 'PAT' },
-      { type: 'field_number', name: 'K', value: 3, min: 1 },
-      { type: 'field_number', name: 'N', value: 8, min: 1 },
-    ],
-    output: null,
-    colour: 200,
-    tooltip: '.rhythm(k, n) — Euclidean rhythm: spread k hits evenly across n steps.',
+    colour: 0,
+    tooltip: 'Raw JavaScript with no dedicated block (e.g. a Strudel pattern). Preserved verbatim so switching between text and blocks never loses code. Edit as text.',
   },
 
   // ── Shader ─────────────────────────────────────────────────────────────────
@@ -1765,54 +1657,10 @@ javascriptGenerator.forBlock['ctrl_random'] = (b) => {
 };
 javascriptGenerator.forBlock['ctrl_random_color'] = () => ['Color.random()', Order.FUNCTION_CALL];
 
-// Patterns
-javascriptGenerator.forBlock['pat_create'] = (b, g) => {
-  const notes = b.getFieldValue('NOTES');
-  const synth = g.valueToCode(b, 'SYNTH', Order.NONE) || 'null';
-  return [`pattern(${JSON.stringify(notes)}, ${synth})`, Order.FUNCTION_CALL];
-};
-javascriptGenerator.forBlock['pat_chord'] = (b, g) => {
-  const notes = b.getFieldValue('NOTES').split(/\s+/).filter(Boolean);
-  const synth = g.valueToCode(b, 'SYNTH', Order.NONE) || 'null';
-  return [`audio.chord(${JSON.stringify(notes)}, ${synth})`, Order.FUNCTION_CALL];
-};
-javascriptGenerator.forBlock['pat_start'] = (b, g) => {
-  const pat = g.valueToCode(b, 'PAT', Order.NONE) || 'null';
-  const bpm = b.getFieldValue('BPM');
-  return `(${pat}).bpm(${bpm}).start();\naudio.start();\n`;
-};
-javascriptGenerator.forBlock['pat_stack'] = (b, g) => {
-  const p1 = g.valueToCode(b, 'PAT1', Order.NONE) || 'null';
-  const p2 = g.valueToCode(b, 'PAT2', Order.NONE) || 'null';
-  return [`stack(${p1}, ${p2})`, Order.FUNCTION_CALL];
-};
-javascriptGenerator.forBlock['pat_speed'] = (b, g) => {
-  const pat = g.valueToCode(b, 'PAT', Order.NONE) || 'null';
-  return [`(${pat}).speed(${b.getFieldValue('N')})`, Order.FUNCTION_CALL];
-};
-javascriptGenerator.forBlock['pat_slow'] = (b, g) => {
-  const pat = g.valueToCode(b, 'PAT', Order.NONE) || 'null';
-  return [`(${pat}).slow(${b.getFieldValue('N')})`, Order.FUNCTION_CALL];
-};
-javascriptGenerator.forBlock['pat_reverse'] = (b, g) => {
-  const pat = g.valueToCode(b, 'PAT', Order.NONE) || 'null';
-  return [`(${pat}).reverse()`, Order.FUNCTION_CALL];
-};
-javascriptGenerator.forBlock['pat_transpose'] = (b, g) => {
-  const pat = g.valueToCode(b, 'PAT', Order.NONE) || 'null';
-  return [`(${pat}).transpose(${b.getFieldValue('N')})`, Order.FUNCTION_CALL];
-};
-javascriptGenerator.forBlock['pat_volume'] = (b, g) => {
-  const pat = g.valueToCode(b, 'PAT', Order.NONE) || 'null';
-  return [`(${pat}).volume(${b.getFieldValue('V')})`, Order.FUNCTION_CALL];
-};
-javascriptGenerator.forBlock['pat_dropout'] = (b, g) => {
-  const pat = g.valueToCode(b, 'PAT', Order.NONE) || 'null';
-  return [`(${pat}).dropoutBy(${b.getFieldValue('P')})`, Order.FUNCTION_CALL];
-};
-javascriptGenerator.forBlock['pat_rhythm'] = (b, g) => {
-  const pat = g.valueToCode(b, 'PAT', Order.NONE) || 'null';
-  return [`(${pat}).rhythm(${b.getFieldValue('K')}, ${b.getFieldValue('N')})`, Order.FUNCTION_CALL];
+// Raw JS passthrough (ADR 037) — emit the stored source verbatim.
+javascriptGenerator.forBlock['js_raw'] = (b) => {
+  const code = b.getFieldValue('CODE') || '';
+  return code.trim() ? code.replace(/\n+$/, '') + '\n' : '';
 };
 
 // Audio
@@ -3071,45 +2919,6 @@ export const TOOLBOX = {
         // Speech
         { kind: 'block', type: 'audio_on_word' },
         { kind: 'block', type: 'audio_say' },
-      ],
-    },
-    {
-      kind: 'category', name: 'Patterns', colour: 200,
-      contents: [
-        {
-          kind: 'block', type: 'pat_start',
-          inputs: {
-            PAT: {
-              block: {
-                type: 'pat_create',
-                fields: { NOTES: 'C4 E4 G4 B4' },
-                inputs: { SYNTH: { block: { type: 'audio_create_synth', fields: { TYPE: 'fm' } } } },
-              },
-            },
-          },
-        },
-        {
-          kind: 'block', type: 'pat_start',
-          inputs: {
-            PAT: {
-              block: {
-                type: 'pat_chord',
-                fields: { NOTES: 'C4 E4 G4' },
-                inputs: { SYNTH: { block: { type: 'audio_create_synth', fields: { TYPE: 'poly' } } } },
-              },
-            },
-          },
-        },
-        { kind: 'block', type: 'pat_create' },
-        { kind: 'block', type: 'pat_chord' },
-        { kind: 'block', type: 'pat_stack' },
-        { kind: 'block', type: 'pat_speed' },
-        { kind: 'block', type: 'pat_slow' },
-        { kind: 'block', type: 'pat_reverse' },
-        { kind: 'block', type: 'pat_transpose' },
-        { kind: 'block', type: 'pat_volume' },
-        { kind: 'block', type: 'pat_dropout' },
-        { kind: 'block', type: 'pat_rhythm' },
       ],
     },
     {

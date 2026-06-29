@@ -128,16 +128,11 @@ setInterval(() => {
 ### Expression triggers audio
 
 ```js
-const s = audio.fm();
-pat('<C4 E4 G4>', s).start();
-audio.bpm(80); audio.start();
+note("<c4 e4 g4>").play();
+setcps(0.33); // ~80 bpm
 
-vision.onExpression('smile', () => {
-  audio.bpm(140); // smile = faster
-});
-vision.onExpression('frown', () => {
-  audio.bpm(60);  // frown = slower
-});
+vision.onExpression('smile', () => setcps(0.58)); // smile = faster (~140 bpm)
+vision.onExpression('frown', () => setcps(0.25)); // frown = slower (~60 bpm)
 ```
 
 ### Object count drives density

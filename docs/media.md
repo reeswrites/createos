@@ -107,14 +107,12 @@ s.start(); // shader at z:30 overlays the video at z:10
 const vid = Media.video('https://example.com/clip.mp4');
 vid.play();
 
-const kick = audio.kick();
-pat('x . x .', (note, time, dur) => {
-  kick.play('C1', dur, time);
+note("c1 ~ c1 ~").play();
+setcps(0.5);
+on('beat:tick').do(() => {        // Strudel is locked to the Tone transport
   vid.opacity(1);
   setTimeout(() => vid.opacity(0.3), 80);
-}).start();
-audio.bpm(120);
-audio.start();
+});
 ```
 
 ---

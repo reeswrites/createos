@@ -3,7 +3,8 @@ import { TOOLKIT_CATEGORIES, addToolkitEntries } from "../editor/completions.js"
 import { _registerBuiltin, registerAPI, _setToolkitApplier, _setBlocksApplier } from "./api-registry.js";
 import { initCamera, Camera, cleanupCameras } from "../api/camera.js";
 import { initMic } from "../api/mic.js";
-import { audio, startAudio, cleanupAudio, Pattern } from "../api/audio.js";
+import { audio, startAudio, cleanupAudio } from "../api/audio.js";
+import { initStrudel, strudelGlobals } from "../api/strudel.js";
 import { Shader, ShaderFX, cleanupShaders } from "../api/shader.js";
 import { GLShader, GLSL_PRESETS } from "../api/glsl-shader.js";
 import { initPixi, PIXI } from "../api/pixi.js";
@@ -103,10 +104,57 @@ _registerBuiltin('compositeCanvasStream', compositeCanvasStream);
 _registerBuiltin('recordWindow',      (winId, opts) => window.wm?.record(winId, opts));
 _registerBuiltin('snapshot',          (winId, opts) => window.wm?.snapshot(winId, opts));
 _registerBuiltin('Media',    Media);
-_registerBuiltin('pat',     (str, inst, opts) => audio.pat(str, inst, opts));
-_registerBuiltin('pattern', (str, inst, opts) => audio.pattern(str, inst, opts));
-_registerBuiltin('stack',   (...pats) => audio.stack(...pats));
-_registerBuiltin('Pattern', Pattern);
+
+// Strudel pattern engine (ADR 035). Replaces the removed in-house pat()/pattern()/
+// stack()/Pattern. Bootstrap is async; globals are registered eagerly from the
+// imported namespace so they exist before the first run, and .play() awaits init.
+// Registered with literal names (not a loop) so the completion-coherence gate and
+// the toolkit/detection surfaces can see each one.
+initStrudel();
+const _S = strudelGlobals();
+// sources
+_registerBuiltin('note',   _S.note);
+_registerBuiltin('s',      _S.s);
+_registerBuiltin('n',      _S.n);
+_registerBuiltin('sound',  _S.sound);
+_registerBuiltin('silence', _S.silence);
+// combinators
+_registerBuiltin('stack',    _S.stack);
+_registerBuiltin('cat',      _S.cat);
+_registerBuiltin('slowcat',  _S.slowcat);
+_registerBuiltin('fastcat',  _S.fastcat);
+_registerBuiltin('seq',      _S.seq);
+_registerBuiltin('sequence', _S.sequence);
+_registerBuiltin('timeCat',  _S.timeCat);
+_registerBuiltin('arrange',  _S.arrange);
+_registerBuiltin('polymeter', _S.polymeter);
+_registerBuiltin('polyrhythm', _S.polyrhythm);
+_registerBuiltin('run',      _S.run);
+// random / signals
+_registerBuiltin('rand',     _S.rand);
+_registerBuiltin('rand2',    _S.rand2);
+_registerBuiltin('perlin',   _S.perlin);
+_registerBuiltin('irand',    _S.irand);
+_registerBuiltin('choose',   _S.choose);
+_registerBuiltin('wchoose',  _S.wchoose);
+_registerBuiltin('chooseCycles', _S.chooseCycles);
+_registerBuiltin('randcat',  _S.randcat);
+_registerBuiltin('sine',     _S.sine);
+_registerBuiltin('cosine',   _S.cosine);
+_registerBuiltin('saw',      _S.saw);
+_registerBuiltin('isaw',     _S.isaw);
+_registerBuiltin('square',   _S.square);
+_registerBuiltin('tri',      _S.tri);
+_registerBuiltin('signal',   _S.signal);
+_registerBuiltin('steady',   _S.steady);
+// helpers + transport
+_registerBuiltin('pure',     _S.pure);
+_registerBuiltin('reify',    _S.reify);
+_registerBuiltin('mini',     _S.mini);
+_registerBuiltin('samples',  _S.samples);
+_registerBuiltin('setcps',   _S.setcps);
+_registerBuiltin('setcpm',   _S.setcpm);
+_registerBuiltin('hush',     _S.hush);
 
 class Color {
   static random() {

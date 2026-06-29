@@ -145,7 +145,7 @@ All events fire on the global bus via `notify()`. Subscribe with `on()`:
 
 ```js
 on('note:char').do(({ char, winId }) => {
-  if (char !== '\n') audio.pat('click').once?.();
+  if (char !== '\n') note("c6").play();
 });
 ```
 
@@ -204,7 +204,7 @@ const note = new Notepad({ title: 'Rain', w: 420, h: 300 });
 
 // Play a soft click per character typed
 on('note:char').do(({ char }) => {
-  if (char !== ' ' && char !== '\n') audio.pat('click', 'sine').once?.();
+  if (char !== ' ' && char !== '\n') note("c6").sound("sine").play();
 });
 
 await note.type('listen\n', { cps: 8 });

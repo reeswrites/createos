@@ -42,7 +42,7 @@ draw               // Fluent 2D drawing API — draw.rect/circle/text/line/backd
 draw.backdrop(src, opts?)  // image/video/camera underlay below draw calls; src: URL|'camera'|element|Shader
 getCanvas(z?)      // HTMLCanvasElement at logical z (default 0)
 getLayer(z?)       // Layer object with CSS effects API
-pat(str, synth)    // Create audio pattern (mini-notation)
+note(str).play()   // Strudel pattern (mini-notation) — see audio.md
 stack(p1, p2, …)  // Layer multiple patterns
 onKey(key, fn)     // Keyboard handler
 randUni(lo, hi)    // Random float in range

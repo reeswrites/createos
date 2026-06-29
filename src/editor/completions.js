@@ -463,14 +463,12 @@ function drawCA(c) {
   c.forEach((v, i) => draw.rect(i * bw, 0, bw, draw.height, v ? '#fff' : '#111'));
 }
 
-const k = audio.kick();
-pat('x . x . x . x x', (note, time, dur) => {
-  k.play('C1', dur, time);
+note("c1 ~ c1 ~ c1 ~ c1 c1").play();
+setcps(0.5);
+on('beat:tick').do(() => {        // Tone transport tick — Strudel is locked to it
   cells = stepCA(cells);
   drawCA(cells);
-}).start();
-audio.bpm(120);
-audio.start();`,
+});`,
         hint: "Each kick advances a 1D cellular automaton one generation. Audio is the clock — visuals evolve independently.",
       },
       {
@@ -496,20 +494,15 @@ setInterval(() => {
   });
 }, 16);
 
-const s = audio.fm({ volume: -6 });
-const notes = ['C4','Eb4','G4','Bb4','D5'];
-pat(notes.join(' '), (note, time, dur) => {
-  s.play(note, dur, time);
-  const idx = notes.indexOf(note);
-  pal = palettes[idx % palettes.length]; // note value selects palette
-}).start();
-audio.bpm(100);
-audio.start();`,
+note("c4 eb4 g4 bb4 d5").play();
+setcps(0.5);
+let pi = 0;
+on('beat:tick').do(() => { pal = palettes[pi++ % palettes.length]; }); // beat selects palette`,
         hint: "Each note value selects a color palette. Audio drives visual state transitions — not a visualizer, a shared index.",
       },
       {
         label: "amplitude → gravity",
-        code: `const meter = audio.meter();
+        code: `const sig = audio.fft; // master amplitude — captures Strudel via the shared context
 
 let balls = Array.from({length: 20}, () => ({
   x: Math.random(), y: Math.random() * 0.5,
@@ -517,8 +510,7 @@ let balls = Array.from({length: 20}, () => ({
 }));
 
 setInterval(() => {
-  const db = meter.getValue();
-  const amp = isFinite(db) ? Math.pow(10, db / 20) : 0; // 0..1
+  const amp = sig.value; // 0..1
   const gravity = amp * 0.004; // loud = strong pull
 
   draw.alpha(0.2).bg('#000').alpha(1);
@@ -531,11 +523,8 @@ setInterval(() => {
   });
 }, 16);
 
-const s = audio.fm();
-s.chain(meter); // synth → meter → destination
-pat('C3 G3 E3 Bb3 D4', s).speed(1.5).start();
-audio.bpm(130);
-audio.start();`,
+note("c3 g3 e3 bb3 d4").fast(1.5).play();
+setcps(0.5);`,
         hint: "RMS amplitude becomes gravitational force in a particle sim. Loud → balls fall faster. Nothing draws audio — amplitude perturbs physics.",
       },
       {
@@ -555,32 +544,19 @@ audio.start();`,
 \`);
 s.start();
 
-const meter = audio.meter();
-const synth = audio.fm({ volume: -4 });
-synth.chain(meter); // synth → meter → destination
+note("c3 e3 g3 bb3 d4 f4").play();
+setcps(0.5);
 
-const notes = ['C3','E3','G3','Bb3','D4','F4'];
-pat(notes.join(' '), (note, time, dur) => {
-  synth.play(note, dur, time);
-  const midi = audio.freq(note);
-  const hue = (midi - 130) / 600; // map freq range to 0..1
-  s.set(1, hue);                  // pitch → hue shift in shader
-}).start();
-
+const sig = audio.fft; // master signal — captures Strudel via the shared context
 setInterval(() => {
-  const db = meter.getValue();
-  const amp = isFinite(db) ? Math.pow(10, db / 20) : 0;
-  s.set(0, amp); // amplitude → ring distortion
-}, 16);
-
-audio.bpm(90);
-audio.start();`,
+  s.set(sig.value, sig.high ?? 0.3); // amplitude → ring distortion, spectral high → hue
+}, 16);`,
         hint: "Pitch maps to shader hue, amplitude maps to ring distortion. Shader has its own visual logic — audio is just two input parameters.",
       },
       {
         label: "meter → blur",
         code: `const layer = getLayer(0);
-const meter = audio.meter();
+const sig = audio.fft; // master amplitude — captures Strudel via the shared context
 
 let angle = 0;
 setInterval(() => {
@@ -593,16 +569,11 @@ setInterval(() => {
   draw.pop();
   angle += 0.01;
 
-  const db = meter.getValue();
-  const amp = isFinite(db) ? Math.pow(10, db / 20) : 0;
-  layer.blur(amp * 20); // loud = blurry
+  layer.blur(sig.value * 20); // loud = blurry
 }, 16);
 
-const s = audio.fm();
-s.chain(meter); // synth → meter → destination
-pat('<C3 C4> E4 G4 <Bb3 B3>', s).speed(0.5).start();
-audio.bpm(80);
-audio.start();`,
+note("<c3 c4> e4 g4 <bb3 b3>").slow(2).play();
+setcps(0.5);`,
         hint: "Amplitude drives CSS blur on the canvas layer. Loud moments go soft-focus. Audio influences visual *quality*, not what's drawn.",
       },
       {
@@ -672,7 +643,7 @@ audio.start();`,
       },
       {
         label: "mixer.show",
-        code: "const lead = audio.fm();\npat('0 3 5 7').note(audio.scale('minor')).start({ id: 'lead', inst: lead });\n\nmixer.show();\n// Or script the mix:\nmixer.strip('lead').volume(-6).pan(-0.3);\nmixer.master.volume(-2);\naudio.start();",
+        code: "n(\"0 3 5 7\").scale(\"C:minor\").play();\n\nmixer.show();\n// All Strudel sound arrives on the 'Strudel' strip (ADR 035):\nmixer.strip('Strudel').volume(-6).pan(-0.3);\nmixer.master.volume(-2);",
         hint: "mixer.show() opens the live audio console. Every running instrument/window/mic gets a Strip (volume/pan/mute/solo + VU + 4-band EQ). Script it: mixer.strip(name).volume(dB).pan(-1..1).mute().solo().eq(bands); mixer.master.volume(dB); mixer.add(node, {name}).",
       },
       {
@@ -757,105 +728,75 @@ audio.start();`,
     name: "Patterns",
     commands: [
       {
-        label: "notation reference",
+        label: "mini-notation reference",
         code: "",
-        hint: "Mini-notation symbols: NOTES = C4 D4 E4 (space-separated, play evenly) | x = trigger/hit | . or ~ = rest | [E4 G4] = group (share one slot) | <C4 G3> = alternate each cycle | C4*3 = repeat 3× | C4,E4,G4 = chord (polyphony) | !3 = replicate 3× | @2 = weight 2× longer | ? = random drop | {C4 E4}%3 = polymeter over 3 steps | 0..4 = range expansion",
-        tags: ['mini', 'notation', 'syntax', 'reference', 'cheat sheet', 'symbols'],
+        hint: "Strudel mini-notation (inside note()/s()/n()): space = sequence (play evenly) | ~ = rest | [a b] = subgroup (share one step) | <a b> = alternate per cycle | a*3 = repeat 3x | a!3 = replicate | a@3 = weight (longer) | a? = random drop | a,b = parallel (stack) | {a b c}%4 = polymeter | 0..4 = range. Docs: strudel.cc",
+        tags: ['mini', 'notation', 'syntax', 'reference', 'strudel', 'cheat sheet'],
       },
       {
-        label: "chord",
-        code: "const s = audio.poly();\naudio.chord(['C4','E4','G4'], s).start();\naudio.bpm(120);\naudio.start();",
-        hint: "audio.chord(notes, inst) — play multiple notes simultaneously each cycle. Pass array or comma-separated string. Uses polyphonic synth.",
+        label: "melody (synth — no samples)",
+        code: "note(\"c e g b\").play();\nsetcps(0.5);",
+        hint: "note(\"...\") plays pitches on the default synth — works with zero setup, no samples needed. .play() starts it on the shared scheduler. setcps(n) sets cycles/sec (also drives Tone's BPM = n*60).",
       },
       {
-        label: "pattern — melody",
-        code: "const s = audio.fm();\npattern('C4 E4 G4 B4', s).start();\naudio.bpm(120);\naudio.start();",
-        hint: "pattern(str, inst) — play notes across one measure. Space-separated notes play evenly. Rests: ~ or .  Shorthand: pat()",
+        label: "chord (parallel notes)",
+        code: "note(\"c,e,g\").play();",
+        hint: "Comma = parallel. \"c,e,g\" sounds all three at once. Combine with sequence: \"<c,e,g> <f,a,c>\".",
       },
       {
-        label: "pattern — drums",
-        code: "const k = audio.kick();\npattern('x . x . x . x x', k).start();\naudio.bpm(120);\naudio.start();",
-        hint: "x = trigger, . or ~ = rest. Works with any synth; non-note values use default pitch C1.  Shorthand: pat()",
+        label: "scale degrees",
+        code: "n(\"0 2 4 6\").scale(\"C:minor\").play();",
+        hint: "n(numbers).scale('C:minor') maps degrees to a scale — easier than typing note names. Try 'C:major', 'A:dorian', 'E:pentatonic'.",
       },
       {
-        label: "stack patterns",
-        code: "const k = audio.kick();\nconst sn = audio.noise();\nconst s = audio.fm({ volume: -6 });\nstack(\n  pattern('x . x .', k),\n  pattern('. . x .', sn),\n  pattern('C4 E4 G4 E4', s)\n).bpm(120).start();",
-        hint: "stack(...patterns) — layer multiple patterns, all synced. Call .bpm().start() on the result.",
+        label: "drums (needs a sample pack)",
+        code: "samples('github:tidalcycles/dirt-samples');\ns(\"bd hh sd hh\").play();",
+        hint: "s(\"...\") plays named samples — but createos bundles NO kit (ADR 035). Call samples('github:...') (or your own URL) FIRST, then s(\"bd sd hh cp\"). Without a pack, s() is silent.",
       },
       {
-        label: "groups [ ]",
-        code: "const s = audio.pluck();\npattern('C4 [E4 G4] B4 [C5 D5 E5]', s).start();\naudio.start();",
-        hint: "[ ] groups share one time slot — [E4 G4] plays both notes in the time of one normal step.",
-      },
-      {
-        label: "alternating < >",
-        code: "const s = audio.fm();\npattern('<C4 G3 F3> E4 G4', s).start();\naudio.start();",
-        hint: "< > cycles through values each measure — C4 on cycle 0, G3 on cycle 1, F3 on cycle 2, repeat.",
-      },
-      {
-        label: "repeat *N",
-        code: "const s = audio.pluck();\npattern('C4*4 ~ G4*2 E4', s).start();\naudio.start();",
-        hint: "*N repeats a note N times inside its slot — C4*4 fires 4 rapid notes in the same space as one step.",
-      },
-      {
-        label: "speed / slow",
-        code: "const s = audio.fm();\npattern('C4 E4 G4 B4', s).speed(2).start();\naudio.start();",
-        hint: ".speed(n) plays n× faster. .slow(n) plays n× slower. Chain with other modifiers.",
+        label: "faster / slower",
+        code: "note(\"c e g b\").fast(2).play();",
+        hint: ".fast(n) / .slow(n) scale the pattern's speed. Chain freely: note(\"c e g\").slow(2).rev().",
       },
       {
         label: "reverse",
-        code: "const s = audio.fm();\npattern('C4 E4 G4 B4', s).reverse().start();\naudio.start();",
-        hint: ".reverse() plays the pattern backwards.  Shorthand: .rev()",
+        code: "note(\"c e g b\").rev().play();",
+        hint: ".rev() plays the pattern backwards each cycle.",
       },
       {
-        label: "volume",
-        code: "const s = audio.fm();\npattern('C4 E4 G4 B4', s).volume(0.5).start();\naudio.start();",
-        hint: ".volume(0–1) scales note volume across the whole pattern. Stack with .gain() — same method, different name.  Shorthand: .gain(v)",
+        label: "transpose / add",
+        code: "note(\"c e g\").add(note(\"0 7\")).play();",
+        hint: "Patterns are numbers too — .add(note(\"7\")) shifts up 7 semitones; .add(note(\"<0 7 12>\")) moves it per cycle.",
       },
       {
-        label: "transpose",
-        code: "const s = audio.fm();\npattern('C4 E4 G4 B4', s).transpose(7).start();\naudio.start();",
-        hint: ".transpose(semitones) shifts all notes up or down by semitones. .transpose(12) = up one octave.  Shorthand: .add(n)",
+        label: "stack layers",
+        code: "stack(\n  note(\"c2 e2 g2\").slow(2),\n  n(\"0 2 4 6\").scale(\"C:minor\")\n).play();",
+        hint: "stack(...patterns) layers patterns in parallel on one scheduler. (Last .play() wins, so stack() is how you run more than one line.)",
       },
       {
-        label: "mirror (stereo)",
-        code: "const s = audio.fm();\npattern('C4 E4 G4 B4', s).mirror(p => p.reverse()).start();\naudio.start();",
-        hint: ".mirror(fn) pans original pattern left, applies fn to a copy and pans it right — creates stereo width.  Shorthand: .jux(fn)",
+        label: "alternate per cycle < >",
+        code: "note(\"<c e g> d\").play();",
+        hint: "< > picks one element per cycle: c on cycle 0, e on cycle 1, g on cycle 2, then d every cycle in the second slot.",
       },
       {
-        label: "offset echo",
-        code: "const s = audio.pluck();\npattern('C4 E4 G4', s).offset(0.125, p => p.gain(0.5)).start();\naudio.start();",
-        hint: ".offset(t, fn) adds a delayed echo of the pattern shifted by t (0–1 = fraction of cycle). fn transforms the echo.  Shorthand: .off(t, fn)",
+        label: "gain / pan (pattern-rate)",
+        code: "note(\"c e g b\").gain(\"0.4 0.8\").pan(\"0 1\").play();",
+        hint: "Effects take patterns too — .gain(\"0.4 0.8\") alternates loudness; .pan(\"0 1\") sweeps stereo. This is real Strudel pattern-rate control.",
       },
       {
-        label: "dropout (random)",
-        code: "const s = audio.fm();\npattern('C4 E4 G4 B4', s).dropout().start();\naudio.start();",
-        hint: ".dropout() randomly drops ~50% of notes each cycle. .dropoutBy(0.7) drops 70%.  Shorthands: .degrade() / .degradeBy(p)",
+        label: "every / sometimes",
+        code: "note(\"c e g b\").every(3, x => x.rev()).sometimes(x => x.fast(2)).play();",
+        hint: ".every(n, fn) applies fn every n cycles; .sometimes(fn) applies it randomly ~50%. Probabilistic variation, built in.",
       },
       {
-        label: "rhythm (euclidean)",
-        code: "const k = audio.kick();\nconst hh = audio.metal({ volume: -10 });\nstack(\n  pattern('x', k).rhythm(3, 8),\n  pattern('x', hh).rhythm(5, 8)\n).bpm(130).start();",
-        hint: ".rhythm(k, n) — place k hits across n equal steps using Euclidean spacing. Classic polyrhythm generator.  Shorthand: .euclid(k, n)",
+        label: "euclidean rhythm",
+        code: "note(\"c\").euclid(3, 8).play();",
+        hint: ".euclid(pulses, steps) spreads pulses evenly — (3,8) is the classic tresillo. Try (5,8), (7,16).",
       },
       {
-        label: "every N cycles",
-        code: "const s = audio.fm();\npattern('C4 E4 G4 B4', s)\n  .every(4, evts => [...evts].reverse())\n  .start();\naudio.start();",
-        hint: ".every(n, fn) — apply fn to events every n cycles. fn gets [{value,time,dur}] and returns modified array.",
-      },
-      {
-        label: "scale",
-        code: "const notes = audio.scale('C4', 'minor'); // ['C4','D4','Eb4','F4','G4','Ab4','Bb4']\nconst s = audio.fm();\npattern(notes.join(' '), s).speed(0.75).start();\naudio.bpm(110);\naudio.start();",
-        hint: "audio.scale(root, name) — generate scale notes. Names: major, minor, dorian, phrygian, lydian, mixolydian, pentatonic, blues",
-      },
-      {
-        label: "note from scale",
-        code: "const sc = audio.scale('C4', 'pentatonic');\nconst s = audio.pluck();\nconst degrees = '0 2 4 2 1 4 0 3';\npattern(degrees, (val, time, dur) => {\n  s.play(audio.note(sc, +val), dur, time);\n}).start();\naudio.start();",
-        hint: "audio.note(scale, degree) — pick scale degree by index (wraps around). Combine with callback pattern for melodic patterns by number.",
-      },
-      {
-        label: "callback pattern",
-        code: "const k = audio.kick();\nconst s = audio.fm();\npattern('C4 E4 [G4 B4] C5', (note, time, dur) => {\n  k.play('C1', dur, time);\n  s.play(note, dur * 1.5, time);\n}).start();\naudio.start();",
-        hint: "Pass a function instead of instrument — receives (note, time, dur) for full control of multiple synths.",
+        label: "stop all (hush)",
+        code: "hush();",
+        hint: "hush() stops the Strudel scheduler. A code reset (re-run/stop) also hushes automatically.",
       },
     ],
   },
@@ -1441,7 +1382,7 @@ audio.start();`,
       {
         label: "drum flash on beat",
         code: "// Flash a window every time a drum plays\n// First spawn or find your video/image window:\nconst winId = wm.getByTitle('Drum Kit');\n\npat('[bd sd] hh', (val) => {\n  if (!winId) return;\n  if (val === 'bd') {\n    wm.filter(winId, 'brightness(3) saturate(2)');\n    setTimeout(() => wm.filter(winId, ''), 80);\n  }\n}).start();\naudio.start();",
-        hint: "Wire pat() note triggers to wm.filter() to flash a window on each drum hit. Swap the filter for hue-rotate, sepia, invert, etc.",
+        hint: "Wire beat:tick (or a drumpad onHit) to wm.filter() to flash a window on each hit. Swap the filter for hue-rotate, sepia, invert, etc.",
       },
       {
         label: "layout",
@@ -2390,7 +2331,7 @@ audio.start();`,
       },
       {
         label: "poetry pattern",
-        code: "const note = new Notepad({ title: 'Poem' });\non('note:char').do(() => audio.pat('hh'));\nawait note.type('the quiet\\nbetween words', { cps: 12 });\nnote.color('#c0392b', 0, 9);",
+        code: "const poem = new Notepad({ title: 'Poem' });\non('note:char').do(() => note(\"c5\").play());\nawait poem.type('the quiet\\nbetween words', { cps: 12 });\npoem.color('#c0392b', 0, 9);",
         hint: "Full poetry pattern: type text with a sound per character, then color words.",
         tags: ["notepad", "poetry", "pattern", "example"],
       },
@@ -2401,7 +2342,7 @@ audio.start();`,
     commands: [
       {
         label: "pattern with id",
-        code: "pat('bd*2 sd').fast(2).start({ id: 'groove' });",
+        code: "note(\"c2*2 e2\").fast(2).play(); // synth groove (no samples); for drums: samples('github:tidalcycles/dirt-samples'); s(\"bd*2 sd\")",
         hint: "Start a pattern and give it a named id so you can control it via events later.",
         tags: ["pattern", "actor", "id", "audio"],
       },

@@ -6,97 +6,90 @@ Live coding with Tone.js. Press **?** in the IDE to see this as an in-app quick 
 
 ## Quick Start
 
-```js
-// Melody
-const s = audio.fm();
-pat("C4 E4 G4 B4", s).start();
-audio.bpm(120);
-audio.start();
+Patterns use the real [Strudel](https://strudel.cc) engine (ADR 035) — **explicit calls**, no
+global transpiler. `.play()` starts a pattern on the shared scheduler; `hush()` stops all.
 
-// Drums + melody stacked
-const kick = audio.kick();
-const snare = audio.noise();
+```js
+// Melody — synth, works with NO samples (the front door)
+note("c4 e4 g4 b4").play();
+setcps(0.5);              // cycles/sec — also sets Tone BPM = cps*60 (shared tempo)
+
+// Layered — stack() runs more than one line (last .play() wins otherwise)
 stack(
-  pat("x . x .", kick),
-  pat(". . x .", snare),
-  pat("C4 E4 G4 E4", s)
-).bpm(130).start();
+  note("c2 ~ c2 ~").slow(2),     // bassline
+  n("0 2 4 6").scale("C:minor")  // scale-degree melody
+).play();
+```
+
+Samples are **bring-your-own** — createos bundles no kit. `note(...)` needs nothing; `s(...)`
+is silent until you load a pack:
+
+```js
+samples('github:tidalcycles/dirt-samples');  // or any sample-map URL
+s("bd hh sd hh").play();
 ```
 
 ---
 
 ## Pattern Syntax (Mini-notation)
 
+A string passed to `note()` / `s()` / `n()` parses as mini-notation (no `String.prototype`
+patching — bare JS strings elsewhere stay normal):
+
 | Syntax | Meaning |
 |--------|---------|
-| `"C4 E4 G4"` | Space-separated — equally spaced across one measure |
-| `"~ . x"` | `~` or `.` = rest / silence; `x` = generic trigger |
-| `"C4 [E4 G4]"` | `[ ]` group — E4 G4 share C4's time slot (double speed) |
-| `"<C4 G3> E4"` | `< >` alternate each cycle — C4 on cycle 0, G3 on cycle 1 |
-| `"C4*3 G4"` | `*N` repeat N times inside the slot |
-| `"C4! E4"` | `!N` replicate N times (default 2); `C4!` = `C4 C4` |
-| `"C4@2 E4"` | `@N` weight — C4 takes 2× duration relative to E4 |
-| `"C4? E4"` | `?` degrade — 50% chance to drop the event; `?0.3` sets probability |
-| `"[C4, E4, G4]"` | `,` polyphony — events sound simultaneously in that slot |
-| `"{C4 E4 G4}%4"` | `{}%N` polymeter — N steps/cycle cycling through inner values |
+| `"c4 e4 g4"` | Space-separated — equally spaced across one cycle |
+| `"~ c4"` | `~` = rest / silence |
+| `"c4 [e4 g4]"` | `[ ]` subgroup — e4 g4 share c4's slot (double speed) |
+| `"<c4 g3> e4"` | `< >` alternate each cycle — c4 on cycle 0, g3 on cycle 1 |
+| `"c4*3 g4"` | `*N` repeat N times inside the slot |
+| `"c4!3 e4"` | `!N` replicate N times |
+| `"c4@3 e4"` | `@N` weight — c4 takes 3× duration relative to e4 |
+| `"c4? e4"` | `?` degrade — random drop; `?0.3` sets probability |
+| `"c4,e4,g4"` | `,` polyphony — sound simultaneously (a chord) |
+| `"{c4 e4 g4}%4"` | `{}%N` polymeter — N steps/cycle cycling inner values |
 | `"0..7"` | range — expands to `0 1 2 3 4 5 6 7` |
 
 ### Pattern API
 
-`pat(str, instrument?)` → `Pattern`. All transforms return new Patterns (immutable).
+Sources return a Strudel `Pattern`; transforms are chainable and immutable.
 
 ```js
-// Basic
-pat("C4 E4 G4", synth).start()         // create + schedule
-pat("bd sd hh", (val, t, dur) => { })  // callback form — full control
-stack(pat1, pat2).bpm(140).start()      // layer patterns
+// Sources
+note("c e g")           // pitches on the default synth (no samples)
+n("0 2 4").scale("C:minor")  // scale degrees → notes (@strudel/tonal)
+s("bd sd hh")           // named samples (load a pack first)
+sound("...")            // alias of s()
+stack(a, b, ...)        // layer in parallel    seq(a,b) / cat(a,b)  // sequence / alternate
+silence                 // empty pattern
 
-// Transforms (chain before .start())
-.fast(2)                // 2× faster (= .speed(2))
-.slow(2)                // 2× slower
-.rev()                  // reverse event order each cycle
-.add(7)                 // transpose all notes +7 semitones
-.gain(0.6)              // scale event velocity (0–1, chainable)
-.pan(0.2)               // stereo pan 0 (left) – 1 (right)
-.note(scaleArr)         // map degree numbers → notes in scale array
+// Transforms (chain before .play())
+.fast(2) / .slow(2)     .rev()              .add(note("7"))   // transpose by a pattern
+.gain("0.4 0.8")        .pan("0 1")         .lpf("400 2000")  // effects take patterns too
+.euclid(3, 8)           .euclid(5, 8, 2)    // Euclidean rhythm (+ rotation)
+.every(4, p => p.rev()) .off(0.125, p => p.add(note("12")))   .jux(p => p.rev())
+.sometimes(p => p.fast(2)) / .often / .rarely / .someCyclesBy(0.3, fn)
+.degradeBy(0.3)         .scale("C:minor")
 
-.euclid(3, 8)           // 3 hits across 8 steps (Bresenham)
-.euclid(5, 8, 2)        // with rotation offset 2
-.every(4, p => p.rev()) // apply transform every 4 cycles
-.off(0.125, p => p.add(12))   // play original + time-shifted+transformed copy
-.jux(p => p.rev())      // pan original left + fn(pat) right
-
-.sometimesBy(0.3, p => p.fast(2))  // apply with probability 0.3
-.sometimes(p => p.rev())           // prob 0.5
-.often(p => p.add(12))             // prob 0.75
-.rarely(p => p.slow(2))            // prob 0.25
-
-.degrade()              // randomly drop ~50% of events per cycle
-.degradeBy(0.3)         // drop with prob 0.3
-
-.bpm(140)               // set global BPM (affects transport)
-.start(inst?)           // begin scheduling; inst overrides pat(str, inst)
-.stop()                 // stop loop
+.play()                 // start on the shared scheduler
+.stop()                 // stop this pattern (or hush() for all)
 ```
+
+`setcps(n)` controls tempo (Tone is master clock: `bpm = n*60`). In the Mixer, all Strudel
+sound is carried by a single **"Strudel"** strip (`mixer.strip('Strudel')`).
 
 ### Composing patterns
 
 ```js
-const kick  = pat("x . x .", audio.kick());
-const snare = pat(". . x .", audio.synth());
-const hat   = pat("x*4",     audio.metal());
+const drums = stack(
+  s("bd ~ bd ~"),                    // needs a loaded sample pack
+  s("~ sd ~ sd"),
+);
+const bass  = note("{c2 g2 bb2 f2}%4").slow(2);
+const mel   = n("0..7").scale("C:minor");
 
-// Polymeter: kick grid vs synth grid
-const bass  = pat("{C2 G2 Bb2 F2}%4", audio.synth());
-
-// Scale-mapped melody (0..7 → C minor)
-const scale = audio.scale('C4', 'minor');
-const mel   = pat("0..7", (deg, t, dur) => {
-  audio.synth().play(audio.note(scale, +deg), dur, t);
-});
-
-stack(kick, snare, hat, bass, mel).bpm(120).start();
-audio.start();
+stack(drums, bass, mel).play();
+setcps(0.5);
 ```
 
 ---
@@ -159,15 +152,12 @@ audio.scale('C4', 'minor')
 
 audio.note(scaleArr, degree)  // pick note by scale degree (wraps)
 
-// Pattern from scale:
-const sc = audio.scale('D4', 'pentatonic');
-pat(sc.join(' '), audio.pluck()).start();
+// In Strudel, prefer n(...).scale() — scale degrees map to notes for you:
+n("0 1 2 3 4").scale("D:pentatonic").play();
 
 // Degree-based melody:
-const sc = audio.scale('C4', 'minor');
-pat("0 2 4 2 1 3 5 4", (val, time, dur) => {
-  s.play(audio.note(sc, +val), dur, time);
-}).start();
+n("0 2 4 2 1 3 5 4").scale("C:minor").play();
+setcps(0.5);
 ```
 
 ---
@@ -303,43 +293,42 @@ const bins = fft.getValue();       // Float32Array of dB values
 
 ### Audio→Visual Patterns
 
-**Beat as state machine trigger** — each callback fires at musical time:
+**Beat as state machine trigger** — the bus `beat:tick` fires at musical time, and Strudel
+is locked to the same Tone transport:
 ```js
-const kick = audio.kick();
 let caState = initCA();
+note("c1 ~ c1 ~ c1 ~ c1 c1").play();   // audio is the clock
+setcps(0.5);
 
-pat("x . x . x . x x", (note, time, dur) => {
-  kick.play("C1", dur, time);
-  caState = stepCA(caState);   // advance CA on every kick
+on('beat:tick').do(() => {
+  caState = stepCA(caState);            // advance CA on every beat
   draw(caState);
-}).start();
+});
 ```
 
-**Note value selects visual mode** — the `note` string is structured data:
+**Beat selects visual mode** — step a palette on each beat:
 ```js
-const palettes = { C4: ["#f00","#f60"], E4: ["#0ff","#06f"], G4: ["#fff","#888"] };
-pat("C4 E4 G4 E4", (note, time, dur) => {
-  s.play(note, dur, time);
-  currentPalette = palettes[note];  // note → visual state
-}).start();
+const palettes = [["#f00","#f60"], ["#0ff","#06f"], ["#fff","#888"]];
+note("c4 e4 g4 e4").play();
+let i = 0;
+on('beat:tick').do(() => { currentPalette = palettes[i++ % palettes.length]; });
 ```
 
-**Amplitude as physics force**:
+**Amplitude as physics force** — `audio.fft` taps the master, so it sees Strudel:
 ```js
+const sig = audio.fft;
 setInterval(() => {
-  const amp = Math.pow(10, meter.getValue() / 20);
-  balls.forEach(b => { b.vy += amp * 0.005; }); // loud = stronger gravity
+  balls.forEach(b => { b.vy += sig.value * 0.005; }); // loud = stronger gravity
 }, 16);
 ```
 
-**Pitch mapped to shader parameter**:
+**Spectrum mapped to shader parameter**:
 ```js
-pat("C3 E3 G3 Bb3", (note, time, dur) => {
-  s.play(note, dur, time);
-  const hz = audio.freq(note);          // frequency in Hz
-  const norm = (hz - 130) / 800;        // normalize to 0..1
-  shader.set(1, norm);                  // → hue, warp, any visual param
-}).start();
+note("c3 e3 g3 bb3").play();
+const sig = audio.fft;
+setInterval(() => {
+  shader.set(1, sig.high ?? 0.3);  // spectral high → hue, warp, any visual param
+}, 16);
 ```
 
 ### Master FFT signal — `audio.fft`
@@ -469,19 +458,19 @@ The live audio console. Every running instrument, window, mic and drumpad gets a
 through to the **Master**. Open the panel from the toolbar 🎚️ button or from code.
 
 ```js
-const lead = audio.fm();
-pat('0 3 5 7').note(audio.scale('minor')).start({ id: 'lead', inst: lead });
+n("0 3 5 7").scale("C:minor").play();      // Strudel — sounds through the 'Strudel' strip
 
-mixer.show();                              // open the console
-mixer.strip('lead').volume(-6).pan(-0.3);  // script a strip (chainable)
-mixer.strip('lead').solo();                // additive solo — non-soloed strips duck
-mixer.strip('lead').eq([{ freq: 2500, gain: 4 }]);
-mixer.master.volume(-2);                   // master strip
-mixer.add(someWebAudioNode, { name: 'fx' }); // bring an arbitrary node into the mix
+mixer.show();                                 // open the console
+mixer.strip('Strudel').volume(-6).pan(-0.3);  // all Strudel sound is one strip (ADR 035)
+mixer.strip('Strudel').solo();                // additive solo — non-soloed strips duck
+mixer.strip('Strudel').eq([{ freq: 2500, gain: 4 }]);
+mixer.master.volume(-2);                      // master strip
+mixer.add(someWebAudioNode, { name: 'fx' });  // bring an arbitrary node into the mix
 ```
 
-- Strip name = pattern id if given (`start({id:'lead'})`), else instrument-type+counter
-  (`fm 1`), window title, `mic`, or drumpad title. Rename in the panel (double-click).
+- All Strudel output is carried by one **"Strudel"** strip (per-orbit strips deferred — ADR 035 #4).
+  Other strip names = instrument-type+counter (`fm 1`), window title, `mic`, or drumpad title.
+  Rename in the panel (double-click).
 - Settings persist by name across re-runs (localStorage) and travel in the `.vljson`
   project. Solo is a persisted per-strip flag.
 - The standalone `audio.eqWidget()` is gone — its role is now the Master strip's EQ.
@@ -492,7 +481,7 @@ mixer.add(someWebAudioNode, { name: 'fx' }); // bring an arbitrary node into the
 
 ```js
 audio.bpm(120)    // set tempo
-audio.start()     // start transport clock (needed for pat/loop/sequence)
+audio.start()     // start transport clock (needed for Strudel .play(), loop, sequence)
 audio.stop()      // stop transport
 audio.volume(-6)  // master output volume in dB
 audio.now()       // current audio time in seconds

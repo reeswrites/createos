@@ -350,19 +350,17 @@ setInterval(() => {
 ```js
 draw.bg('#111');
 
-const kick = audio.kick();
-const meter = audio.meter();
-kick.chain(meter);
+const sig = audio.fft; // master amplitude — captures Strudel via the shared context
 
 setInterval(() => {
-  const amp = Math.pow(10, (meter.getValue() || -Infinity) / 20);
+  const amp = sig.value;
   draw.clear()
       .circle(800, 450, 100 + amp * 200, `hsl(${Date.now() / 20 % 360}, 80%, 60%)`);
   getLayer(0).blur(amp * 8);
 }, 16);
 
-pat('x . x . x x . x', kick).start();
-audio.bpm(130); audio.start();
+note("c2 ~ c2 ~ c2 c2 ~ c2").play();
+setcps(0.54); // ~130 bpm
 ```
 
 ### Two-layer compositing

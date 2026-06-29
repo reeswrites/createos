@@ -29,15 +29,20 @@ const KNOWN_GLOBALS = new Set([
   'Sprite', 'SpriteEditor', 'spriteEditor',
   'Paint', 'paint',
   'AsciiEditor', 'asciiEditor',
-  'Drumpad', 'Pattern', 'Piano', 'Notepad', 'notepad',
+  'Drumpad', 'Piano', 'Notepad', 'notepad',
   'Recording', 'recordStream', 'compositeCanvasStream', 'recordWindow', 'snapshot',
   'PIXI', 'pixi', 'Stage',
   'PluginHost',
   'Color', 'tween', 'randUni',
   // Event bus
   'on', 'emit', 'any', 'tick', 'hold',
-  // Pattern / audio shorthands
-  'pat', 'pattern', 'stack',
+  // Strudel pattern engine globals (ADR 035) — registered in app.js
+  'note', 's', 'n', 'sound', 'silence',
+  'stack', 'cat', 'slowcat', 'fastcat', 'seq', 'sequence', 'timeCat', 'arrange',
+  'polymeter', 'polyrhythm', 'run',
+  'rand', 'rand2', 'perlin', 'irand', 'choose', 'wchoose', 'chooseCycles', 'randcat',
+  'sine', 'cosine', 'saw', 'isaw', 'square', 'tri', 'signal', 'steady',
+  'pure', 'reify', 'mini', 'samples', 'setcps', 'setcpm', 'hush',
   // Layer/canvas helpers (registered in editor preamble)
   'getCanvas', 'getLayer', 'getDraw',
   // Other registered names

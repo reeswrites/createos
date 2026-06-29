@@ -33,7 +33,6 @@ const COVERAGE = {
   'Audio':           ['audio_', 'drumpad_'],
   'Piano':           ['piano_'],
   'Audio→Visual':    ['audio_viz'],
-  'Patterns':        ['pat_'],
   'Canvas':          ['canvas_', 'draw_'],
   'Pipeline':        ['pipe_'],
   'Vision':          ['vision_'],
@@ -55,6 +54,10 @@ const COVERAGE = {
 // conscious "text-only on purpose" decision ADR 002's functional-coverage rule
 // asks for — advanced / hardware / niche desktop-shell surfaces.
 const TEXT_ONLY_INTENTIONAL = new Set([
+  'Patterns',       // Strudel is a text-first DSL (ADR 035); mirroring its function
+                    //   algebra as blocks is lossy + high-maintenance. Text-only on
+                    //   purpose; the round-trip is protected by the js_raw passthrough
+                    //   block (ADR 037), not by native Strudel blocks.
   'Desktop',        // file-icon management — imperative, low value as blocks
   'Desktop Shell',  // Electron/Tauri bridge — desktop-only, advanced
   'MIDI',           // hardware I/O — advanced

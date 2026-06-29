@@ -19,7 +19,9 @@ function walk(node, visitor) {
 // ── Text-level fast scan ──────────────────────────────────────────────────────
 
 export const API_PATTERNS = {
-  usesAudio:    /\baudio\s*\.|\bpattern\s*\(|\bpat\s*\(|\bstack\s*\(|\bnew\s+Pattern\b|\bnew\s+Drumpad\b/,
+  // Strudel pattern engine (ADR 035): note()/sound()/stack()/seq()/cat() sources,
+  // setcps()/hush()/samples() transport, and the universal `.play()` trigger.
+  usesAudio:    /\baudio\s*\.|\bnote\s*\(|\bsound\s*\(|\bstack\s*\(|\bseq\s*\(|\bsequence\s*\(|\bcat\s*\(|\bsetcps\s*\(|\bsetcpm\s*\(|\bhush\s*\(|\bsamples\s*\(|\.play\s*\(\s*\)|\bnew\s+Drumpad\b/,
   usesShader:   /\bnew\s+Shader\b/,
   usesGLShader: /\bnew\s+GLShader\b/,
   usesShaderFX: /\bShaderFX\b/,

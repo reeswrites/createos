@@ -236,32 +236,41 @@ audio.autoFilter(rate) / audio.vibrato(freq, depth) / audio.tremolo(freq, depth)
 audio.pitchShift(semitones) / audio.compressor(threshold, ratio) / audio.eq(low, mid, high)
 ```
 
-### Patterns (mini-notation)
+### Patterns — Strudel (ADR 035)
+
+Real [Strudel](https://strudel.cc) engine (`@strudel/*`). Invoked by **explicit calls** — no
+global transpiler, so bare strudel.cc string-method sugar (`"c e g".fast(2)`) is not available;
+write the function form. `.play()` starts a pattern on the shared scheduler; `hush()` stops all.
 
 ```js
-pat(str, inst?)           // → Pattern (immutable, chainable transforms)
-pat(str, (v,t,dur) => {}) // callback form
-stack(pat1, pat2, ...)    // layer patterns; .bpm(v).start()
+note("c e g b")            // pitches on the default synth — NO samples needed (front door)
+n("0 2 4").scale("C:minor")// scale degrees → notes (@strudel/tonal)
+s("bd hh sd hh")           // named samples — silent until you load a pack (see below)
+sound("...")               // alias of s()
+stack(patA, patB, ...)     // layer patterns in parallel (how you run >1 line; last .play() wins)
+seq(a, b) / cat(a, b)      // sequence / alternate-per-cycle
+silence                    // the empty pattern
 
-// Notation:
-//   spaces=steps  []=group  <>=alternate  *N=repeat  !=replicate  @N=weight
-//   ?=degrade(0.5)  ,=simultaneous  {}%N=polymeter  0..7=range  ~/.=rest
+// Mini-notation (inside note()/s()/n()): the string parses as a sequence —
+//   space=sequence  [a b]=subgroup  <a b>=alternate  a*N=repeat  a!N=replicate
+//   a@N=weight  a?=degrade  a,b=parallel  {a b}%N=polymeter  0..7=range  ~=rest
 
-// Transforms (return new Pattern):
-.fast(n) / .slow(n) / .speed(n)
-.rev()                                    // reverse each cycle
-.add(semitones)                           // transpose all notes
-.gain(v)                                  // velocity scale 0–1
-.pan(v)                                   // stereo pan 0–1
-.note(scaleArr)                           // map numbers → scale degrees
-.euclid(k, n, rot?)                       // Euclidean rhythm with optional rotation
-.every(n, fn)                             // apply fn(pat) every N cycles
-.off(t, fn)                               // original + t-shifted fn(pat) copy
-.jux(fn)                                  // original (pan=0) + fn(pat) (pan=1)
-.sometimesBy(p, fn) / .sometimes / .often / .rarely
-.degrade() / .degradeBy(p)
-.bpm(v)
-.start(inst?) / .stop()
+// Chainable transforms (return a new Pattern):
+.fast(n) / .slow(n)            .rev()              .add(note("7"))  // transpose
+.gain("0.4 0.8")  .pan("0 1")  .lpf(...) .room(...) // effects take patterns too
+.every(n, fn)     .sometimes(fn) / .often / .rarely / .someCyclesBy
+.jux(fn)          .off(t, fn)    .euclid(pulses, steps)   .degradeBy(p)
+.scale("C:minor")  // @strudel/tonal
+.play() / .stop()
+
+setcps(n)   // cycles/sec — also sets Tone.Transport.bpm = n*60 (shared tempo, Tone is master)
+hush()      // stop the Strudel scheduler (a code reset also hushes)
+
+// Samples are BRING-YOUR-OWN — createos bundles no kit:
+samples('github:tidalcycles/dirt-samples');  // (or any sample-map URL) THEN s("bd sd hh")
+
+// In the Mixer, all Strudel sound is carried by a single "Strudel" strip:
+//   mixer.strip('Strudel').volume(-6).pan(-0.3)
 ```
 
 ### Scales & analysis
@@ -1405,11 +1414,9 @@ setInterval(() => {
 ### Shader driven by mouse + audio
 
 ```js
-const s = audio.fm();
-const meter = audio.meter();
-s.chain(meter);
-pat("C4 E4 G4 B4", s).bpm(120).start();
-audio.start();
+note("c4 e4 g4 b4").play();
+setcps(0.5);
+const sig = audio.fft; // master signal — captures Strudel via the shared context
 
 const shader = new Shader(`
   let amp = custom.x;
@@ -1419,8 +1426,7 @@ const shader = new Shader(`
 `);
 shader.start();
 setInterval(() => {
-  const db = meter.getValue();
-  shader.set(0, isFinite(db) ? Math.pow(10, db / 20) : 0);
+  shader.set(0, sig.value); // master amplitude 0..1 (incl. Strudel)
 }, 16);
 ```
 
@@ -1448,12 +1454,11 @@ tick(16).do(() => {
 ### Vision + audio
 
 ```js
-const kick = audio.kick();
-pat("x . x .", kick).bpm(100).start();
-audio.start();
+note("c2 ~ c2 ~").play();
+setcps(0.42); // ~100 bpm
 
-vision.onGesture('Open_Palm', () => audio.bpm(160));
-vision.onGesture('Closed_Fist', () => audio.bpm(80));
+vision.onGesture('Open_Palm', () => setcps(0.66));   // ~160 bpm
+vision.onGesture('Closed_Fist', () => setcps(0.33)); // ~80 bpm
 
 setInterval(() => {
   const h = vision.hands()[0];

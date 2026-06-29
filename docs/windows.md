@@ -181,11 +181,10 @@ const id = wm.getByTitle('My Window')      // look up id by titlebar text (case-
 ```js
 // Pulse a window's brightness on each beat
 const id = wm.spawn('Flash', { type: 'html', html: '<canvas id="c"></canvas>', w: 300, h: 300 });
-audio.pat('bd').stream(v => {
-  if (v > 0) {
-    wm.filter(id, 'brightness(3)');
-    setTimeout(() => wm.filter(id, ''), 80);
-  }
+note("c2*4").play();
+on('beat:tick').do(() => {   // Strudel is locked to the Tone transport
+  wm.filter(id, 'brightness(3)');
+  setTimeout(() => wm.filter(id, ''), 80);
 });
 ```
 

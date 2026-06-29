@@ -16,8 +16,6 @@ import { searchMarksField, initSearch } from './cm-search.js';
 import { paramHintsExtension } from './param-hints.js';
 import { windowMemberCompletionSource } from './completions.js';
 import { shaderSignalPickerExtension } from './shader-signal-picker.js';
-import { getDraw } from '../api/draw.js';
-import { Layer } from '../api/layer.js';
 import { startAudio } from '../api/audio.js';
 import { addEditorIcon, removeEditorIcon, updateEditorIconLabel, duplicateEditor } from '../api/desktop-files.js';
 // Per-subsystem cleanups are no longer imported here — each module self-registers
@@ -109,8 +107,9 @@ const traceLineField = StateField.define({
 });
 
 // Number of lines the execute() preamble adds before user code (1-based offset).
-// Structure: `(async function(){\n` + 13 preamble lines + `\nawait ...\n` = 14.
-const PREAMBLE_LINES = 14;
+// Structure: `(async function(){\n` + 9 preamble lines + `\nawait ...\n` = 10.
+// (9 = 5 PER_EDITOR_LOCALS windowed consts + 4 run-control sugar lines.)
+const PREAMBLE_LINES = 10;
 
 // ── Per-Editor Locals (CONTEXT.md) ───────────────────────────────────────────
 // The single source of truth for the windowed per-editor locals. `_setupGlobals`
@@ -121,10 +120,8 @@ const PREAMBLE_LINES = 14;
 // Run-control sugar (stop/pause/resume) is NOT here: it has no window-global side
 // and never grows, so it stays inline in editorPreamble.
 const PER_EDITOR_LOCALS = [
-  ['draw',          (i) => i.draw],
-  ['getCanvas',     (i) => (z = 0) => i._getLayerCanvas(z)],
-  ['getLayer',      (i) => (z) => i._getLayerObj(z)],
-  ['getDraw',       (i) => (z = 0) => i._getDraw(z)],
+  // ADR 040: global `draw` / getCanvas / getLayer / getDraw deleted. The sole 2D
+  // surface is `new Canvas()` (window.Canvas), which owns its window + layer stack.
   ['setInterval',   (i) => (cb, delay, ...args) => {
     const id = i._native.setInterval(cb, delay, ...args);
     i._intervals.set(id, { cb, delay, args });
@@ -185,22 +182,6 @@ export function editorPreamble(id) {
 const STORAGE_PREFIX      = 'vl-ide-code-';
 const EXEC_STATE_PREFIX   = 'vl-ide-exec-';
 const TITLE_PREFIX        = 'vl-ide-title-';
-const _OUTPUT_SIZE_KEY    = 'vl-output-size';
-
-/** Read persisted output-window geometry. Returns {x,y,w,h} or null. */
-function _getOutputGeom() {
-  try { return JSON.parse(localStorage.getItem(_OUTPUT_SIZE_KEY) || 'null'); } catch (_) { return null; }
-}
-/** Persist output-window geometry from a live DOM element. */
-function _saveOutputGeom(win) {
-  try {
-    const x = parseInt(win.style.left)   || 0;
-    const y = parseInt(win.style.top)    || 0;
-    const w = parseInt(win.style.width)  || 640;
-    const h = parseInt(win.style.height) || 400;
-    localStorage.setItem(_OUTPUT_SIZE_KEY, JSON.stringify({ x, y, w, h }));
-  } catch (_) {}
-}
 const LEGACY_KEY = 'vl-ide-code';
 
 const ICONS = {
@@ -232,10 +213,6 @@ export class EditorInstance {
     this._hadOutput = false;
     this._pausedState = null;
 
-    this._layers = new Map();
-    this._layerObjects = new Map();
-    this._drawTargets = new Map();
-
     this.blocklyWorkspace = null;
     this.blocksMode = false;
 
@@ -248,7 +225,6 @@ export class EditorInstance {
     this._traceRAF = null;
 
     this.editorWinId = `win-editor-${id}`;
-    this.canvasWinId = `win-canvas-${id}`;
 
     this._buildDOM();
     this._setupGlobals();
@@ -263,74 +239,11 @@ export class EditorInstance {
     }
   }
 
-  // ── Canvas / layer ─────────────────────────────────────────────────────────
-
-  _makeGetLayerCanvas() {
-    return (z) => {
-      if (this._layers.has(z)) return this._layers.get(z);
-      const c = document.createElement('canvas');
-      c.width = this.mainCanvas.width;
-      c.height = this.mainCanvas.height;
-      c.className = 'ar-layer';
-      Object.assign(c.style, {
-        position: 'absolute', top: '0', left: '0',
-        width: '100%', height: '100%',
-        zIndex: String(z < 0 ? z : 20 + z),
-        pointerEvents: 'none',
-      });
-      this.canvasWrapper.appendChild(c);
-      this._layers.set(z, c);
-      return c;
-    };
-  }
-
-  _getDraw(z) {
-    if (this._drawTargets.has(z)) return this._drawTargets.get(z);
-    const t = getDraw(z, this._getLayerCanvas);
-    this._drawTargets.set(z, t);
-    return t;
-  }
-
-  _getLayerObj(z) {
-    if (this._layerObjects.has(z)) return this._layerObjects.get(z);
-    const canvas = this._getLayerCanvas(z);
-    const layer = new Layer(canvas);
-    this._layerObjects.set(z, layer);
-    return layer;
-  }
-
   // ── DOM construction ───────────────────────────────────────────────────────
 
   _buildDOM() {
-    // Canvas stack
-    this.mainCanvas = document.createElement('canvas');
-    this.mainCanvas.width = 1600;
-    this.mainCanvas.height = 900;
-    Object.assign(this.mainCanvas.style, {
-      position: 'absolute', top: '0', left: '0',
-      width: '100%', height: '100%', zIndex: '20',
-    });
-
-    this.canvasWrapper = document.createElement('div');
-    this.canvasWrapper.className = 'ar-canvas-wrapper';
-    this.canvasWrapper.tabIndex = -1;
-    this.canvasWrapper.style.outline = 'none';
-    this.canvasWrapper.appendChild(this.mainCanvas);
-
-    this.fsContainer = document.createElement('div');
-    this.fsContainer.className = 'ar-fs-container';
-    this.fsContainer.appendChild(this.canvasWrapper);
-
-    new ResizeObserver(([entry]) => {
-      const { width, height } = entry.contentRect;
-      const w = Math.min(width, (height * 16) / 9);
-      this.canvasWrapper.style.width = `${w}px`;
-      this.canvasWrapper.style.height = `${(w * 9) / 16}px`;
-    }).observe(this.fsContainer);
-
-    this._layers.set(0, this.mainCanvas);
-    this._getLayerCanvas = this._makeGetLayerCanvas();
-    this.draw = this._getDraw(0);
+    // ADR 040: the editor no longer owns a 2D canvas stack or output window —
+    // visual output is `new Canvas()` (spawns its own wm window).
 
     // Console panel
     this.consoleEl = document.createElement('div');
@@ -586,16 +499,6 @@ export class EditorInstance {
       if (this.btnState === 'running' || this.btnState === 'paused') this.stopRunning();
     });
 
-    // Clear canvas button
-    this.clearCanvasBtn = document.createElement('button');
-    this.clearCanvasBtn.className = 'ar-btn';
-    this.clearCanvasBtn.title = 'Clear Canvas';
-    this.clearCanvasBtn.innerHTML = '<i class="fa-solid fa-eraser"></i>';
-    this.clearCanvasBtn.style.display = 'none';
-    this.clearCanvasBtn.addEventListener('click', () => {
-      for (const c of this._layers.values())
-        c.getContext('2d').clearRect(0, 0, c.width, c.height);
-    });
 
     // Console toggle
     this.consoleToggleBtn = document.createElement('button');
@@ -633,7 +536,6 @@ export class EditorInstance {
     });
 
     bar.appendChild(modeToggle);
-    bar.appendChild(this.clearCanvasBtn);
     bar.appendChild(this.consoleToggleBtn);
     bar.appendChild(inlayBtn);
     this.executeBtn.style.marginLeft = 'auto';
@@ -711,8 +613,6 @@ export class EditorInstance {
         return;
       }
       editorWin.style.display = 'none';
-      const canvasWin = document.getElementById(this.canvasWinId);
-      if (canvasWin) canvasWin.style.display = 'none';
     };
     editorWin._wmOnTitleChange = (newTitle) => {
       this.title = newTitle;
@@ -720,8 +620,6 @@ export class EditorInstance {
       const ownTitle = editorWin.querySelector('.wm-title');
       if (ownTitle && ownTitle.textContent !== newTitle) ownTitle.textContent = newTitle;
       updateEditorIconLabel(this.id, newTitle);
-      const outWin = document.getElementById(this.canvasWinId);
-      if (outWin) { const t = outWin.querySelector('.wm-title'); if (t) t.textContent = `${newTitle} — Output`; }
     };
     editorWin._wmIsEditor = true;
 
@@ -732,64 +630,6 @@ export class EditorInstance {
         resizeBlockly(this.blocklyWorkspace);
     }).observe(editorWin);
 
-  }
-
-  _ensureOutputWin() {
-    if (document.getElementById(this.canvasWinId)) return;
-    // Reuse last known output window geometry (persisted across sessions)
-    const savedGeom = _getOutputGeom();
-    const outW = savedGeom?.w || 640;
-    const outH = savedGeom?.h || 400;
-    const spawnOpts = { id: this.canvasWinId, type: 'html', html: '', w: outW, h: outH, audio: false };
-    // Pass saved x/y when available so spawn places the window correctly
-    if (savedGeom?.x != null) { spawnOpts.x = savedGeom.x; spawnOpts.y = savedGeom.y ?? 0; }
-    this._wm.spawn(`${this.title} — Output`, spawnOpts);
-    const canvasWin = document.getElementById(this.canvasWinId);
-    // Start hidden so _showOutputWin() runs its positioning logic (or restores saved geom)
-    canvasWin.style.display = 'none';
-    canvasWin.classList.add('wm-draggable-body');
-    if (document.body.classList.contains('ar-embed')) canvasWin.classList.add('ar-embed-output');
-    const canvasBody = canvasWin.querySelector('.wm-body');
-    canvasBody.style.flexDirection = 'column';
-    canvasBody.appendChild(this.fsContainer);
-    canvasWin._wmSpawnOpts = { title: `Output mirror`, type: 'canvas', z: 0 };
-    canvasWin._wmCleanup = () => {
-      // Persist geometry before the window is removed so the next open restores it
-      _saveOutputGeom(canvasWin);
-      this._keepAlive.delete(canvasWin);
-      if (this.btnState === 'running' || this.btnState === 'paused') {
-        this.reset();
-        this._setIdle();
-      }
-    };
-
-    // Save full geometry (including position) on resize/drag so the next window reuses it
-    new ResizeObserver(() => { _saveOutputGeom(canvasWin); }).observe(canvasWin);
-
-    // Mirror button — spawns a composited copy of all layers
-    const mirrorBtn = document.createElement('span');
-    mirrorBtn.className = 'wm-btn';
-    mirrorBtn.title = 'Spawn mirror window';
-    mirrorBtn.innerHTML = '<i class="fa-regular fa-clone"></i>';
-    let _mirrorCount = 0;
-    mirrorBtn.addEventListener('click', e => {
-      e.stopPropagation();
-      const mirrorId = `win-mirror-${this.id}${_mirrorCount++ ? `-${_mirrorCount}` : ''}`;
-      // Mirror inherits master's current size and spawns slightly offset so it's not hidden underneath
-      const mw = parseInt(canvasWin.style.width)  || 480;
-      const mh = parseInt(canvasWin.style.height) || 270;
-      const mx = (parseInt(canvasWin.style.left)  || 0) + 24;
-      const my = (parseInt(canvasWin.style.top)   || 0) + 24;
-      this._wm.spawn(`${this.title} — Mirror`, {
-        id: mirrorId,
-        type: 'canvas',
-        getLayers: () => [...this.fsContainer.querySelectorAll('canvas')]
-          .sort((a, b) => (parseInt(a.style.zIndex) || 0) - (parseInt(b.style.zIndex) || 0)),
-        w: mw, h: mh, x: mx, y: my,
-      });
-    });
-    const firstBtn = canvasWin.querySelector('.wm-titlebar .wm-btn');
-    canvasWin.querySelector('.wm-titlebar').insertBefore(mirrorBtn, firstBtn);
   }
 
   // ── Globals injected into IIFE ─────────────────────────────────────────────
@@ -839,12 +679,6 @@ export class EditorInstance {
     this._traceActive.clear();
     this._traceDirty.clear();
     if (this.cm) this.cm.dispatch({ effects: setTraceLinesEffect.of(null) });
-  }
-
-  _refreshDraw() {
-    this._drawTargets.clear();
-    this.draw = this._getDraw(0);
-    window[`__ar_e${this.id}_draw`] = this.draw;
   }
 
   // ── Console ────────────────────────────────────────────────────────────────
@@ -981,7 +815,6 @@ export class EditorInstance {
     this.executeBtn.title = 'Run';
     this.executeBtn.className = 'ar-btn ar-btn-green';
     this.stopBtn.style.display = 'none';
-    this.clearCanvasBtn.style.display = 'none';
     this._updateTaskbarChip();
   }
 
@@ -992,7 +825,6 @@ export class EditorInstance {
     this.executeBtn.title = 'Pause';
     this.executeBtn.className = 'ar-btn ar-btn-orange';
     this.stopBtn.style.display = '';
-    this.clearCanvasBtn.style.display = '';
     this._updateTaskbarChip();
   }
 
@@ -1003,7 +835,6 @@ export class EditorInstance {
     this.executeBtn.title = 'Resume';
     this.executeBtn.className = 'ar-btn ar-btn-green';
     this.stopBtn.style.display = '';
-    this.clearCanvasBtn.style.display = '';
     this._updateTaskbarChip();
   }
 
@@ -1025,7 +856,6 @@ export class EditorInstance {
 
   _setStopped() {
     if (this.idleWatcher) { this._native.clearInterval(this.idleWatcher); this.idleWatcher = null; }
-    this._wm.close(this.canvasWinId);
     const isPopped = !!document.getElementById(`win-console-${this.id}`);
     if (!isPopped) {
       this.consolePanel.style.display = 'none';
@@ -1077,7 +907,7 @@ export class EditorInstance {
     this._listeners.forEach(({ target, type, handler, options }) =>
       target?.removeEventListener(type, handler, options));
     this._listeners = [];
-    runResetHandlers(this.id);   // release run-scoped leases/routes/shaders (camera, mic, etc.) — scoped to this editor
+    runResetHandlers(this.id, false);   // hard reset/stop — tear everything down (Canvas windows too)
     this._pausedState = null;
     this._clearTrace();
     this._setStopped();
@@ -1118,56 +948,16 @@ export class EditorInstance {
     for (const id of this._timeouts.keys()) this._native.clearTimeout(id);
     this._intervals.clear();
     this._timeouts.clear();
-    runResetHandlers(this.id);   // every subsystem's cleanup, registered via onReset (ADR 008) — scoped to this editor
+    runResetHandlers(this.id, soft);   // every subsystem's cleanup, registered via onReset (ADR 008) — scoped to this editor; soft → Canvas windows survive
     if (!soft) {
       this._keepAlive = new Set();
       this._hadOutput = false;
       window.__ar_keepAlive = this._keepAlive;
     }
     if (this.currentScript) { document.body.removeChild(this.currentScript); this.currentScript = null; }
-    this._layerObjects.forEach(layer => layer.reset());
-    this._layerObjects.clear();
-    this._drawTargets.clear();
-    for (const [z, c] of this._layers) {
-      if (!soft) c.getContext('2d').clearRect(0, 0, c.width, c.height);
-      if (z !== 0) c.remove();
-    }
-    this._layers = new Map([[0, this.mainCanvas]]);
-    this._getLayerCanvas = this._makeGetLayerCanvas();
-    this._refreshDraw();
     if (this.idleWatcher) { this._native.clearInterval(this.idleWatcher); }
     this.idleWatcher = null;
     this._setIdle();
-  }
-
-  _showOutputWin({ audio = false } = {}) {
-    this._ensureOutputWin();
-    if (audio) this._wm.ensureAudioControls(this.canvasWinId);
-    const outputWin = document.getElementById(this.canvasWinId);
-    const editorWin = document.getElementById(this.editorWinId);
-    if (!outputWin || outputWin.style.display === 'flex') return;
-    const savedGeom = _getOutputGeom();
-    if (savedGeom?.x != null) {
-      // Restore exact saved geometry — window comes back where the user left it
-      outputWin.style.left   = `${savedGeom.x}px`;
-      outputWin.style.top    = `${savedGeom.y ?? 0}px`;
-      outputWin.style.width  = `${savedGeom.w}px`;
-      outputWin.style.height = `${savedGeom.h}px`;
-    } else {
-      // First-run / legacy: auto-layout next to the editor
-      const desk = document.getElementById('desktop');
-      const dw = desk.offsetWidth, dh = desk.offsetHeight;
-      const editorLeft = editorWin?.offsetLeft ?? 0;
-      const editorNewW = Math.round((dw - editorLeft) * 0.45);
-      if (editorWin) editorWin.style.width = `${editorNewW}px`;
-      outputWin.style.left   = `${editorLeft + editorNewW}px`;
-      outputWin.style.top    = '0px';
-      outputWin.style.width  = `${dw - editorLeft - editorNewW}px`;
-      outputWin.style.height = `${dh}px`;
-    }
-    outputWin.style.display = 'flex';
-    this._keepAlive.add(outputWin);
-    this._hadOutput = true;
   }
 
   execute({ soft = false } = {}) {
@@ -1182,18 +972,14 @@ export class EditorInstance {
     this.reset({ soft });
     _beginRun(); // snapshot API registry so run-scoped registerAPI() calls are reverted on reset
 
-    // Smart output detection: analyse user code before executing so we only open
-    // the output window and start audio when they're actually needed.
+    // Smart output detection: analyse user code before executing so we only start
+    // audio when it's needed. ADR 040: there is no auto-opened output window —
+    // visual output comes from `new Canvas()` / `.show()`, which spawn their own.
     const _apiHints = detectAPIUsage(raw);
-    const _needsCanvas = _apiHints.usesDraw || _apiHints.usesLayer || _apiHints.usesGetCanvas || _apiHints.usesPixi ||
-      _apiHints.usesShaderFX || _apiHints.usesThree ||
-      (_apiHints.usesShader && _apiHints.shaderStartCalled) ||
-      (_apiHints.usesGLShader && _apiHints.shaderStartCalled);
-    // Show output window; pass usesAudio so volume controls only appear for audio scripts
-    if (_needsCanvas) this._showOutputWin({ audio: _apiHints.usesAudio });
 
     window.__ar_usesAudio  = _apiHints.usesAudio;
     window.__ar_audioReady = _apiHints.usesAudio ? startAudio() : Promise.resolve();
+    if (_apiHints.usesAudio) this._wm.ensureAudioChip?.();   // master audio control in taskbar (ADR 040)
     if (!soft) {
       this._keepAlive = new Set();
       this._hadOutput = false;
@@ -1204,9 +990,6 @@ export class EditorInstance {
     // Tag listeners to this editor during synchronous setup
     window.__ar_active_editor_id = this.id;
     emit('session:start', { code: raw });
-    // Expose per-editor containers so shared APIs (Shader) find the right DOM node
-    window.__ar_fsContainer   = this.fsContainer;
-    window.__ar_canvasWrapper = this.canvasWrapper;
 
     let protected_code;
     try {
@@ -1247,9 +1030,7 @@ export class EditorInstance {
     try { localStorage.removeItem(`vl-blocks-open-${this.id}`);  } catch (_) {}
 
     const editorWin = document.getElementById(this.editorWinId);
-    const canvasWin = document.getElementById(this.canvasWinId);
     if (editorWin) { editorWin._wmOnClose = null; editorWin.remove(); }
-    if (canvasWin) { canvasWin._wmCleanup?.(); canvasWin.remove(); }
     this._wm.saveState(); // flush WM state now so orphaned window IDs don't respawn on reload
 
     const ns = `__ar_e${this.id}`;

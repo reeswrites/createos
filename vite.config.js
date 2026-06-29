@@ -3,7 +3,9 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   base: '/createos/',
   optimizeDeps: {
-    exclude: ['@mediapipe/tasks-vision'],
+    // transformers (ONNX Runtime Web) is dynamically imported by the STT engine; excluding
+    // it keeps the WASM/worker assets intact and out of the pre-bundle (ADR 039).
+    exclude: ['@mediapipe/tasks-vision', '@huggingface/transformers'],
     include: [
       '@codemirror/view',
       '@codemirror/state',

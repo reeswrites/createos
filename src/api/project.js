@@ -153,13 +153,8 @@ export async function applyProject(data, wm, instances, appAPI) {
 
   appAPI.updateManifest(editorIds);
 
-  // Output windows — must exist before applying geometry
-  for (const w of data.windows.filter(w => w.type === 'output')) {
-    const inst = instances.get(w.editorId);
-    if (!inst) continue;
-    inst._ensureOutputWin();
-    _applyGeo(document.getElementById(inst.canvasWinId), w);
-  }
+  // ADR 040: legacy `type:'output'` windows are ignored on load — there is no
+  // editor output window; a project's `new Canvas()` code spawns its own.
 
   // Other windows
   for (const w of data.windows) {

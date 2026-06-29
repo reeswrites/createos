@@ -120,6 +120,17 @@ export function getLastPayload(event) {
   return _lastPayloads.get(event);
 }
 
+// Does anyone subscribe to this exact event? `runScopedOnly` restricts the check
+// to subscriptions created during the current editor run (user-code on()/tick()),
+// ignoring persistent system listeners — i.e. "is the running sketch listening?".
+export function hasSubscribers(event, { runScopedOnly = false } = {}) {
+  const set = _subscribers.get(event);
+  if (!set || set.size === 0) return false;
+  if (!runScopedOnly) return true;
+  for (const entry of set) if (entry.runScoped) return true;
+  return false;
+}
+
 // Add a persistent observer called for every fired event (before subscribers).
 // Not run-scoped — not cleared by clearRunScoped(). Returns an unsubscribe fn.
 export function addBusTap(fn) {

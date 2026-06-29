@@ -20,9 +20,14 @@ export function onReset(fn) {
 // track per-editor outputs (e.g. route.js) use it to tear down only their own
 // editor's artifacts, so running one editor does not kill another editor's live
 // outputs. When omitted (undefined), handlers fall back to a full global reset.
-export function runResetHandlers(editorId) {
+//
+// soft (optional): true for an auto-execute soft reset (output windows should
+// survive — ADR 040 Canvas identity-reuse), false/undefined for a hard reset/stop
+// (tear everything down). Most handlers ignore it; Canvas uses it to keep its
+// window across re-runs instead of flash-rebuilding it every ~1s.
+export function runResetHandlers(editorId, soft = false) {
   for (const fn of _handlers) {
-    try { fn(editorId); }
+    try { fn(editorId, soft); }
     catch (e) { console.error('[reset] handler failed:', e); }
   }
 }

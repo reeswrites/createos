@@ -34,9 +34,10 @@ export class ThreeScene {
     this.camera.position.z = 5;
 
     this.renderer = new THREE.WebGLRenderer({ antialias, alpha });
-    const wrapper = window.__ar_canvasWrapper ?? document.getElementById('canvasWrapper');
-    const w = width || wrapper?.offsetWidth || 800;
-    const h = height || wrapper?.offsetHeight || 600;
+    // ADR 040: no editor output window — sized to the mount target (mount/show),
+    // defaulting to 800×600 until mounted.
+    const w = width || 800;
+    const h = height || 600;
     this.renderer.setSize(w, h);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 
@@ -50,10 +51,46 @@ export class ThreeScene {
     _scenes.push(this);
   }
 
+  // ── Mount / show (ADR 040) ─────────────────────────────────────────────────
+  // mount(target[, z]) — render into a window's layer stack. target: a Canvas
+  //   (has .winId), a window id, or a DOM element. show(opts) — spawn own window.
+  mount(target, z) {
+    if (z !== undefined) { this._z = z; this.canvas.style.zIndex = String(z); }
+    let body = null, winId = null;
+    if (target && typeof target === 'object' && target.winId) winId = target.winId;
+    else if (typeof target === 'string') winId = target;
+    else if (target instanceof HTMLElement) body = target;
+
+    if (winId) {
+      window.wm?.layer?.(winId, this._z, { adopt: this.canvas });
+      body = document.getElementById(winId)?.querySelector('.wm-body') ?? null;
+    } else if (body) {
+      if (getComputedStyle(body).position === 'static') body.style.position = 'relative';
+      body.appendChild(this.canvas);
+    }
+    if (body) {
+      const rw = body.clientWidth || 800, rh = body.clientHeight || 600;
+      this.renderer.setSize(rw, rh);
+      this.camera.aspect = rw / rh;
+      this.camera.updateProjectionMatrix();
+    }
+    return this.start();
+  }
+
+  show(opts = {}) {
+    const { title = 'Three', w = 700, h = 500 } = opts;
+    const winId = window.wm?.spawn(title, {
+      w, h, html: '', transient: true,
+      onClose: () => this._destroy(),
+      ...(opts.noChrome    !== undefined ? { noChrome:    opts.noChrome    } : {}),
+      ...(opts.transparent !== undefined ? { transparent: opts.transparent } : {}),
+    });
+    this._ownWinId = winId ?? null;
+    return this.mount(winId);
+  }
+
   start() {
     if (this._rafId || this._destroyed) return this;
-    const wrapper = window.__ar_canvasWrapper ?? document.getElementById('canvasWrapper');
-    if (wrapper && !wrapper.contains(this.canvas)) wrapper.appendChild(this.canvas);
     this._live = liveOutput(this);
     this._startTime = performance.now();
     this._lastTime = this._startTime;
@@ -124,6 +161,7 @@ export class ThreeScene {
     this._bindings = {};
     if (this.canvas.parentNode) this.canvas.parentNode.removeChild(this.canvas);
     this.renderer.dispose();
+    if (this._ownWinId) { const id = this._ownWinId; this._ownWinId = null; window.wm?.remove?.(id, { animate: false }); }
     this._destroyed = true;
   }
 }

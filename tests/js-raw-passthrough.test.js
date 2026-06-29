@@ -29,9 +29,9 @@ describe('js_raw passthrough (ADR 037)', () => {
   });
 
   it('keeps recognized blocks AND wraps unrecognized ones in the same program', () => {
-    const ws = jsToBlocks("draw.bg('#000');\nnote(\"c e g\").play();");
+    const ws = jsToBlocks("canvas.bg('#000');\nnote(\"c e g\").play();");
     const blocks = chain(ws.blocks.blocks[0]);
-    expect(blocks.some((b) => b.type !== 'js_raw')).toBe(true);   // draw.bg recognized
+    expect(blocks.some((b) => b.type !== 'js_raw')).toBe(true);   // canvas.bg recognized
     const raw = blocks.find((b) => b.type === 'js_raw');
     expect(raw?.fields.CODE).toContain('note("c e g").play()');
   });

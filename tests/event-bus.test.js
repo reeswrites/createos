@@ -8,13 +8,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Strategy: use vi.isolateModules for stateful tests, or just reimport
 // and work with the exported API (statefulness is acceptable for integration-style tests).
 
-let emit, notify, subscribe, registerCommand, registerSource, getLastPayload, clearRunScoped;
+let emit, notify, subscribe, registerCommand, registerSource, getLastPayload, clearRunScoped, hasSubscribers;
 let on, any, tick, hold;
 
 beforeEach(async () => {
   // Re-import to get a fresh module instance per test would require vitest resetModules.
   // Instead we rely on clearRunScoped + direct cleanup via returned unsub handles.
-  ({ emit, notify, subscribe, registerCommand, registerSource, getLastPayload, clearRunScoped } = await import('../src/events/bus.js'));
+  ({ emit, notify, subscribe, registerCommand, registerSource, getLastPayload, clearRunScoped, hasSubscribers } = await import('../src/events/bus.js'));
   ({ on, any, tick, hold } = await import('../src/events/event-selector.js'));
 });
 
@@ -538,5 +538,46 @@ describe('addBusTap', () => {
     emit('test:tap:persist', {});
     expect(fn).toHaveBeenCalled();
     remove();
+  });
+});
+
+// ── hasSubscribers — used by wm.js to yield body-drag to an interactive sketch ──
+
+describe('hasSubscribers', () => {
+  it('false when no one subscribes', () => {
+    expect(hasSubscribers('hs:none')).toBe(false);
+  });
+
+  it('true when a plain subscriber exists', () => {
+    const unsub = subscribe('hs:plain', () => {});
+    expect(hasSubscribers('hs:plain')).toBe(true);
+    unsub();
+    expect(hasSubscribers('hs:plain')).toBe(false);
+  });
+
+  it('runScopedOnly ignores persistent subscribers', () => {
+    const unsub = subscribe('hs:persist', () => {}, { persistent: true });
+    expect(hasSubscribers('hs:persist')).toBe(true);
+    expect(hasSubscribers('hs:persist', { runScopedOnly: true })).toBe(false);
+    unsub();
+  });
+
+  it('runScopedOnly true for subscriptions created during an active run', () => {
+    const prev = window.__ar_active_editor_id;
+    window.__ar_active_editor_id = 1;          // simulate an active editor run
+    const unsub = subscribe('hs:run', () => {});
+    expect(hasSubscribers('hs:run', { runScopedOnly: true })).toBe(true);
+    unsub();
+    window.__ar_active_editor_id = prev;
+  });
+
+  it('clearRunScoped drops run-scoped subscribers from the check', () => {
+    const prev = window.__ar_active_editor_id;
+    window.__ar_active_editor_id = 1;
+    subscribe('hs:wiped', () => {});
+    expect(hasSubscribers('hs:wiped', { runScopedOnly: true })).toBe(true);
+    clearRunScoped();
+    expect(hasSubscribers('hs:wiped', { runScopedOnly: true })).toBe(false);
+    window.__ar_active_editor_id = prev;
   });
 });

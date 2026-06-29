@@ -9,7 +9,13 @@ A self-contained authoring unit. Comprises an **Editor Window** and a paired **O
 The floating window that holds the code area (text or blocks), mode toggle, play/pause/stop controls, and embedded console. Each Editor Window belongs to exactly one Editor Instance. Cannot be closed without confirmation; can be minimized to the Taskbar.
 
 ### Output Window
-The canvas display window paired with an Editor Instance. Renders only the visual output of its paired editor's running code. Can be closed independently (no effect on the Editor Window or running code). Automatically spawned when an Editor Instance is created.
+**Removed (ADR 040).** There is no longer a per-editor canvas display window. Visual output comes from a **Canvas** (or `pixi`/`Shader`/`ThreeScene` via `.mount`/`.show`), each of which spawns its own WM window. An Editor Instance owns no canvas stack.
+
+### Canvas
+The sole 2D drawing surface (ADR 038/040): `new Canvas()` spawns its own WM window and exposes the full fluent draw API scoped to it, with pointer pre-mapped into its own canvas space. Replaces the deleted global `draw`. It is the **z=0 plane** of its window's **Window Layer Stack**; `c.layer(z)` / `c.fx(z)` reach higher planes. Run-scoped, but its window **survives soft reset by identity** (key = `{id}` or `title+w+h`) so live-coding doesn't flash-rebuild it.
+
+### Window Layer Stack
+A window's z-ordered stack of `<canvas>` planes, owned by the WM (ADR 040): `wm.layer(winId, z)` creates/returns a plane, `wm.layers(winId)` returns them z-sorted (the snapshot/record composite order). One registry for every plane — draw@0, pixi@25, shader@30, paint overlay@50, text@51. Lazy: a window grows a stack only when something mounts into it. The single owner that replaced the old per-editor layer singleton.
 
 ### Embedded Console
 A collapsible log panel inside the Editor Window. Receives `console.log`/`console.error` output only from that Editor Instance's running code. Can be "popped off" into an independent floating window that remains connected to the same editor's output stream.
@@ -30,7 +36,7 @@ APIs that live on `window` and are accessible from all Editor Instances simultan
 The single record of everything a built-in API *is*, carried by its registration in `src/runtime/api-registry.js`: the implementation, plus a `descriptor` holding its parameter signatures (`params`), authoring-surface metadata, and a detection spec (`detect: { effect, triggers? }`). The descriptor is the **source of truth**; the editor surfaces *derive* from it rather than re-declaring it — `KNOWN_GLOBALS` (test mirror), `PARAM_HINTS` (`param-hints.js`), and `detectAPIUsage`'s patterns (`api-detector.js`) all read the registry instead of keeping parallel hand-lists. `detect.effect` (`'canvas'|'audio'|null`) drives output-window/audio-start decisions; the default detection trigger is derived from the **registered name** (so a rename can't silently break detection), with optional `triggers[]` for constructor/alias forms (`new Shader`, `pat(`, `stack(`). Two surfaces stay deliberately separate: **Blockly blocks** (a visual surface, governed by the ADR-011 coverage gate) and the curated `TOOLKIT_CATEGORIES` snippets (editorial label/code/hint). The ADR-011/012 coherence gates are kept as redundant assertions — the descriptor makes them pass by construction.
 
 ### Per-Editor Locals
-APIs injected as locals into each Editor Instance's IIFE at execution time, scoping them to that instance's canvas stack: `draw`, `getCanvas`, `getLayer`, `getDraw`, `setInterval`, `clearInterval`, `setTimeout`, `clearTimeout`, `console`. These shadow any global with the same name inside the user's IIFE. The set is enumerated **once** in the `PER_EDITOR_LOCALS` table (`src/editor/editor-instance.js`): `_setupGlobals` creates each on `window[__ar_e{id}_<name>]` and `editorPreamble` aliases each back to a `const`, both deriving from the table so the two halves can't drift. Run-control sugar (`stop`/`stopRunning`/`pause`/`resume`) is *not* a Per-Editor Local — it has no window-global side and stays inline in `editorPreamble`.
+APIs injected as locals into each Editor Instance's IIFE at execution time: `setInterval`, `clearInterval`, `setTimeout`, `clearTimeout`, `console`. These shadow any global with the same name inside the user's IIFE. (Pre-ADR-040 this also included `draw`/`getCanvas`/`getLayer`/`getDraw` — all removed; 2D drawing is now `new Canvas()`.) The set is enumerated **once** in the `PER_EDITOR_LOCALS` table (`src/editor/editor-instance.js`): `_setupGlobals` creates each on `window[__ar_e{id}_<name>]` and `editorPreamble` aliases each back to a `const`, both deriving from the table so the two halves can't drift. Run-control sugar (`stop`/`stopRunning`/`pause`/`resume`) is *not* a Per-Editor Local — it has no window-global side and stays inline in `editorPreamble`.
 
 ### IIFE Isolation
 The execution strategy used to scope per-editor APIs. Each editor's `execute()` injects **Per-Editor Locals** as named variables in the IIFE wrapper before user code runs. Callbacks and timers capture these locals via closure. Globals (`Shared Globals`) remain on `window` and are unaffected.
@@ -52,7 +58,7 @@ _Avoid_: run-scoped output (that is the narrower **Run-Scoped Output**), live ou
 A **Run-Scoped Process** that is *also* a visible output, so it additionally joins the **keep-alive** Set that holds a run alive while something is on screen. `runScopedOutput({ owner, onStop, token })` = `runScoped` + `liveOutput(token)` (`src/runtime/keep-alive.js`); `dispose()` releases keep-alive in the same idempotent step. Inputs (camera/mic leases) use the bare `runScoped` core instead — they are owner-scoped but must **not** join keep-alive (ADR 009). The `token` stays caller-supplied (default `{}`) because the **Signal Graph** labels live entries by `token.constructor.name`, and audio/mixer tag marker tokens.
 
 ### Snapshot
-A **declarative** export of a widget's current state as runnable code — the end result with no timing. Drumpad emits `dp.pattern(...)`, Piano emits `p.note(...)`, Paint/Sprite/Ascii emit `draw.image(dataUrl)`. Reproduces *what the widget looks like now*, not *how it got there*. Distinct from a **Performance** (which carries time) and from a **Recording** (which is video). Triggered by each widget's `</>` button via the **Active Editor** seam.
+A **declarative** export of a widget's current state as runnable code — the end result with no timing. Drumpad emits `dp.pattern(...)`, Piano emits `p.note(...)`, Paint/Sprite/Ascii emit a `new Canvas()` + `.image(dataUrl)`. Reproduces *what the widget looks like now*, not *how it got there*. Distinct from a **Performance** (which carries time) and from a **Recording** (which is video). Triggered by each widget's `</>` button via the **Active Editor** seam.
 
 ### Performance
 A **temporal** export: a recorded sequence of timestamped widget actions (a piano note at t=300ms, a brush stroke at t=1100ms). Reproduces *how the result was made over time*, not just the end state. Captured between **Capture ●** and Stop on a widget. Timestamps are wall-clock milliseconds from the start of the **Take**. A Performance is replayed via **Replay**, never persisted to a project file — the emitted code *is* its persistence. **Not** a video — that is a **Recording**.
@@ -113,3 +119,21 @@ _Avoid_: training, gaze setup
 
 ### Event Stream Panel
 A floating WM window that shows a live rate-limited feed of bus events during a run. One row per unique event name; repeat fires within 200 ms increment a counter badge (`×N`) rather than spawning new rows. Rows are expandable to show full payload (depth-2 JSON tree). Default filter excludes harness-internal prefixes (`editor:`, `session:`, `wm:`). Implemented via a bus tap (`addBusTap`) — not a run-scoped subscription. See ADR 019.
+
+### Transcription
+Turning speech into text inside the browser, with no server. Available on **any audio-bearing stream** — a microphone, a media element, screen-share audio — not only the microphone. Emits a stream of word events (**interim** then **final**) and a running **Transcript** on the bus (`audio:word:interim`, `audio:word:final`, `audio:transcript`). Distinct from the legacy keyword matcher (`audio.onWord`): that listens for named words on the mic via the browser's built-in speech recognition; Transcription is the general, cross-browser capability. When a visual route with no audio of its own (a camera route) asks for Transcription, the audio is drawn from the **microphone** — you speak while your face is on screen.
+_Avoid_: speech recognition (ambiguous with the browser API), dictation
+
+### STT Engine
+The process that performs **Transcription** for one audio input. Shared and reference-counted per audio source: many consumers listening for words on the same microphone are served by a single engine and a single model, fanning results out over the bus. Lives only while a run needs it; the model itself stays cached across runs. Backed by an in-browser ML model (a **CTC** model for live interim words; an optional accuracy-first model for final-only transcripts of completed audio).
+_Avoid_: recognizer, transcriber instance
+
+### Word Differ
+The part of the **STT Engine** that converts the model's per-chunk full-transcript guesses into discrete word events. It tracks a **committed** prefix (words it has emitted as final) and a **frontier** (still-changing trailing words); a frontier word becomes final once it survives unchanged for a few consecutive chunks. This is what produces the interim-then-final cadence callers see.
+
+### Transcript
+The full running text of a **Transcription** so far, carried by `audio:transcript` with whether it is final. The word stream is the per-word view of the same thing; the Transcript is the whole-utterance view.
+
+### Model Manager
+The single owner of in-browser ML model lifecycle: which models exist, whether each is downloaded, download progress, deletion, and total storage used. Backends ask it to load a model rather than fetching directly, so a model downloads once and is reused. Surfaced to the user as a settings panel (toolbar entry) where models can be pre-downloaded or removed without writing code; the first programmatic use also triggers a download with progress shown on the spawned window.
+_Avoid_: model cache, downloader

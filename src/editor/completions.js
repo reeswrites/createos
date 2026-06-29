@@ -6,133 +6,133 @@ export const TOOLKIT_CATEGORIES = [
     commands: [
       {
         label: "background",
-        code: "draw.bg('#111');",
+        code: "canvas.bg('#111');",
         hint: "Fill entire canvas with a color",
       },
       {
         label: "rect",
-        code: "draw.rect(x, y, w, h, 'red');",
+        code: "canvas.rect(x, y, w, h, 'red');",
         hint: "Filled rectangle — x, y, width, height, color",
       },
       {
         label: "circle",
-        code: "draw.circle(x, y, r, 'red');",
+        code: "canvas.circle(x, y, r, 'red');",
         hint: "Filled circle — x, y, radius, color",
       },
       {
         label: "line",
-        code: "draw.line(x1, y1, x2, y2, 'white', 2);",
+        code: "canvas.line(x1, y1, x2, y2, 'white', 2);",
         hint: "Line — start, end, color, thickness",
       },
       {
         label: "ring",
-        code: "draw.ring(x, y, r, 'white', 3);",
+        code: "canvas.ring(x, y, r, 'white', 3);",
         hint: "Stroked circle — x, y, radius, color, thickness",
       },
       {
         label: "stroked rect",
-        code: "draw.rectStroke(x, y, w, h, 'white', 2);",
+        code: "canvas.rectStroke(x, y, w, h, 'white', 2);",
         hint: "Stroked rectangle — x, y, w, h, color, thickness",
       },
       {
         label: "polygon",
-        code: "draw.poly([[0,0],[100,0],[50,100]], 'teal');",
+        code: "canvas.poly([[0,0],[100,0],[50,100]], 'teal');",
         hint: "Filled polygon — array of [x,y] points, color",
       },
       {
         label: "text",
-        code: "draw.text('hello', x, y, 32, 'white');",
+        code: "canvas.text('hello', x, y, 32, 'white');",
         hint: "Text — string, x, y, size(px), color. Optional 6th arg: { font, align, baseline }",
       },
       {
         label: "text centered",
-        code: "draw.text('hello', draw.width/2, draw.height/2, 48, 'white', { align: 'center', baseline: 'middle' });",
-        hint: "Center text on canvas using draw.width/draw.height",
+        code: "canvas.text('hello', canvas.width/2, canvas.height/2, 48, 'white', { align: 'center', baseline: 'middle' });",
+        hint: "Center text on canvas using canvas.width/canvas.height",
       },
       {
         label: "text stroke",
-        code: "draw.text('OUTLINE', 100, 200, 64, '#fff', { stroke: true, strokeColor: '#000', strokeWidth: 3 });",
+        code: "canvas.text('OUTLINE', 100, 200, 64, '#fff', { stroke: true, strokeColor: '#000', strokeWidth: 3 });",
         hint: "Text with outline stroke — stroke:true, strokeColor, strokeWidth",
         tags: ["text", "stroke", "outline"],
       },
       {
         label: "text shadow",
-        code: "draw.text('Shadow', 100, 200, 64, '#fff', { shadow: true, shadowColor: 'rgba(0,0,0,0.7)', shadowBlur: 8, shadowX: 3, shadowY: 3 });",
+        code: "canvas.text('Shadow', 100, 200, 64, '#fff', { shadow: true, shadowColor: 'rgba(0,0,0,0.7)', shadowBlur: 8, shadowX: 3, shadowY: 3 });",
         hint: "Text with drop shadow — shadow:true, shadowColor, shadowBlur, shadowX, shadowY",
         tags: ["text", "shadow"],
       },
       {
         label: "text gradient",
-        code: "draw.text('GRADIENT', 100, 200, 72, '#fff', { gradient: ['#f0f', '#0ff', '#ff0'], weight: 'bold' });",
+        code: "canvas.text('GRADIENT', 100, 200, 72, '#fff', { gradient: ['#f0f', '#0ff', '#ff0'], weight: 'bold' });",
         hint: "Text filled with vertical color gradient — gradient: array of CSS colors top→bottom",
         tags: ["text", "gradient", "color"],
       },
       {
         label: "load font",
-        code: "await draw.loadFont('Orbitron', 'https://fonts.gstatic.com/s/orbitron/v31/yMJMMIlzdpvBhQQL_SC3X9yhF25-T1nyGy6BoWgz.woff2');\ndraw.text('SPACE', 100, 200, 64, '#0ff', { font: 'Orbitron', weight: 'bold' });",
-        hint: "Load custom font by name + URL (FontFace API), then use with draw.text({ font })",
+        code: "await canvas.loadFont('Orbitron', 'https://fonts.gstatic.com/s/orbitron/v31/yMJMMIlzdpvBhQQL_SC3X9yhF25-T1nyGy6BoWgz.woff2');\ndraw.text('SPACE', 100, 200, 64, '#0ff', { font: 'Orbitron', weight: 'bold' });",
+        hint: "Load custom font by name + URL (FontFace API), then use with canvas.text({ font })",
         tags: ["font", "text", "custom"],
       },
       {
         label: "arc / pie",
-        code: "draw.arc(x, y, r, 0, Math.PI, 'orange');",
+        code: "canvas.arc(x, y, r, 0, Math.PI, 'orange');",
         hint: "Filled arc/pie slice — x, y, radius, startAngle, endAngle, color",
       },
       {
         label: "arc stroke",
-        code: "draw.arcStroke(x, y, r, 0, Math.PI * 1.5, 'white', 4);",
+        code: "canvas.arcStroke(x, y, r, 0, Math.PI * 1.5, 'white', 4);",
         hint: "Stroked arc — x, y, radius, start, end, color, thickness",
       },
       {
         label: "image",
         code: "const img = await Media.image('https://example.com/photo.jpg');\ndraw.image(img, x, y, w, h);",
-        hint: "Draw an image — load with Media.image(), then draw.image(img, x, y, w?, h?)",
+        hint: "Draw an image — load with Media.image(), then canvas.image(img, x, y, w?, h?)",
       },
       {
         label: "backdrop (image/video underlay)",
-        code: "draw.backdrop('https://example.com/photo.jpg');\n// now draw on top:\ndraw.circle(400, 300, 50, 'red');",
-        hint: "draw.backdrop(source) — renders an image, video, camera, or canvas on the layer below so all draw calls appear on top. Accepts a URL string, 'camera', HTMLImageElement, HTMLVideoElement, CameraStream, or any canvas/shader. Returns { stop(), layer }. stop() cancels a live video loop. Cleaned up automatically on reset.",
+        code: "canvas.backdrop('https://example.com/photo.jpg');\n// now draw on top:\ndraw.circle(400, 300, 50, 'red');",
+        hint: "canvas.backdrop(source) — renders an image, video, camera, or canvas on the layer below so all draw calls appear on top. Accepts a URL string, 'camera', HTMLImageElement, HTMLVideoElement, CameraStream, or any canvas/shader. Returns { stop(), layer }. stop() cancels a live video loop. Cleaned up automatically on reset.",
         tags: ["draw", "backdrop", "image", "video", "camera", "underlay", "overlay", "background", "trace", "annotate"],
       },
       {
         label: "backdrop — camera underlay",
-        code: "const cam = await Camera.open();\ndraw.backdrop(cam);\n\nsetInterval(() => {\n  // draw on top of live camera each frame\n  draw.circle(\n    draw.width/2 + Math.cos(Date.now()/500)*100,\n    draw.height/2, 40, 'rgba(255,0,0,0.7)'\n  );\n}, 16);",
-        hint: "draw.backdrop(cam) — live camera feed as a background layer. Use Camera.open() to get a CameraStream, then draw shapes/text on top.",
+        code: "const cam = await Camera.open();\ndraw.backdrop(cam);\n\nsetInterval(() => {\n  // draw on top of live camera each frame\n  canvas.circle(\n    canvas.width/2 + Math.cos(Date.now()/500)*100,\n    canvas.height/2, 40, 'rgba(255,0,0,0.7)'\n  );\n}, 16);",
+        hint: "canvas.backdrop(cam) — live camera feed as a background layer. Use Camera.open() to get a CameraStream, then draw shapes/text on top.",
         tags: ["draw", "backdrop", "camera", "live", "ar", "augmented", "overlay"],
       },
       {
         label: "alpha",
-        code: "draw.alpha(0.5);\ndraw.circle(x, y, r, 'red');\ndraw.alpha(1);",
+        code: "canvas.alpha(0.5);\ndraw.circle(x, y, r, 'red');\ndraw.alpha(1);",
         hint: "Set global alpha (0–1) — affects all subsequent draw calls until changed",
       },
       {
         label: "blend mode",
-        code: "draw.blend('screen');\ndraw.circle(x, y, r, 'blue');\ndraw.blend('source-over');",
+        code: "canvas.blend('screen');\ndraw.circle(x, y, r, 'blue');\ndraw.blend('source-over');",
         hint: "Set composite blend mode — screen, multiply, add, overlay, etc.",
       },
       {
         label: "save / restore",
-        code: "draw.push();\ndraw.alpha(0.3);\ndraw.translate(100, 100);\ndraw.circle(0, 0, 50, 'white');\ndraw.pop();",
+        code: "canvas.push();\ndraw.alpha(0.3);\ndraw.translate(100, 100);\ndraw.circle(0, 0, 50, 'white');\ndraw.pop();",
         hint: "push()/pop() save and restore all ctx state (alpha, blend, transform)",
       },
       {
         label: "transform",
-        code: "draw.push();\ndraw.translate(draw.width/2, draw.height/2);\ndraw.rotate(Math.PI / 4);\ndraw.rect(-50, -50, 100, 100, 'cyan');\ndraw.pop();",
+        code: "canvas.push();\ndraw.translate(canvas.width/2, canvas.height/2);\ndraw.rotate(Math.PI / 4);\ndraw.rect(-50, -50, 100, 100, 'cyan');\ndraw.pop();",
         hint: "translate/rotate/scale — use push/pop to scope transforms",
       },
       {
         label: "animate",
-        code: "draw.bg('#111');\nlet t = 0;\nsetInterval(() => {\n  draw.clear();\n  draw.bg('#111');\n  draw.circle(draw.width/2 + Math.cos(t)*200, draw.height/2, 40, 'red');\n  t += 0.05;\n}, 16);",
+        code: "canvas.bg('#111');\nlet t = 0;\nsetInterval(() => {\n  canvas.clear();\n  canvas.bg('#111');\n  canvas.circle(canvas.width/2 + Math.cos(t)*200, canvas.height/2, 40, 'red');\n  t += 0.05;\n}, 16);",
         hint: "Animation loop — clear each frame, update state, redraw",
       },
       {
         label: "other layer",
-        code: "draw.at(2).rect(x, y, w, h, 'blue');",
-        hint: "draw.at(z) targets a different z-layer canvas",
+        code: "canvas.at(2).rect(x, y, w, h, 'blue');",
+        hint: "canvas.at(z) targets a different z-layer canvas",
       },
       {
         label: "reset state",
-        code: "draw.reset();",
+        code: "canvas.reset();",
         hint: "Reset alpha, blend, transform to defaults without clearing pixels",
       },
     ],
@@ -148,7 +148,7 @@ export const TOOLKIT_CATEGORIES = [
       {
         label: "load image",
         code: "const img = await Media.image('https://example.com/photo.jpg');\ndraw.image(img, 0, 0);",
-        hint: "Load image URL — returns HTMLImageElement. Draw with draw.image(img, x, y) or draw.image(img, x, y, w, h).",
+        hint: "Load image URL — returns HTMLImageElement. Draw with canvas.image(img, x, y) or canvas.image(img, x, y, w, h).",
       },
       {
         label: "video layer",
@@ -433,7 +433,7 @@ export const TOOLKIT_CATEGORIES = [
       },
       {
         label: "audio.onTime callback",
-        code: "const file = audio.load('https://example.com/sound.mp3');\nawait file.ready;\nfile.onTime(5, () => draw.bg('red'));\nfile.onTime(10, () => draw.bg('blue'));\nfile.play();",
+        code: "const file = audio.load('https://example.com/sound.mp3');\nawait file.ready;\nfile.onTime(5, () => canvas.bg('red'));\nfile.onTime(10, () => canvas.bg('blue'));\nfile.play();",
         hint: "Fire callbacks at specific timestamps during playback (seconds). Resets on file.stop().",
       },
       {
@@ -458,9 +458,9 @@ function stepCA(c) {
   });
 }
 function drawCA(c) {
-  const bw = draw.width / W;
-  draw.clear();
-  c.forEach((v, i) => draw.rect(i * bw, 0, bw, draw.height, v ? '#fff' : '#111'));
+  const bw = canvas.width / W;
+  canvas.clear();
+  c.forEach((v, i) => canvas.rect(i * bw, 0, bw, canvas.height, v ? '#fff' : '#111'));
 }
 
 note("c1 ~ c1 ~ c1 ~ c1 c1").play();
@@ -486,11 +486,11 @@ let particles = Array.from({length: 40}, () => ({
 }));
 
 setInterval(() => {
-  draw.alpha(0.15).bg('#000').alpha(1);
+  canvas.alpha(0.15).bg('#000').alpha(1);
   particles.forEach((p, i) => {
     p.x = (p.x + p.vx + 1) % 1;
     p.y = (p.y + p.vy + 1) % 1;
-    draw.circle(p.x * draw.width, p.y * draw.height, 4, pal[i % pal.length]);
+    canvas.circle(p.x * canvas.width, p.y * canvas.height, 4, pal[i % pal.length]);
   });
 }, 16);
 
@@ -513,13 +513,13 @@ setInterval(() => {
   const amp = sig.value; // 0..1
   const gravity = amp * 0.004; // loud = strong pull
 
-  draw.alpha(0.2).bg('#000').alpha(1);
+  canvas.alpha(0.2).bg('#000').alpha(1);
   balls.forEach(b => {
     b.vy += gravity;
     b.x = (b.x + b.vx + 1) % 1;
     b.y += b.vy;
     if (b.y > 1) { b.y = 0; b.vy = 0; } // wrap top
-    draw.circle(b.x * draw.width, b.y * draw.height, 6, \`hsl(\${b.x * 360}, 80%, 60%)\`);
+    canvas.circle(b.x * canvas.width, b.y * canvas.height, 6, \`hsl(\${b.x * 360}, 80%, 60%)\`);
   });
 }, 16);
 
@@ -555,18 +555,18 @@ setInterval(() => {
       },
       {
         label: "meter → blur",
-        code: `const layer = getLayer(0);
+        code: `const layer = canvas.fx(0);
 const sig = audio.fft; // master amplitude — captures Strudel via the shared context
 
 let angle = 0;
 setInterval(() => {
-  draw.clear();
-  draw.push();
-  draw.translate(draw.width/2, draw.height/2).rotate(angle);
+  canvas.clear();
+  canvas.push();
+  canvas.translate(canvas.width/2, canvas.height/2).rotate(angle);
   for (let i = 0; i < 6; i++) {
-    draw.push().rotate(i * Math.PI / 3).rect(20, -4, 80, 8, \`hsl(\${i*60}, 70%, 60%)\`).pop();
+    canvas.push().rotate(i * Math.PI / 3).rect(20, -4, 80, 8, \`hsl(\${i*60}, 70%, 60%)\`).pop();
   }
-  draw.pop();
+  canvas.pop();
   angle += 0.01;
 
   layer.blur(sig.value * 20); // loud = blurry
@@ -578,7 +578,7 @@ setcps(0.5);`,
       },
       {
         label: "mic → visual",
-        code: "const mic = await audio.mic();\nconst meter = audio.meter();\nmic.connect(meter);\n\nlet radius = 10;\nsetInterval(() => {\n  const db = meter.getValue();\n  const amp = isFinite(db) ? Math.pow(10, db / 20) : 0;\n  radius = radius * 0.85 + amp * 300 * 0.15; // smoothed\n  draw.alpha(0.15).bg('#000').alpha(1);\n  draw.circle(draw.width/2, draw.height/2, Math.max(4, radius), `hsl(${amp * 200}, 80%, 60%)`);\n}, 16);",
+        code: "const mic = await audio.mic();\nconst meter = audio.meter();\nmic.connect(meter);\n\nlet radius = 10;\nsetInterval(() => {\n  const db = meter.getValue();\n  const amp = isFinite(db) ? Math.pow(10, db / 20) : 0;\n  radius = radius * 0.85 + amp * 300 * 0.15; // smoothed\n  canvas.alpha(0.15).bg('#000').alpha(1);\n  canvas.circle(canvas.width/2, canvas.height/2, Math.max(4, radius), `hsl(${amp * 200}, 80%, 60%)`);\n}, 16);",
         hint: "Mic amplitude drives a pulsing circle — loud = big and saturated. Replace the drawing with anything: particles, shader uniforms, layer blur.",
       },
       {
@@ -608,7 +608,7 @@ setcps(0.5);`,
       },
       {
         label: "audio.signal → stream (RAF push)",
-        code: "const synth = audio.fm();\nconst sig = audio.signal(synth);\n\n// .stream() fires fn every frame — no setInterval needed\nsig.stream(s => {\n  draw.clear();\n  draw.circle(800, 450, s.bass * 400, `hsl(${s.high * 360}, 80%, 50%)`);\n  draw.rect(0, 450 - s.mid * 200, 1600, 4, 'cyan');\n});\n\nsetInterval(() => synth.play('C3', '4n'), 500);\naudio.start();",
+        code: "const synth = audio.fm();\nconst sig = audio.signal(synth);\n\n// .stream() fires fn every frame — no setInterval needed\nsig.stream(s => {\n  canvas.clear();\n  canvas.circle(800, 450, s.bass * 400, `hsl(${s.high * 360}, 80%, 50%)`);\n  canvas.rect(0, 450 - s.mid * 200, 1600, 4, 'cyan');\n});\n\nsetInterval(() => synth.play('C3', '4n'), 500);\naudio.start();",
         hint: "sig.stream(fn) — RAF-driven push, fn(sig) called every frame. Cleaned up automatically on stop. No polling loop needed. Chainable: audio.signal(src).stream(fn).",
       },
       {
@@ -654,7 +654,7 @@ setcps(0.5);`,
       },
       {
         label: "dp.onPad — react to a specific drum",
-        code: "const dp = audio.drumpad();\ndp.onPad('kick', ({ source }) => {\n  draw.circle(400, 225, 80, 'red');\n  setTimeout(() => draw.clear(), 80);\n});\n// voice = index 0-7 or name: 'kick','snare','hhc','hho','clap','tomL','tomH','cym'",
+        code: "const dp = audio.drumpad();\ndp.onPad('kick', ({ source }) => {\n  canvas.circle(400, 225, 80, 'red');\n  setTimeout(() => canvas.clear(), 80);\n});\n// voice = index 0-7 or name: 'kick','snare','hhc','hho','clap','tomL','tomH','cym'",
         hint: "dp.onPad(voice, fn) — fire fn({vi,id,label,source,step}) only for one pad. source: 'pad'|'key'|'seq'. Returns dp.",
         tags: ["drum", "event", "hook", "reactive", "onPad"],
       },
@@ -666,7 +666,7 @@ setcps(0.5);`,
       },
       {
         label: "dp.onStep — sequencer clock",
-        code: "const dp = audio.drumpad();\ndp.onStep(({ step, activeVoices }) => {\n  draw.bg(`hsl(${step * 22},60%,10%)`);\n});\n// fires once per sequencer step (0-15) while playing",
+        code: "const dp = audio.drumpad();\ndp.onStep(({ step, activeVoices }) => {\n  canvas.bg(`hsl(${step * 22},60%,10%)`);\n});\n// fires once per sequencer step (0-15) while playing",
         hint: "dp.onStep(fn) — fire fn({step,activeVoices:[vi…]}) once per sequencer step while playing.",
         tags: ["drum", "sequencer", "step", "clock", "onStep"],
       },
@@ -694,19 +694,19 @@ setcps(0.5);`,
       },
       {
         label: "piano.onNote — react to any key",
-        code: "const p = audio.piano();\np.onNote(({ note, midi, source }) => {\n  draw.circle(midi * 12, 225, 40, `hsl(${midi * 3}, 80%, 50%)`);\n  setTimeout(() => draw.clear(), 100);\n});\n// source: 'mouse' | 'kbd' | 'seq'",
+        code: "const p = audio.piano();\np.onNote(({ note, midi, source }) => {\n  canvas.circle(midi * 12, 225, 40, `hsl(${midi * 3}, 80%, 50%)`);\n  setTimeout(() => canvas.clear(), 100);\n});\n// source: 'mouse' | 'kbd' | 'seq'",
         hint: "p.onNote(fn) — fn({note, midi, velocity, source, step}) on any note. source: 'mouse'|'kbd'|'seq'. Returns p.",
         tags: ["piano", "event", "hook", "reactive", "onNote"],
       },
       {
         label: "piano.onKey — react to specific note",
-        code: "const p = audio.piano();\np.onKey('C4', ({ source }) => {\n  draw.circle(400, 225, 100, 'cyan');\n  setTimeout(() => draw.clear(), 80);\n});",
+        code: "const p = audio.piano();\np.onKey('C4', ({ source }) => {\n  canvas.circle(400, 225, 100, 'cyan');\n  setTimeout(() => canvas.clear(), 80);\n});",
         hint: "p.onKey(note, fn) — fn({note, midi, velocity, source, step}) scoped to one note string like 'C4'. Returns p.",
         tags: ["piano", "event", "hook", "onKey"],
       },
       {
         label: "piano.onStep — sequencer clock",
-        code: "const p = audio.piano();\np.onStep(({ step, notes }) => {\n  draw.bg(`hsl(${step * 22}, 60%, 10%)`);\n  console.log('step', step, notes);\n});\n// fires once per sequencer step (0-15) while playing",
+        code: "const p = audio.piano();\np.onStep(({ step, notes }) => {\n  canvas.bg(`hsl(${step * 22}, 60%, 10%)`);\n  console.log('step', step, notes);\n});\n// fires once per sequencer step (0-15) while playing",
         hint: "p.onStep(fn) — fn({step, notes:['C4','E4']}) once per sequencer step while playing.",
         tags: ["piano", "sequencer", "step", "clock", "onStep"],
       },
@@ -804,78 +804,83 @@ setcps(0.5);`,
     name: "Canvas",
     commands: [
       {
+        label: "windowed canvas",
+        code: "const c = new Canvas({ w: 800, h: 600, title: 'Sketch' });\nc.bg('#0a0a14');\nc.on('move', ({ x, y }) => c.circle(x, y, 8, '#fff'));",
+        hint: "new Canvas({ w, h, title }) — its own window + own size (default 1600×900). Full draw API. Pointer via c.pointer / c.on('down'|'move'|'up') in canvas coords.",
+      },
+      {
         label: "get canvas",
-        code: "const ctx = getCanvas(0).getContext('2d');\nctx.fillStyle = 'red';\nctx.fillRect(0, 0, 100, 100);",
+        code: "const ctx = canvas.el.getContext('2d');\nctx.fillStyle = 'red';\nctx.fillRect(0, 0, 100, 100);",
         hint: "Get HTMLCanvasElement for z-index 0 — draw with 2D context",
       },
       {
         label: "get layer",
-        code: "const layer = getLayer(0);",
+        code: "const layer = canvas.fx(0);",
         hint: "Get Layer object for z-index — apply blur, hue, opacity effects",
       },
       {
         label: "blur",
-        code: "getLayer(0).blur(5);",
+        code: "canvas.fx(0).blur(5);",
         hint: "Gaussian blur the layer (px)",
       },
       {
         label: "hue shift",
-        code: "getLayer(0).hue(90);",
+        code: "canvas.fx(0).hue(90);",
         hint: "Shift hue by degrees (0–360)",
       },
       {
         label: "brightness",
-        code: "getLayer(0).brightness(1.5);",
+        code: "canvas.fx(0).brightness(1.5);",
         hint: "Adjust brightness (1 = normal, 2 = double)",
       },
       {
         label: "saturate",
-        code: "getLayer(0).saturate(2);",
+        code: "canvas.fx(0).saturate(2);",
         hint: "Adjust saturation (1 = normal, 0 = grayscale)",
       },
       {
         label: "invert",
-        code: "getLayer(0).invert(1);",
+        code: "canvas.fx(0).invert(1);",
         hint: "Invert colors (0–1, 1 = full invert)",
       },
       {
         label: "opacity",
-        code: "getLayer(0).opacity(0.5);",
+        code: "canvas.fx(0).opacity(0.5);",
         hint: "Layer opacity (0 = invisible, 1 = full)",
       },
       {
         label: "rotate",
-        code: "getLayer(0).rotate(45);",
+        code: "canvas.fx(0).rotate(45);",
         hint: "Rotate entire layer in degrees",
       },
       {
         label: "scale",
-        code: "getLayer(0).scale(1.5);",
+        code: "canvas.fx(0).scale(1.5);",
         hint: "Scale layer (1 = normal, 2 = double)",
       },
       {
         label: "clip",
-        code: "getLayer(0).clip('circle(50%)');",
+        code: "canvas.fx(0).clip('circle(50%)');",
         hint: "Clip layer to CSS clip-path shape",
       },
       {
         label: "reset effects",
-        code: "getLayer(0).reset();",
+        code: "canvas.fx(0).reset();",
         hint: "Remove all CSS effects from the layer",
       },
       {
         label: "blend mode",
-        code: "getLayer(1).blendMode('screen');",
+        code: "canvas.fx(1).blendMode('screen');",
         hint: "CSS mix-blend-mode for layer compositing — 'multiply' 'screen' 'overlay' 'difference' 'lighten' 'darken' 'hard-light' 'soft-light' 'exclusion' 'color-burn'",
       },
       {
         label: "pixelate",
-        code: "draw.pixelate(getCanvas(0), 8);",
+        code: "canvas.pixelate(canvas.el, 8);",
         hint: "Render a blocky pixelated copy of any canvas onto the draw target — pixelate(source, blockSize, x?, y?, w?, h?)",
       },
       {
         label: "ASCII art",
-        code: "const art = draw.toASCII(getCanvas(0), { cols: 80 });\nconst id = wm.spawn('ASCII', { type: 'html', html: '', w: 600, h: 400, onClose: stopRunning });\ndocument.getElementById(id)?.querySelector('.wm-body').appendChild(art.el);\nsetInterval(() => art.update(getCanvas(0)), 50);",
+        code: "const art = canvas.toASCII(canvas.el, { cols: 80 });\nconst id = wm.spawn('ASCII', { type: 'html', html: '', w: 600, h: 400, onClose: stopRunning });\ndocument.getElementById(id)?.querySelector('.wm-body').appendChild(art.el);\nsetInterval(() => art.update(canvas.el), 50);",
         hint: "Convert canvas to ASCII <pre> — toASCII(canvas, { cols, rows, charset, bg, color }) → { el, update(canvas) }",
       },
       {
@@ -967,7 +972,7 @@ setcps(0.5);`,
       },
       {
         label: "canvas → pipeline",
-        code: "pipe(getCanvas(0))\n  .ascii({ cols: 80, color: '#ff6600' })\n  .show('Canvas ASCII', { w: 600, h: 400 });",
+        code: "pipe(canvas.el)\n  .ascii({ cols: 80, color: '#ff6600' })\n  .show('Canvas ASCII', { w: 600, h: 400 });",
         hint: "Pass any canvas as source — pipe() accepts CameraStream, canvas, video, GLShader, Shader, or Layer.",
         tags: ["pipe", "ascii", "canvas", "pipeline"],
       },
@@ -1060,7 +1065,7 @@ setcps(0.5);`,
       },
       {
         label: "gaze in element",
-        code: "vision.gazeIn(getCanvas())",
+        code: "vision.gazeIn(canvas.el)",
         hint: "Gaze point converted to coordinates local to an element/canvas — {x, y} or null. Needs calibration.",
       },
       {
@@ -1080,7 +1085,7 @@ setcps(0.5);`,
       },
       {
         label: "when gaze in region",
-        code: "vision.onGaze(getCanvas(), (inside) => {\n  \n});",
+        code: "vision.onGaze(canvas.el, (inside) => {\n  \n});",
         hint: "Fire when gaze enters (inside=true) / leaves (false) an element or {x,y,w,h} viewport rect. Needs calibration. A direction string ('left'/'center'/…) instead registers a calibration-free handler.",
       },
     ],
@@ -1216,12 +1221,12 @@ setcps(0.5);`,
       },
       {
         label: "tween",
-        code: "const cancel = tween(2000, t => {\n  draw.bg(`hsl(0,100%,${t * 50}%)`);\n}, { onDone: () => console.log('done') });",
+        code: "const cancel = tween(2000, t => {\n  canvas.bg(`hsl(0,100%,${t * 50}%)`);\n}, { onDone: () => console.log('done') });",
         hint: "tween(duration, fn(t), { easing?, onDone? }) — animate t from 0→1 over duration ms, then call onDone. Returns cancel handle. easing: fn(t)=>t, default linear.",
       },
       {
         label: "tick + hold keys",
-        code: "const keys = hold('window:key:down');\ntick(16).do(() => {\n  if (keys.has('ArrowUp')) y -= 4;\n  if (keys.has('ArrowDown')) y += 4;\n  draw.clear();\n  draw.circle(x, y, 10, 'white');\n});",
+        code: "const keys = hold('window:key:down');\ntick(16).do(() => {\n  if (keys.has('ArrowUp')) y -= 4;\n  if (keys.has('ArrowDown')) y += 4;\n  canvas.clear();\n  canvas.circle(x, y, 10, 'white');\n});",
         hint: "hold(event) returns a live Set (for key/mouse pairs) or object. Use inside tick for polling held state. Never stale — auto-clears on reset.",
       },
     ],
@@ -1296,23 +1301,23 @@ setcps(0.5);`,
       },
       {
         label: "mic level trigger",
-        code: "audio.onLevel(0.6, () => {\n  draw.bg('red'); // loud\n}, () => {\n  draw.bg('black'); // quiet\n});",
+        code: "audio.onLevel(0.6, () => {\n  canvas.bg('red'); // loud\n}, () => {\n  canvas.bg('black'); // quiet\n});",
         hint: "audio.onLevel(threshold, onEnter, onExit?) — edge-triggered when mic amplitude crosses threshold (0–1). Enable mic in toolbar.",
       },
       {
         label: "voice command",
-        code: "audio.onWord('red', () => draw.bg('red'));\naudio.onWord('blue', () => draw.bg('blue'));\naudio.onWord('clear', () => draw.clear());",
+        code: "audio.onWord('red', () => canvas.bg('red'));\naudio.onWord('blue', () => canvas.bg('blue'));\naudio.onWord('clear', () => canvas.clear());",
         hint: "audio.onWord(word, fn) — fires when that word is spoken. Uses Web Speech API (Chrome/Edge). Mic must be enabled.",
       },
       {
         label: "speech transcript",
-        code: "audio.onSpeech((text) => {\n  console.log('heard:', text);\n  draw.text(text, 50, 50, { size: 24, color: 'white' });\n});",
+        code: "audio.onSpeech((text) => {\n  console.log('heard:', text);\n  canvas.text(text, 50, 50, { size: 24, color: 'white' });\n});",
         hint: "audio.onSpeech(fn) — fires with full transcript string on every recognized utterance.",
       },
       {
         label: "word stream",
-        code: "audio.onWordStream(({ word, utteranceId, wordIndex, final }) => {\n  console.log(word, final ? '(final)' : '(interim)');\n});",
-        hint: "audio.onWordStream(fn) — fires for every word as it streams in, interim and final. payload: { word, utteranceId, wordIndex, final }",
+        code: "audio.onWordStream(({ word, final, index }) => {\n  console.log(word, final ? '(final)' : '(interim)');\n});",
+        hint: "audio.onWordStream(fn) — fires for every word as it streams in, interim and final. payload: { word, final, index }",
       },
       {
         label: "text to speech",
@@ -1326,7 +1331,7 @@ setcps(0.5);`,
       },
       {
         label: "video signal — camera",
-        code: "// Enable camera in toolbar first\nconst sig = video.signal('camera', { x: 0.5, y: 0.5, radius: 0.1 });\n// sig.brightness 0–1 luminance  sig.r / .g / .b  sig.motion 0–1  sig.hue 0–360\n\n// .stream() — RAF push, no polling needed\nsig.stream(s => {\n  draw.clear();\n  draw.circle(800, 450, s.brightness * 400, `hsl(${s.hue}, 80%, 50%)`);\n});\n\naudio.start();",
+        code: "// Enable camera in toolbar first\nconst sig = video.signal('camera', { x: 0.5, y: 0.5, radius: 0.1 });\n// sig.brightness 0–1 luminance  sig.r / .g / .b  sig.motion 0–1  sig.hue 0–360\n\n// .stream() — RAF push, no polling needed\nsig.stream(s => {\n  canvas.clear();\n  canvas.circle(800, 450, s.brightness * 400, `hsl(${s.hue}, 80%, 50%)`);\n});\n\naudio.start();",
         hint: "video.signal(source, opts) → live {brightness, r, g, b, motion, hue}. sig.stream(fn) fires fn every frame — no setInterval needed, cleaned up on stop.",
       },
       {
@@ -1337,7 +1342,7 @@ setcps(0.5);`,
       {
         label: "video signal → shader",
         code: "// Enable camera in toolbar first\nconst sig = video.signal('camera');\n\nconst s = new Shader(`\n  let bright = custom.x;  // camera brightness\n  let motion = custom.y;  // motion intensity\n  let hue    = custom.z;  // dominant hue 0–1\n  return vec4f(motion * 2.0, bright, hue, 1.0);\n`);\n\nsetInterval(() => s.set([sig.brightness, sig.motion, sig.hue / 360, 0]), 16);\ns.start();",
-        hint: "Read video.signal() getters and push to shader.set() — or use audio.signal() + shader.bind() for audio sources. video.signal works on any canvas: 'camera', getCanvas(0), viz.canvas.",
+        hint: "Read video.signal() getters and push to shader.set() — or use audio.signal() + shader.bind() for audio sources. video.signal works on any canvas: 'camera', canvas.el, viz.canvas.",
       },
       {
         label: "video signal — color → note",
@@ -1571,32 +1576,32 @@ setcps(0.5);`,
     commands: [
       {
         label: "mouse position",
-        code: "const mouse = hold('window:mouse:move');\ntick(16).do(() => {\n  draw.clear();\n  draw.circle(mouse.x, mouse.y, 20, 'white');\n});",
+        code: "const mouse = hold('window:mouse:move');\ntick(16).do(() => {\n  canvas.clear();\n  canvas.circle(mouse.x, mouse.y, 20, 'white');\n});",
         hint: "hold('window:mouse:move') → live { x, y, winId }. x/y in viewport pixels. Use inside tick() for polling.",
       },
       {
         label: "mouse → shader",
-        code: "const mouse = hold('window:mouse:move');\nconst s = new Shader(({ uv, time, custom }) => {\n  const d = length(uv - vec2(custom.x, custom.y));\n  return [1.0 - smoothstep(0.0, 0.1, d), uv.y, uv.x, 1.0];\n});\ntick(16).do(() => s.set([mouse.x / draw.width, mouse.y / draw.height, 0, 0]));\ns.start();",
+        code: "const mouse = hold('window:mouse:move');\nconst s = new Shader(({ uv, time, custom }) => {\n  const d = length(uv - vec2(custom.x, custom.y));\n  return [1.0 - smoothstep(0.0, 0.1, d), uv.y, uv.x, 1.0];\n});\ntick(16).do(() => s.set([mouse.x / canvas.width, mouse.y / canvas.height, 0, 0]));\ns.start();",
         hint: "Pipe live mouse position into shader uniform each tick via hold('window:mouse:move').",
       },
       {
         label: "mouse click",
-        code: "on('window:mouse:click').do(({ button, x, y }) => {\n  if (button === 0) draw.circle(x, y, 10, 'white');\n});",
+        code: "on('window:mouse:click').do(({ button, x, y }) => {\n  if (button === 0) canvas.circle(x, y, 10, 'white');\n});",
         hint: "on('window:mouse:click') — button: 0=left, 2=right. x/y in viewport pixels. winId tags which WM window was clicked.",
       },
       {
         label: "gamepad",
-        code: "// Connect a gamepad first (press any button to activate)\non('sensor:gamepad').do(({ index, axes, pressed }) => {\n  if (index !== 0) return;\n  const x = axes[0]; // left stick X  -1..1\n  const y = axes[1]; // left stick Y  -1..1\n  draw.clear();\n  draw.circle(800 + x * 300, 450 + y * 300, 30, 'white');\n  if (pressed[0]) draw.bg('#222'); // A button\n});",
+        code: "// Connect a gamepad first (press any button to activate)\non('sensor:gamepad').do(({ index, axes, pressed }) => {\n  if (index !== 0) return;\n  const x = axes[0]; // left stick X  -1..1\n  const y = axes[1]; // left stick Y  -1..1\n  canvas.clear();\n  canvas.circle(800 + x * 300, 450 + y * 300, 30, 'white');\n  if (pressed[0]) canvas.bg('#222'); // A button\n});",
         hint: "sensor:gamepad — lazy source, starts polling on first subscriber. { index, axes[], buttons[], pressed[] }. Standard mapping: pressed[0]=A/Cross, pressed[1]=B/Circle.",
       },
       {
         label: "motion (device tilt)",
-        code: "// iOS: requires user gesture to grant permission — wrap in a button click\non('sensor:motion').do(({ ax, ay, az, alpha, beta, gamma, magnitude }) => {\n  draw.clear();\n  draw.circle(800 + gamma * 6, 450 - beta * 6, 20, 'cyan');\n});",
+        code: "// iOS: requires user gesture to grant permission — wrap in a button click\non('sensor:motion').do(({ ax, ay, az, alpha, beta, gamma, magnitude }) => {\n  canvas.clear();\n  canvas.circle(800 + gamma * 6, 450 - beta * 6, 20, 'cyan');\n});",
         hint: "sensor:motion — lazy source, starts on first subscriber. { ax, ay, az (m/s²), alpha (compass 0–360), beta (-180..180), gamma (-90..90), magnitude }.",
       },
       {
         label: "shake",
-        code: "on('sensor:shake').when(d => d.magnitude > 20).do(() => {\n  draw.clear();\n  draw.bg(Color.random());\n});",
+        code: "on('sensor:shake').when(d => d.magnitude > 20).do(() => {\n  canvas.clear();\n  canvas.bg(Color.random());\n});",
         hint: "sensor:shake — fires alongside sensor:motion. { magnitude } in m/s². Threshold 15 = moderate, 25 = hard shake.",
       },
       {
@@ -1666,7 +1671,7 @@ setcps(0.5);`,
       {
         label: "PIXI text",
         code: "const style = new PIXI.TextStyle({\n  fontFamily: 'Arial', fontSize: 48,\n  fill: '#ffffff', fontWeight: 'bold',\n  dropShadow: true, dropShadowDistance: 4,\n});\nconst label = new PIXI.Text('hello pixi', style);\nlabel.anchor.set(0.5);\nlabel.x = pixi.screen.width / 2;\nlabel.y = pixi.screen.height / 2;\nStage.addChild(label);\n\npixi.tick(t => { label.text = `t = ${pixi.ticker.lastTime.toFixed(0)}ms`; });",
-        hint: "PIXI.Text + PIXI.TextStyle — rich text with shadows, stroke, font. Better than draw.text() for animating, filtering, or hit-testing text.",
+        hint: "PIXI.Text + PIXI.TextStyle — rich text with shadows, stroke, font. Better than canvas.text() for animating, filtering, or hit-testing text.",
       },
       {
         label: "container + children",
@@ -1690,7 +1695,7 @@ setcps(0.5);`,
       },
       {
         label: "hit testing / click",
-        code: "const btn = new PIXI.Graphics();\nbtn.beginFill(0x4488ff);\nbtn.drawRoundedRect(0, 0, 200, 60, 12);\nbtn.endFill();\nbtn.x = pixi.screen.width / 2 - 100;\nbtn.y = pixi.screen.height / 2 - 30;\nbtn.interactive = true;\nbtn.cursor = 'pointer';\nbtn.on('pointerdown', () => draw.bg(Color.random()));\nStage.addChild(btn);\n\nconst label = new PIXI.Text('Click me', { fill: '#fff', fontSize: 28 });\nlabel.anchor.set(0.5);\nlabel.x = 100; label.y = 30;\nbtn.addChild(label);",
+        code: "const btn = new PIXI.Graphics();\nbtn.beginFill(0x4488ff);\nbtn.drawRoundedRect(0, 0, 200, 60, 12);\nbtn.endFill();\nbtn.x = pixi.screen.width / 2 - 100;\nbtn.y = pixi.screen.height / 2 - 30;\nbtn.interactive = true;\nbtn.cursor = 'pointer';\nbtn.on('pointerdown', () => canvas.bg(Color.random()));\nStage.addChild(btn);\n\nconst label = new PIXI.Text('Click me', { fill: '#fff', fontSize: 28 });\nlabel.anchor.set(0.5);\nlabel.x = 100; label.y = 30;\nbtn.addChild(label);",
         hint: "interactive = true + cursor = 'pointer' enables hit-testing. Events: pointerdown, pointerup, pointerover, pointerout, click. Works for any DisplayObject.",
       },
       {
@@ -1797,7 +1802,7 @@ setcps(0.5);`,
       },
       {
         label: "record ASCII from canvas",
-        code: "// Capture ASCII frames from the current canvas for 2 seconds\nconst frames = await ascii.record(getCanvas(0), { fps: 12, duration: 2, cols: 60 });\nconsole.log('captured', frames.length, 'frames');\nconst anim = ascii.play(frames, 12);\nconst win = wm.spawn('Replay', { w: 400, h: 300 });\nwin.querySelector('.wm-body')?.appendChild(anim.el);",
+        code: "// Capture ASCII frames from the current canvas for 2 seconds\nconst frames = await ascii.record(canvas.el, { fps: 12, duration: 2, cols: 60 });\nconsole.log('captured', frames.length, 'frames');\nconst anim = ascii.play(frames, 12);\nconst win = wm.spawn('Replay', { w: 400, h: 300 });\nwin.querySelector('.wm-body')?.appendChild(anim.el);",
         hint: "ascii.record(source, opts) — captures ASCII frames from a canvas source over `duration` seconds. source: HTMLCanvasElement, GLShader, ThreeScene, or any object with .canvas.",
         tags: ["ascii", "record", "capture", "animation"],
       },
@@ -1909,13 +1914,13 @@ setcps(0.5);`,
       },
       {
         label: "paint.signal — decaying-pulse from stroke",
-        code: "const p = paint({ width: 400, height: 300 });\nconst sig = p.signal('stroke', { decay: 300 });\nsetInterval(() => {\n  draw.bg(`hsl(200,80%,${sig.value * 50}%)`);\n}, 16);",
+        code: "const p = paint({ width: 400, height: 300 });\nconst sig = p.signal('stroke', { decay: 300 });\nsetInterval(() => {\n  canvas.bg(`hsl(200,80%,${sig.value * 50}%)`);\n}, 16);",
         hint: "p.signal(event?, { decay, region }) → { value, velocity, stream(fn), on(fn) }. value=1 on stroke, decays to 0 over decay ms. Region { x,y,w,h } in canvas px filters to a spatial area.",
         tags: ["paint", "signal", "decay", "reactive", "shader", "region"],
       },
       {
         label: "paint.signal with region",
-        code: "const p = paint({ width: 400, height: 300 });\n// React only to strokes in the left half\nconst sig = p.signal('stroke', { decay: 400, region: { x: 0, y: 0, w: 200, h: 300 } });\nsig.stream(s => draw.bg(`hsl(280,80%,${s.value * 40}%)`));",
+        code: "const p = paint({ width: 400, height: 300 });\n// React only to strokes in the left half\nconst sig = p.signal('stroke', { decay: 400, region: { x: 0, y: 0, w: 200, h: 300 } });\nsig.stream(s => canvas.bg(`hsl(280,80%,${s.value * 40}%)`));",
         hint: "region:{x,y,w,h} scopes the signal to a canvas region. .stream(fn) pushes value on every animation frame via RAF.",
         tags: ["paint", "signal", "region", "spatial", "decay", "stream"],
       },
@@ -1939,13 +1944,13 @@ setcps(0.5);`,
       },
       {
         label: "spriteEditor.signal — decaying pixel signal",
-        code: "const sp = spriteEditor({ width: 16, height: 16, scale: 16 });\nconst sig = sp.signal('pixel', { decay: 200 });\nsig.stream(s => draw.circle(200, 200, s.value * 80, '#f38ba8'));",
+        code: "const sp = spriteEditor({ width: 16, height: 16, scale: 16 });\nconst sig = sp.signal('pixel', { decay: 200 });\nsig.stream(s => canvas.circle(200, 200, s.value * 80, '#f38ba8'));",
         hint: "sp.signal(event?, {decay, region}) → decaying 0–1 signal. event: 'pixel'|'stroke'|'color'|'frame'|'*'. region scopes to sprite-pixel bbox.",
         tags: ["sprite", "editor", "signal", "decay", "reactive", "pixel", "stream"],
       },
       {
         label: "spriteEditor.signal region (corner)",
-        code: "const sp = spriteEditor({ width: 16, height: 16, scale: 16 });\n// fire only when painting top-left 4×4\nconst sig = sp.signal('pixel', { decay: 300, region: { x: 0, y: 0, w: 4, h: 4 } });\nsetInterval(() => draw.bg(`hsl(120,70%,${sig.value*40}%)`), 16);",
+        code: "const sp = spriteEditor({ width: 16, height: 16, scale: 16 });\n// fire only when painting top-left 4×4\nconst sig = sp.signal('pixel', { decay: 300, region: { x: 0, y: 0, w: 4, h: 4 } });\nsetInterval(() => canvas.bg(`hsl(120,70%,${sig.value*40}%)`), 16);",
         hint: "region:{x,y,w,h} filters to sprite-pixel coordinates (NOT screen px). Lets you make different canvas regions control different parameters.",
         tags: ["sprite", "editor", "signal", "region", "spatial", "decay"],
       },
@@ -1963,13 +1968,13 @@ setcps(0.5);`,
       },
       {
         label: "asciiEditor.signal — decaying cell signal",
-        code: "const ae = asciiEditor({ cols: 40, rows: 20 });\nconst sig = ae.signal('cell', { decay: 250 });\nsig.stream(s => draw.bg(`hsl(55,90%,${s.value * 30}%)`));",
+        code: "const ae = asciiEditor({ cols: 40, rows: 20 });\nconst sig = ae.signal('cell', { decay: 250 });\nsig.stream(s => canvas.bg(`hsl(55,90%,${s.value * 30}%)`));",
         hint: "ae.signal(event?, {decay, region}) → 0–1 decaying signal. event: 'cell'|'stroke'|'color'|'char'|'frame'|'*'. region in cell coords {x,y,w,h}.",
         tags: ["ascii", "editor", "signal", "decay", "cell", "reactive", "stream"],
       },
       {
         label: "asciiEditor.signal region (cell grid)",
-        code: "const ae = asciiEditor({ cols: 40, rows: 20 });\n// top-left 10×5 cell region\nconst sig = ae.signal('cell', { decay: 300, region: { x: 0, y: 0, w: 10, h: 5 } });\nsetInterval(() => draw.bg(`hsl(200,80%,${sig.value*40}%)`), 16);",
+        code: "const ae = asciiEditor({ cols: 40, rows: 20 });\n// top-left 10×5 cell region\nconst sig = ae.signal('cell', { decay: 300, region: { x: 0, y: 0, w: 10, h: 5 } });\nsetInterval(() => canvas.bg(`hsl(200,80%,${sig.value*40}%)`), 16);",
         hint: "region:{x,y,w,h} filters to cell column/row coordinates (not pixels). Lets you spatially map art regions to audio parameters, shader uniforms, etc.",
         tags: ["ascii", "editor", "signal", "region", "spatial", "decay", "cell"],
       },
@@ -1981,7 +1986,7 @@ setcps(0.5);`,
       },
       {
         label: "wm.paintSignal — overlay signal",
-        code: "const id = wm.spawn('Cam', { type: 'camera' });\nconst sig = wm.paintSignal(id, 'stroke', { decay: 300 });\nsetInterval(() => draw.bg(`hsl(280,80%,${sig.value * 40}%)`), 16);",
+        code: "const id = wm.spawn('Cam', { type: 'camera' });\nconst sig = wm.paintSignal(id, 'stroke', { decay: 300 });\nsetInterval(() => canvas.bg(`hsl(280,80%,${sig.value * 40}%)`), 16);",
         hint: "wm.paintSignal(id, event?, opts?) → { value, velocity, stream, on }. Live 0–1 signal from the paint overlay on a window. Supports region:{x,y,w,h} in overlay canvas px.",
         tags: ["wm", "overlay", "paint", "signal", "decay", "reactive", "window", "stream"],
       },
@@ -2022,7 +2027,7 @@ setcps(0.5);`,
       },
       {
         label: "save file (native)",
-        code: "const canvas = getCanvas(0);\ncanvas.toBlob(async blob => {\n  const buf = await blob.arrayBuffer();\n  await shell.saveFile(buf, { defaultPath: 'export.png', filters: [{ name: 'PNG', extensions: ['png'] }] });\n});",
+        code: "const canvas = canvas.el;\ncanvas.toBlob(async blob => {\n  const buf = await blob.arrayBuffer();\n  await shell.saveFile(buf, { defaultPath: 'export.png', filters: [{ name: 'PNG', extensions: ['png'] }] });\n});",
         hint: "shell.saveFile(data, opts) — native save dialog in Electron/Tauri. Falls back to browser download in static-site mode.",
         tags: ["shell", "save", "file", "export", "download"],
       },
@@ -2045,13 +2050,13 @@ setcps(0.5);`,
       },
       {
         label: "note on/off handler",
-        code: "await midi.open();\nmidi.onNote(({ type, note, velocity, channel }) => {\n  console.log(type, note, velocity, 'ch', channel);\n  if (type === 'noteon') draw.circle(note * 6, 300, velocity, `hsl(${note*3},80%,60%)`);\n});",
+        code: "await midi.open();\nmidi.onNote(({ type, note, velocity, channel }) => {\n  console.log(type, note, velocity, 'ch', channel);\n  if (type === 'noteon') canvas.circle(note * 6, 300, velocity, `hsl(${note*3},80%,60%)`);\n});",
         hint: "midi.onNote(fn) — fn({type:'noteon'|'noteoff', note, velocity, channel}). Called for every note event on any channel.",
         tags: ["midi", "note", "noteon", "noteoff"],
       },
       {
         label: "CC signal (knob/fader)",
-        code: "await midi.open();\nconst vol = midi.signal(0, 7);  // ch 0, CC 7 = volume\nsetInterval(() => {\n  draw.clear();\n  draw.rect(100, 100, vol.value * 400, 40, '#0f0');\n}, 30);",
+        code: "await midi.open();\nconst vol = midi.signal(0, 7);  // ch 0, CC 7 = volume\nsetInterval(() => {\n  canvas.clear();\n  canvas.rect(100, 100, vol.value * 400, 40, '#0f0');\n}, 30);",
         hint: "midi.signal(channel, cc) → {value} — live 0–1 signal updated on each CC message. Use as shader .bind() source or animation driver.",
         tags: ["midi", "cc", "knob", "signal", "fader"],
       },
@@ -2074,13 +2079,13 @@ setcps(0.5);`,
       },
       {
         label: "live weather stream",
-        code: "const w = await external.weather(51.5074, -0.1278);  // London\nw.stream(sig => {\n  const t = sig.temperature ?? 0;\n  draw.clear();\n  draw.text(`🌡 ${t.toFixed(1)}°C  💨 ${(sig.windSpeed??0).toFixed(0)} km/h`, 40, 200, { size: 36, color: t > 20 ? '#f80' : '#0af' });\n}, 60000);",
+        code: "const w = await external.weather(51.5074, -0.1278);  // London\nw.stream(sig => {\n  const t = sig.temperature ?? 0;\n  canvas.clear();\n  canvas.text(`🌡 ${t.toFixed(1)}°C  💨 ${(sig.windSpeed??0).toFixed(0)} km/h`, 40, 200, { size: 36, color: t > 20 ? '#f80' : '#0af' });\n}, 60000);",
         hint: "WeatherSignal.stream(fn, intervalMs=60000) — calls fn(signal) immediately, then every intervalMs. Refreshes from open-meteo API.",
         tags: ["external", "weather", "stream", "live"],
       },
       {
         label: "generic JSON signal",
-        code: "// Poll any JSON endpoint as a live signal\nconst price = await external.signal(\n  'https://api.coinbase.com/v2/prices/BTC-USD/spot',\n  json => parseFloat(json.data.amount)\n);\nconsole.log('BTC:', price.value);\n\nprice.stream(s => draw.text('$' + s.value.toFixed(2), 50, 300, { size: 40, color: '#f80' }), 10000);",
+        code: "// Poll any JSON endpoint as a live signal\nconst price = await external.signal(\n  'https://api.coinbase.com/v2/prices/BTC-USD/spot',\n  json => parseFloat(json.data.amount)\n);\nconsole.log('BTC:', price.value);\n\nprice.stream(s => canvas.text('$' + s.value.toFixed(2), 50, 300, { size: 40, color: '#f80' }), 10000);",
         hint: "external.signal(url, selector, intervalMs) → DataSignal with .value. selector(json) extracts the value from the response.",
         tags: ["external", "fetch", "json", "signal", "poll"],
       },
@@ -2160,7 +2165,7 @@ setcps(0.5);`,
       },
       {
         label: "GPIO pin read",
-        code: "// Arduino: Serial.println(String(analogRead(A0)) + ':' + String(digitalRead(13)));\n// Default parse expects 'PIN:VALUE\\n' format\non('gpio:pin').do(({ pin, value }) => {\n  console.log(`pin ${pin} = ${value}`);\n  if (pin === 0) draw.bg(`hsl(${value / 4}, 80%, 50%)`);\n});",
+        code: "// Arduino: Serial.println(String(analogRead(A0)) + ':' + String(digitalRead(13)));\n// Default parse expects 'PIN:VALUE\\n' format\non('gpio:pin').do(({ pin, value }) => {\n  console.log(`pin ${pin} = ${value}`);\n  if (pin === 0) canvas.bg(`hsl(${value / 4}, 80%, 50%)`);\n});",
         hint: "gpio:pin { pin, value } — fires when default parse(line) matches 'PIN:VALUE\\n'. fires alongside sensor:serial:data so raw line is always accessible. Default: Serial.println(String(pin) + ':' + String(value));",
         tags: ["gpio", "pin", "arduino", "serial", "analog", "digital"],
       },

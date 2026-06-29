@@ -270,41 +270,42 @@ describe('vision_nearest', () => {
 
 // ── Canvas ────────────────────────────────────────────────────────────────────
 
+// ADR 040: quick-draw blocks emit against an implicit default `canvas` (no global draw).
 describe('canvas_fill_rect', () => {
-  test('generates draw.rect call with color and coords', () => {
+  test('generates canvas.rect call with color and coords', () => {
     const b = makeBlock({ X: '10', Y: '20', W: '100', H: '50', COLOR: 'red' });
     const code = gen('canvas_fill_rect', b);
-    expect(code).toContain('draw.rect(10, 20, 100, 50');
+    expect(code).toContain('canvas.rect(10, 20, 100, 50');
     expect(code).toContain('"red"');
   });
 });
 
 describe('canvas_fill_circle', () => {
-  test('generates draw.circle call', () => {
+  test('generates canvas.circle call', () => {
     const b = makeBlock({ X: '200', Y: '300', R: '50', COLOR: 'blue' });
     const code = gen('canvas_fill_circle', b);
-    expect(code).toContain('draw.circle(200, 300, 50');
+    expect(code).toContain('canvas.circle(200, 300, 50');
     expect(code).toContain('"blue"');
   });
 });
 
 describe('canvas_clear', () => {
-  test('generates draw.clear()', () => {
+  test('generates canvas.clear()', () => {
     const code = gen('canvas_clear', makeBlock());
-    expect(code).toContain('draw.clear()');
+    expect(code).toContain('canvas.clear()');
   });
 });
 
 describe('canvas_blur', () => {
-  test('calls getLayer().blur()', () => {
-    expect(gen('canvas_blur', makeBlock({ Z: '0', AMT: '5' }))).toBe('getLayer(0).blur(5);\n');
+  test('calls canvas.fx().blur()', () => {
+    expect(gen('canvas_blur', makeBlock({ Z: '0', AMT: '5' }))).toBe('canvas.fx(0).blur(5);\n');
   });
 });
 
 describe('canvas_layer_opacity', () => {
-  test('calls getLayer().opacity()', () => {
+  test('calls canvas.fx().opacity()', () => {
     expect(gen('canvas_layer_opacity', makeBlock({ Z: '1', OPACITY: '0.5' }))).toBe(
-      'getLayer(1).opacity(0.5);\n',
+      'canvas.fx(1).opacity(0.5);\n',
     );
   });
 });

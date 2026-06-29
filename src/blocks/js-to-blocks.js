@@ -268,35 +268,37 @@ function translateOne(node, vars) {
   const expr = node?.type === 'ExpressionStatement' ? node.expression : node;
   if (!expr || expr.type !== 'CallExpression') return null;
 
-  // ── draw.* ──
-  if (isCall(expr, 'draw', 'bg'))    return { type: 'draw_bg',     fields: { COLOR: strLit(expr.arguments[0]) ?? '#000' } };
-  if (isCall(expr, 'draw', 'clear')) return { type: 'canvas_clear', fields: {} };
-  if (isCall(expr, 'draw', 'alpha')) return { type: 'draw_alpha',  fields: { ALPHA: numLit(expr.arguments[0]) ?? 1 } };
-  if (isCall(expr, 'draw', 'reset')) return { type: 'draw_reset',  fields: {} };
+  // ── canvas.* (implicit default canvas — ADR 040; was draw.* pre-040) ──
+  if (isCall(expr, 'canvas', 'bg'))    return { type: 'draw_bg',     fields: { COLOR: strLit(expr.arguments[0]) ?? '#000' } };
+  if (isCall(expr, 'canvas', 'clear')) return { type: 'canvas_clear', fields: {} };
+  if (isCall(expr, 'canvas', 'alpha')) return { type: 'draw_alpha',  fields: { ALPHA: numLit(expr.arguments[0]) ?? 1 } };
+  if (isCall(expr, 'canvas', 'reset')) return { type: 'draw_reset',  fields: {} };
 
-  if (isCall(expr, 'draw', 'rect')) {
+  if (isCall(expr, 'canvas', 'rect')) {
     const [x, y, w, h] = expr.arguments.slice(0, 4).map(numLit);
     if (x != null) return { type: 'canvas_fill_rect', fields: { X: x, Y: y ?? 0, W: w ?? 100, H: h ?? 100, COLOR: strLit(expr.arguments[4]) ?? 'white' } };
   }
-  if (isCall(expr, 'draw', 'circle')) {
+  if (isCall(expr, 'canvas', 'circle')) {
     const [x, y, r] = expr.arguments.slice(0, 3).map(numLit);
     if (x != null) return { type: 'canvas_fill_circle', fields: { X: x, Y: y ?? 0, R: r ?? 50, COLOR: strLit(expr.arguments[3]) ?? 'white' } };
   }
-  if (isCall(expr, 'draw', 'line')) {
+  if (isCall(expr, 'canvas', 'line')) {
     const [x1, y1, x2, y2] = expr.arguments.slice(0, 4).map(numLit);
     if (x1 != null) return { type: 'draw_line', fields: { X1: x1, Y1: y1 ?? 0, X2: x2 ?? 400, Y2: y2 ?? 400, COLOR: strLit(expr.arguments[4]) ?? 'white', THICKNESS: numLit(expr.arguments[5]) ?? 1 } };
   }
-  if (isCall(expr, 'draw', 'text')) {
+  if (isCall(expr, 'canvas', 'text')) {
     const str = strLit(expr.arguments[0]);
     const [x, y, size] = expr.arguments.slice(1, 4).map(numLit);
     return { type: 'draw_text', fields: { STR: str ?? '', X: x ?? 0, Y: y ?? 0, SIZE: size ?? 24, COLOR: strLit(expr.arguments[4]) ?? 'white' } };
   }
 
-  // ── getLayer(z).blur/opacity ──
+  // ── canvas.fx(z).blur/opacity (was getLayer(z).* pre-040) ──
   const { callee } = expr;
-  if (isMember(callee, '*', 'blur') && callee.object?.type === 'CallExpression' && callee.object.callee?.name === 'getLayer')
+  const _isFx = (o) => o?.type === 'CallExpression' && o.callee?.type === 'MemberExpression'
+    && o.callee.object?.name === 'canvas' && o.callee.property?.name === 'fx';
+  if (isMember(callee, '*', 'blur') && _isFx(callee.object))
     return { type: 'canvas_blur', fields: { Z: numLit(callee.object.arguments[0]) ?? 0, AMT: numLit(expr.arguments[0]) ?? 5 } };
-  if (isMember(callee, '*', 'opacity') && callee.object?.type === 'CallExpression' && callee.object.callee?.name === 'getLayer')
+  if (isMember(callee, '*', 'opacity') && _isFx(callee.object))
     return { type: 'canvas_layer_opacity', fields: { Z: numLit(callee.object.arguments[0]) ?? 0, OPACITY: numLit(expr.arguments[0]) ?? 0.5 } };
 
   // ── ShaderFX.* — both shorthand (camera/preset/video) and factory (cameraShader/presetShader/videoShader) ──

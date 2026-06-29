@@ -435,7 +435,7 @@ describe('eyedropper', () => {
 // ── Export / code snippet ──────────────────────────────────────────────────────
 
 describe('code export', () => {
-  it('inserts draw.image snippet into active editor', () => {
+  it('inserts a new Canvas() + canvas.image snippet into active editor (ADR 040)', () => {
     const dispatch = vi.fn();
     const mockInst = { cm: { state: { doc: { length: 0 } }, dispatch, focus: vi.fn() } };
     window.__ar_active_editor_id = 42;
@@ -447,7 +447,8 @@ describe('code export', () => {
 
     expect(dispatch).toHaveBeenCalledOnce();
     const inserted = dispatch.mock.calls[0][0].changes.insert;
-    expect(inserted).toContain("draw.image(");
+    expect(inserted).toContain("new Canvas()");
+    expect(inserted).toContain("canvas.image(");
   });
 });
 

@@ -878,12 +878,20 @@ export class Pipeline {
     return this;
   }
 
-  /** Mount pipeline output onto an existing canvas layer at z-index `z`. */
-  layer(z) {
-    const layerCanvas = window.getCanvas?.(z);
+  /**
+   * Mount pipeline output onto a z-plane of a target window (ADR 040 — the global
+   * canvas stack is gone). `target` is a Canvas (has .winId) or a window id; `z`
+   * defaults to 0. For a bare DOM element use `.to(el)`; for a standalone window
+   * use `.show()`.
+   */
+  layer(target, z = 0) {
+    const winId = target && typeof target === 'object' ? target.winId : target;
+    const layerCanvas = winId ? window.wm?.layer?.(winId, z, { raster: true }) : null;
     if (layerCanvas) {
       this._displayCanvas = layerCanvas;
       this._displayCtx    = layerCanvas.getContext('2d');
+    } else {
+      console.warn('pipe.layer(target, z): pass a Canvas or window id (ADR 040). Use .show() for a standalone window.');
     }
     this.start();
     return this;
@@ -922,7 +930,8 @@ export class Pipeline {
     for (const stage of this._stages) stage._start();
 
     // After all stages are up, size the display canvas to match source output
-    if (this._displayCanvas && !(this._displayCanvas === window.getCanvas?.(0))) {
+    // (only if we own it — never resize an external wm.layer/Canvas plane).
+    if (this._displayCanvas && this._ownsDisplayCanvas) {
       const src = this._last()._getSource() ?? this._head._getSource();
       if (src) {
         this._displayCanvas.width  = _srcWidth(src);
@@ -985,6 +994,7 @@ export class Pipeline {
       container.appendChild(dc);
       this._displayCanvas = dc;
       this._displayCtx    = dc.getContext('2d');
+      this._ownsDisplayCanvas = true;   // we created it → safe to size/remove (ADR 040)
     }
   }
 
@@ -996,12 +1006,13 @@ export class Pipeline {
       stage._destroy();
     }
     this._stages = [];
-    // Only remove displayCanvas if we created it (not an externally provided layer canvas)
-    if (this._displayCanvas && this._displayCanvas !== window.getCanvas?.(0)) {
+    // Only remove displayCanvas if we created it (not an external wm.layer/Canvas plane)
+    if (this._displayCanvas && this._ownsDisplayCanvas) {
       this._displayCanvas.remove();
     }
     this._displayCanvas = null;
     this._displayCtx    = null;
+    this._ownsDisplayCanvas = false;
     // Close the window we spawned so it doesn't orphan across reset/re-run.
     if (this._ownWinId) {
       const id = this._ownWinId;

@@ -129,6 +129,66 @@ export class ShaderLayerBase {
 
   get canvas() { return this._canvas; }
 
+  // Pointer in THIS shader's canvas-pixel space (ADR 040). Maps the raw viewport
+  // pointer (set by shader.js's mousemove listener) against this canvas's own
+  // on-screen rect — so `mouse` is correct in whatever window the shader mounts in.
+  _mouseXY() {
+    const raw = window.__ar_shaderMouseRaw;
+    const c = this._canvas;
+    if (!raw || !c) return { x: 0, y: 0 };
+    const r = c.getBoundingClientRect();
+    if (!r.width || !r.height) return { x: 0, y: 0 };
+    return {
+      x: (raw.clientX - r.left) / r.width  * c.width,
+      y: (raw.clientY - r.top)  / r.height * c.height,
+    };
+  }
+
+  // ── Mount / show (ADR 040) ─────────────────────────────────────────────────
+  // Render this shader as a plane in a window's layer stack. Replaces the old
+  // fall-back-to-editor-output-window behavior (which is gone with global draw).
+  //
+  //   .mount(target[, z]) — the primitive: mount onto an existing window. target
+  //                         is a Canvas (has .winId), a window id, or a DOM element.
+  //   .show(opts)         — sugar: spawn a bare window and mount into it (standalone).
+  mount(target, z) {
+    if (z !== undefined) this._z = z;
+    let el = null;
+    if (target && typeof target === 'object' && target.winId) {
+      el = document.getElementById(target.winId)?.querySelector('.wm-body') ?? null;
+    } else if (typeof target === 'string') {
+      el = document.getElementById(target)?.querySelector('.wm-body') ?? document.querySelector(target);
+    } else if (target instanceof HTMLElement) {
+      el = target;
+    }
+    if (el) this._container = el;
+    return this.start();
+  }
+
+  show(opts = {}) {
+    const { title = 'Shader', w = 700, h = 500 } = opts;
+    const winId = window.wm?.spawn(title, {
+      w, h, html: '', transient: true,
+      onClose: () => this._destroy(),
+      ...(opts.noChrome    !== undefined ? { noChrome:    opts.noChrome    } : {}),
+      ...(opts.transparent !== undefined ? { transparent: opts.transparent } : {}),
+    });
+    this._ownWinId = winId ?? null;
+    const body = winId ? document.getElementById(winId)?.querySelector('.wm-body') : null;
+    if (body) this._container = body;
+    return this.start();
+  }
+
+  // Close the window we spawned via show() (call from subclass _destroy so it
+  // doesn't orphan across reset/re-run). Idempotent.
+  _closeOwnWin() {
+    if (this._ownWinId) {
+      const id = this._ownWinId;
+      this._ownWinId = null;
+      window.wm?.remove?.(id, { animate: false });
+    }
+  }
+
   // ── Liveness helpers ──────────────────────────────────────────────────────
   // start() calls _registerLive(); error paths + _destroy() call _releaseLive().
 

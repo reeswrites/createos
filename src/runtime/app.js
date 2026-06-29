@@ -7,6 +7,7 @@ import { audio, startAudio, cleanupAudio } from "../api/audio.js";
 import { initStrudel, strudelGlobals } from "../api/strudel.js";
 import { Shader, ShaderFX, cleanupShaders } from "../api/shader.js";
 import { GLShader, GLSL_PRESETS } from "../api/glsl-shader.js";
+import { Canvas } from "../api/canvas.js";
 import { initPixi, PIXI } from "../api/pixi.js";
 import { AudioViz, SpectrogramCanvas, PianoRollViz, cleanupViz } from "../api/viz.js";
 import { mixer, openMixerPanel } from "../api/mixer.js";
@@ -28,6 +29,7 @@ import { armGlobal, disarmGlobal, isGlobalArmed, buildTimelineCode } from "../ap
 import { insertSnippet } from "../editor/active-editor.js";
 import { library, initLibrary, populateLibraryToolkit, populateLibraryBlocks } from "../api/library.js";
 import { initWM } from "../api/wm.js";
+import { initTooltips } from "../api/tooltips.js";
 import { installWidgetHistoryKeys } from "../api/widget-history.js";
 import {
   initPaletteWorkspace, onPaletteClick, resizeBlockly,
@@ -80,6 +82,7 @@ _registerBuiltin('Shader',   Shader);
 _registerBuiltin('ShaderFX', ShaderFX);
 _registerBuiltin('GLShader', GLShader);
 _registerBuiltin('GLSL_PRESETS', GLSL_PRESETS);
+_registerBuiltin('Canvas',   Canvas);
 _registerBuiltin('pipe',    pipe);
 _registerBuiltin('Source',  Source);
 _registerBuiltin('route',   route);
@@ -253,6 +256,9 @@ if (_isEmbed) {
 window.onload = () => {
   // ── Signal routing table — reset on each run by cleanupSignalGraph() ──────
   window.__ar_signalRoutes = [];
+
+  // ── Styled hover tooltips for every [title] (widgets + wm titlebars) ──────
+  initTooltips();
 
   // ── Camera / Mic ───────────────────────────────────────────────────────────
   initCamera();
@@ -682,9 +688,8 @@ window.onload = () => {
     const x = Math.min(offset + 60, dw - w - 10);
     const y = Math.min(offset + 40, dh - h - 44);
     const edWin  = document.getElementById(inst.editorWinId);
-    const outWin = document.getElementById(inst.canvasWinId);
     if (edWin)  { edWin.style.cssText  += `;left:${x}px;top:${y}px;width:${w}px;height:${h}px;display:flex;`; }
-    if (outWin) { outWin.style.cssText += `;left:${x + w + 6}px;top:${y}px;width:${Math.min(500, dw - x - w - 16)}px;height:${h}px;display:flex;`; }
+    // ADR 040: no editor output window — visual output is `new Canvas()` (own window).
   });
 
   // ── Desktop right-click context menu ──────────────────────────────────────
@@ -1060,6 +1065,17 @@ window.onload = () => {
     }
 
     galleryBtn.addEventListener('click', () => openGallery().catch((err) => console.error('Gallery open failed:', err)));
+  })();
+
+  // ── "Speech-to-Text" button — opens the model-manager panel (ADR 039) ───────
+  (() => {
+    const sttBtn = document.getElementById('sttBtn');
+    if (!sttBtn) return;
+    sttBtn.addEventListener('click', () => {
+      import('../stt/settings-ui.js')
+        .then(({ openSTTSettings }) => openSTTSettings())
+        .catch((err) => console.error('STT settings open failed:', err));
+    });
   })();
 
   // ── "Tutorial" button ──────────────────────────────────────────────────────

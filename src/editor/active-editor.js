@@ -7,9 +7,15 @@
 // The active instance is whichever editor most recently ran (set in
 // editor-instance.js on execute). `__ar_instances` is a Map keyed by editor id.
 export function getActiveInstance() {
+  const map = window.__ar_instances;
   const id = window.__ar_active_editor_id;
-  if (id == null) return null;
-  return window.__ar_instances?.get(id) ?? null;
+  const active = id != null ? map?.get(id) : null;
+  if (active) return active;
+  // No editor has run yet (active id unset) — fall back to the primary editor
+  // (id=1), then to any sole instance, so snippets land in the editor instead
+  // of the clipboard on a fresh session (e.g. the Tutorial's Run button before
+  // the user has pressed play once).
+  return map?.get(1) ?? (map && map.size ? [...map.values()][0] : null) ?? null;
 }
 
 // Append `code` at the end of the active editor's document, padded with blank

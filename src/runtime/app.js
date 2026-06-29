@@ -51,6 +51,7 @@ import { EditorInstance } from "../editor/editor-instance.js";
 import { saveProject, loadProject, serializeProject, applyProject } from "../api/project.js";
 import { on, emit, any, tick, hold, tween, registerCommand, subscribe } from "../events/index.js";
 import { openEventPanel } from "../api/event-panel.js";
+import { openTutorial } from "../api/tutorial.js";
 import "../api/input.js"; // keyboard + mouse → bus (must load after events/index.js)
 
 // ── Capture native timer/event functions before any user-code patching ────────
@@ -1041,6 +1042,12 @@ window.onload = () => {
     galleryClose.addEventListener('click', () => galleryModal.close());
     galleryModal.addEventListener('click', (e) => { if (e.target === galleryModal) galleryModal.close(); });
   })();
+
+  // ── "Tutorial" button ──────────────────────────────────────────────────────
+  // Opens the tutorial WM window, or focuses/restores it if already open.
+  document.getElementById('tutorialBtn')?.addEventListener('click', () => {
+    openTutorial().catch((err) => console.error('Tutorial open failed:', err));
+  });
 
   // Camera / mic toolbar icons — spawn a viz window on click (ADR 023).
   // No toggle semantics; streams are demand-driven via media-lease.js.

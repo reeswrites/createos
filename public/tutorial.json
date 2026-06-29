@@ -1,0 +1,175 @@
+{
+  "version": 1,
+  "title": "createos tutorial",
+  "description": "Learn the two primitives that power every createos sketch: the visual pipeline and the signal system.",
+  "lessons": [
+    {
+      "id": "l1",
+      "number": 1,
+      "title": "Your First Source",
+      "concept": "A Source is anything that produces output continuously. Start with the simplest one.",
+      "prose": "In createos you don't write render loops manually — you **declare** something and tell it to start. A `GLShader` is the simplest source: a program that runs on your GPU every frame.\n\n`uv` is your position on screen as two numbers from 0 to 1. X goes left to right, Y top to bottom. `gl_FragColor` is the output color. `.start()` begins the render loop — after that, the shader runs itself.\n\nYou also always have `uTime` (seconds elapsed), `mouse` (mouse position 0–1), and `uCustom` (four values you set from JS — covered in Lesson 6).",
+      "examples": [
+        {
+          "id": "l1-gradient",
+          "label": "Color gradient",
+          "code": "new GLShader(`\n  gl_FragColor = vec4(uv.x, uv.y, 0.0, 1.0);\n`).start()"
+        },
+        {
+          "id": "l1-wave",
+          "label": "Animated wave",
+          "code": "new GLShader(`\n  float wave = sin(uv.x * 10.0 + uTime) * 0.5 + 0.5;\n  gl_FragColor = vec4(wave, uv.y, 1.0 - wave, 1.0);\n`).start()"
+        }
+      ],
+      "insight": "Declare and start. The shader runs itself. This is the first half of every createos sketch: declaring what exists.",
+      "extend": "Change `10.0` to `50.0` for more stripes. Change `uTime` to `uTime * 0.1` to slow the animation down."
+    },
+    {
+      "id": "l2",
+      "number": 2,
+      "title": "pipe() — the visual chain",
+      "concept": "Camera is also a Source. pipe() is how you transform it and send it somewhere.",
+      "prose": "`pipe(source)` starts a visual chain. `.show('title')` is where things come out — it spawns a floating window. Everything in between is a **transform stage**.\n\nThe chain reads like a sentence: take the camera, convert to ASCII, show the result. You can stack as many stages as you want between source and show.",
+      "examples": [
+        {
+          "id": "l2-show",
+          "label": "Camera to window",
+          "code": "const cam = await Camera.open()\npipe(cam).show('My Camera')"
+        },
+        {
+          "id": "l2-ascii",
+          "label": "Camera through ASCII",
+          "code": "const cam = await Camera.open()\npipe(cam).ascii().show('ASCII Cam')"
+        },
+        {
+          "id": "l2-styled",
+          "label": "ASCII with styling",
+          "code": "const cam = await Camera.open()\npipe(cam)\n  .ascii({ cols: 80, color: '#00ff41', bg: '#000' })\n  .fx('hue-rotate(180deg)')\n  .show('Styled ASCII')"
+        }
+      ],
+      "insight": "pipe() is the visual assembly line. Sources go in on the left, .show() is where things come out on the right. Everything in between is a transformation.",
+      "extend": "Swap .fx('hue-rotate(180deg)') for .fx('invert(1)') or .fx('blur(4px)'). Try chaining two .fx() calls."
+    },
+    {
+      "id": "l3",
+      "number": 3,
+      "title": "Everything is a canvas",
+      "concept": "Each pipe stage takes a canvas in and produces a canvas out. This is why chaining works.",
+      "prose": "The camera is a `<video>` element — not a canvas. The moment it enters the first stage, that stage reads the video frames and draws them onto a new HTML canvas. Every stage after that receives a canvas and produces a new canvas.\n\nThis means `.ascii()` is a **shader pass in disguise**. It reads pixel brightness, maps each pixel to a character, and renders those characters onto a new canvas. `.glshader()` does the same thing but you write the transformation in GLSL. `.fx()` applies a CSS filter to whatever canvas came before it.\n\nInside a `.glshader()` stage, `uVideo` is automatically set to the canvas that the previous stage produced.",
+      "examples": [
+        {
+          "id": "l3-matrix",
+          "label": "ASCII → GLSL → blur (matrix rain)",
+          "code": "const cam = await Camera.open()\npipe(cam)\n  .ascii({ cols: 80, color: '#00ff41', bg: '#000' })\n  .glshader(`\n    vec4 c = texture2D(uVideo, uv);\n    float luma = dot(c.rgb, vec3(0.299, 0.587, 0.114));\n    vec3 rain = 0.5 + 0.5 * cos(6.28 * (uv.y + uTime * 0.4 + vec3(0.0, 0.33, 0.67)));\n    gl_FragColor = vec4(rain * luma, 1.0);\n  `)\n  .fx('blur(1px)')\n  .show('Matrix Rain')"
+        }
+      ],
+      "insight": "The mental model is: Source → shader passes → display. The camera is your first texture. Every transform reads pixels and writes pixels — whether it's called .ascii(), .glshader(), or .fx().",
+      "extend": "Add another .glshader() before .ascii() to pre-process the camera. Notice the ASCII now reacts to a different texture."
+    },
+    {
+      "id": "l4",
+      "number": 4,
+      "title": "Signals — live values",
+      "concept": "Parallel to the visual pipeline is a second system: values that update themselves.",
+      "prose": "A **Signal** is a value that always reflects current state. You don't push to it — it just knows. `audio.fft.bass` is always the current bass level. `sensors.mouse()` is always the current mouse position. You can read them at any time.\n\nSignals exist across many domains: audio frequency bands, mouse and keyboard position, MIDI knobs, device motion, pixel brightness of a screen region, even live weather data. They all share the same idea: always current, always readable.",
+      "examples": [
+        {
+          "id": "l4-fft-poll",
+          "label": "Read audio FFT directly (requires mic or audio playing)",
+          "code": "pat('C4 E4 G4 B4', audio.synth()).bpm(120).start()\naudio.start()\n\nsetInterval(() => {\n  console.log(\n    'bass:', audio.fft.bass.toFixed(2),\n    'mid:',  audio.fft.mid.toFixed(2),\n    'high:', audio.fft.high.toFixed(2)\n  )\n}, 200)"
+        },
+        {
+          "id": "l4-signal-types",
+          "label": "Different signal types",
+          "code": "// mouse position (always works, no setup)\nconst mouse = sensors.mouse()\n\n// MIDI knob or slider on channel 1, CC 74\nconst knob = midi.signal(1, 74)\n\n// brightness of a region of the camera feed\nconst bright = video.signal('camera', { x: 0.5, y: 0.5, radius: 0.1 })\n\n// all of these update themselves — read them whenever you want\nsetInterval(() => console.log(knob.value.toFixed(2)), 200)"
+        }
+      ],
+      "insight": "Signals are variables that maintain themselves. The question isn't how to update them — it's how to react to them. That's what the next lesson is about.",
+      "extend": "Open the console and read audio.fft.bass, audio.fft.mid, and audio.fft.high while music is playing. Notice they're always current without any setup."
+    },
+    {
+      "id": "l5",
+      "number": 5,
+      "title": ".stream() — reacting to change",
+      "concept": "Reading a signal gives you a snapshot. .stream(fn) reacts automatically, every frame.",
+      "prose": "`.stream(fn)` runs your callback on every animation frame, passing the current signal value. You never ask for it — it just arrives. This is how you turn a signal into a behavior.\n\nFor **discrete triggers** — things that fire once per occurrence rather than every frame — the pattern is identical: give a callback, it calls you when something happens. `.onGesture()`, `.onWord()`, `.onKey()` all follow this model.",
+      "examples": [
+        {
+          "id": "l5-mouse-draw",
+          "label": "Mouse drives a circle",
+          "code": "const mouse = sensors.mouse()\nmouse.stream(m => {\n  draw.clear()\n  draw.circle(m.x * 1600, m.y * 900, 30, 'white')\n})"
+        },
+        {
+          "id": "l5-fft-draw",
+          "label": "Audio drives a pulsing circle",
+          "code": "pat('C4 E4 G4 B4 [C5 G4]*2', audio.synth()).bpm(140).start()\naudio.start()\n\naudio.fft.stream(f => {\n  draw.clear().bg('#111')\n  draw.circle(800, 450, 50 + f.bass * 400, `hsl(${f.bass * 200}, 80%, 60%)`)\n})"
+        },
+        {
+          "id": "l5-events",
+          "label": "Discrete event triggers",
+          "code": "vision.onGesture('Thumb_Up',   () => draw.bg('#00ff41'))\nvision.onGesture('Closed_Fist', () => draw.bg('#000'))\n\naudio.onWord('clear', () => draw.clear())\naudio.onWord('red',   () => draw.bg('red'))\n\nsensors.keyboard().onKey('Space',     () => draw.clear())\nsensors.keyboard().onKey('ArrowLeft', () => draw.bg('blue'))"
+        }
+      ],
+      "insight": ".stream() turns 'a signal exists' into 'something happens because of it.' Discrete events (.onGesture, .onWord, .onKey) are the same pattern — a callback — just for one-shot triggers instead of continuous updates.",
+      "extend": "Combine a stream with a gesture trigger. Use .stream() to draw continuously and .onGesture() to change the draw color when you give a thumbs up."
+    },
+    {
+      "id": "l6",
+      "number": 6,
+      "title": "Wiring — where the two tracks meet",
+      "concept": "The visual pipeline and the signal system are parallel tracks. You connect them deliberately.",
+      "prose": "The pipe chain doesn't know about signals. Signals don't know about the pipe. The junction between them is `shader.set()`.\n\n`shader.set(index, value)` writes into `uCustom` inside the GLSL — index 0 is `uCustom.x`, 1 is `uCustom.y`, and so on. A signal writes a value in; the shader reads it every frame. Neither knows where the value came from or what it controls.",
+      "examples": [
+        {
+          "id": "l6-wired",
+          "label": "Camera + audio + mouse, all wired together",
+          "code": "const cam = await Camera.open()\n\nconst shader = new GLShader(`\n  vec4 c = texture2D(uVideo, uv);\n  float energy = uCustom.x;\n  float shift  = uCustom.y;\n\n  vec3 col = c.rgb;\n  col.r *= 1.0 + energy * 3.0;\n  col = mix(col, col.grb, shift);\n  gl_FragColor = vec4(col, 1.0);\n`)\n\npipe(cam).glshader(shader).show('Reactive Cam')\n\npat('C4 E4 G4 B4', audio.synth()).bpm(120).start()\naudio.start()\n\naudio.fft.stream(f => shader.set(0, f.bass))\nsensors.mouse().stream(m => shader.set(1, m.x))"
+        }
+      ],
+      "insight": "The two tracks meet at parameters. A signal sets a value. A shader reads it. The connection is intentional and explicit — nothing wires automatically.",
+      "extend": "Add a third signal: sensors.motion().stream(m => shader.set(2, m.magnitude / 20)) and use uCustom.z in the GLSL. All three signals drive the shader independently."
+    },
+    {
+      "id": "l7",
+      "number": 7,
+      "title": "The full pattern",
+      "concept": "Every createos sketch has two phases. Writing them as separate blocks makes everything clearer.",
+      "prose": "The **declare block** describes what exists: sources, shaders, signals. The **wire block** describes how they connect: the pipeline runs, signals flow into uniforms, gestures trigger actions.\n\nNothing in the wire block creates anything — it only connects things that already exist. This mirrors assembly language: declare your data in the header, write your instructions in the body.\n\nIf you can read the declare block and know exactly what the sketch contains, and read the wire block and know exactly how it behaves — the sketch is well-structured.",
+      "examples": [
+        {
+          "id": "l7-full",
+          "label": "A complete sketch with all four primitives",
+          "code": "// ── DECLARE YOUR WORLD ──────────────────────────\nconst cam = await Camera.open()\n\nconst shader = new GLShader(`\n  vec4 c     = texture2D(uVideo, uv);\n  float bass   = uCustom.x;\n  float mouseX = uCustom.y;\n\n  vec3 tint = mix(\n    vec3(0.1, 0.4, 1.0),\n    vec3(1.0, 0.3, 0.05),\n    mouseX\n  );\n  gl_FragColor = vec4(c.rgb * tint * (1.0 + bass * 2.0), 1.0);\n`)\n\nconst mouse = sensors.mouse()\n\n\n// ── WIRE IT TOGETHER ─────────────────────────────\npipe(cam).glshader(shader).show('My Sketch')\n\npat('C3 E3 G3 [B3 A3]*2', audio.synth({ oscillator: { type: 'sawtooth' } }))\n  .bpm(100).start()\naudio.start()\n\naudio.fft.stream(f => shader.set(0, f.bass))\nmouse.stream(m     => shader.set(1, m.x))\n\nvision.onGesture('Open_Palm',   () => draw.clear())\nvision.onGesture('Closed_Fist', () => draw.bg('#000'))\naudio.onWord('reset', () => draw.bg('#000'))"
+        }
+      ],
+      "insight": "Declare your world. Wire it together. If the declare block says what exists and the wire block says how it behaves, any change stays in the right place.",
+      "extend": "Add a standalone GLShader in the declare block. In the wire block, drive its color with audio.fft.stream(f => standalone.set([f.bass, f.mid, f.high, 1])). Two visual outputs, one signal."
+    },
+    {
+      "id": "l8",
+      "number": 8,
+      "title": "route() — the unified chain",
+      "concept": "Once the two-track model feels natural, route() expresses both tracks as a single declared chain.",
+      "prose": "`route()` is declarative where `.stream()` is imperative. Instead of writing a callback with math, you declare the data flow: source → transforms → sink.\n\n**Bridges** are mandatory when crossing domain boundaries. `.amplitude` extracts a 0–1 scalar from a mic source. `.brightness()` and `.motion()` do the same for a camera source. The bridge makes the type conversion explicit.\n\nFor frame sources, `route()` is a superset of `pipe()` — all the same transforms work — but adds `.wait()`, `.loop()`, and `.clearEffects()` for temporal control. `.tap()` attaches lifecycle-bound event listeners inside the chain: when the window closes or the sketch resets, the listeners clean up automatically.",
+      "examples": [
+        {
+          "id": "l8-scalar",
+          "label": "Mic amplitude → synth frequency (declarative wiring)",
+          "code": "const osc = audio.synth()\nosc.attack('C4')\naudio.start()\n\n// declarative: source → bridge → scale → sink\nroute(Source.mic).amplitude.scale(0, 1, 200, 800).to(osc.frequency)\n\n// vs the imperative equivalent:\n// audio.level.stream(v => { osc.frequency.value = 200 + v * 600 })"
+        },
+        {
+          "id": "l8-tap",
+          "label": "Camera feed with lifecycle-bound event listeners",
+          "code": "route(Source.camera)\n  .tap('audio:word:final', ({ word }, winId) =>\n    wm.addText(winId, word,\n      Math.random() * 1400,\n      Math.random() * 800,\n      { decay: 3000, fontSize: 32 + Math.random() * 48 }\n    )\n  )\n  .tap('beat:bar', (_, winId) =>\n    wm.filter(winId, `hue-rotate(${Math.random() * 360}deg)`)\n  )\n  .show('Word Rain', { w: 900, h: 600 })"
+        },
+        {
+          "id": "l8-temporal",
+          "label": "Temporal frame control (optical printing)",
+          "code": "route(Source.camera)\n  .tint('#4a0').wait(3)\n  .negative().wait(2)\n  .clearEffects().solarize(0.6).wait(2)\n  .loop()\n  .show('Optical Printing')"
+        }
+      ],
+      "insight": "route() is the two-track model expressed as a single declared chain. Learn the two tracks first — pipe() for visuals, .stream() for reactivity. Then route() feels like a natural upgrade, not a new concept.",
+      "extend": "Combine route() scalar wiring with a tap(): route(Source.mic).amplitude.scale(0,1,0,1).tap('beat:bar', ...).to(v => shader.set(0, v))"
+    }
+  ]
+}

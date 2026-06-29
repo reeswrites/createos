@@ -758,47 +758,37 @@
       }
       .toolbar-dropdown li:hover { background: #e8edf8; box-shadow: none; transform: none; }
 
-      /* ── Gallery modal ──────────────────────────────────────────────────── */
-      #galleryModal {
-        background: #1e1e2e; border: 1px solid #45475a; border-radius: 10px;
-        padding: 0; min-width: 640px; max-width: 820px; color: #cdd6f4;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.7);
-      }
-      #galleryModal::backdrop { background: rgba(0,0,0,0.65); }
-      .gallery-header {
-        display: flex; align-items: center; justify-content: space-between;
-        padding: 14px 18px; border-bottom: 1px solid #313244;
-        background: #181825; border-radius: 10px 10px 0 0;
-      }
-      .gallery-header h2 { margin: 0; font-size: 15px; font-weight: 600; font-family: Arial, sans-serif; }
-      .gallery-close-btn {
-        background: none; border: none; color: #6c7086; cursor: pointer;
-        font-size: 20px; line-height: 1; padding: 0 4px; border-radius: 4px;
-      }
-      .gallery-close-btn:hover { color: #cdd6f4; background: #313244; }
+      /* ── Gallery (in a WM window — light OS chrome, matches Tutorial) ────── */
       .gallery-grid {
-        display: grid; grid-template-columns: repeat(2, 1fr);
-        gap: 14px; padding: 18px;
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 14px; padding: 16px; min-height: 100%; box-sizing: border-box;
+        background: #fff; color: #333; align-content: start;
+        flex: 1 1 auto; /* fill the flex .wm-body so auto-fill sees full width */
       }
       .gallery-card {
-        background: #181825; border: 1px solid #313244; border-radius: 8px;
-        padding: 14px; display: flex; flex-direction: column; gap: 8px;
+        background: #f5f7fa; border: 1px solid #e0e4ea; border-radius: 6px;
+        padding: 13px 14px; display: flex; flex-direction: column; gap: 8px;
         transition: border-color 0.15s;
       }
-      .gallery-card:hover { border-color: #89b4fa; }
-      .gallery-card-title { margin: 0; font-size: 13px; font-weight: 600; color: #cba6f7; font-family: Arial, sans-serif; }
-      .gallery-card-desc { margin: 0; font-size: 11px; color: #a6adc8; flex: 1; line-height: 1.5; font-family: Arial, sans-serif; }
+      .gallery-card:hover { border-color: #1565c0; }
+      .gallery-card-title { margin: 0; font-size: 13px; font-weight: 700; color: #1565c0; font-family: Arial, sans-serif; }
+      .gallery-card-desc { margin: 0; font-size: 11px; color: #555; flex: 1; line-height: 1.5; font-family: Arial, sans-serif; }
       .gallery-card-tags { display: flex; gap: 4px; flex-wrap: wrap; }
       .gallery-tag {
         font-size: 9px; padding: 2px 6px; border-radius: 3px;
-        background: #313244; color: #89dceb; font-family: monospace;
+        background: #eef0f5; color: #1565c0; font-family: monospace;
       }
       .gallery-load-btn {
-        background: #313244; color: #cdd6f4; border: 1px solid #45475a;
-        border-radius: 5px; padding: 5px 12px; font-size: 11px; font-family: Arial, sans-serif;
-        cursor: pointer; align-self: flex-end; margin-top: 2px; transition: background 0.12s;
+        align-self: flex-end; margin-top: 2px;
+        display: inline-flex; align-items: center;
+        background: #2e7d32; color: #fff; border: none;
+        border-radius: 6px; padding: 5px 12px; font-size: 11px; font-weight: 600;
+        font-family: Arial, sans-serif; cursor: pointer;
+        box-shadow: 0 3px 0 #1a4d1d; transition: transform 0.07s, box-shadow 0.07s, background 0.12s;
       }
-      .gallery-load-btn:hover { background: #89b4fa; color: #1e1e2e; border-color: #89b4fa; }
+      .gallery-load-btn:hover { background: #388e3c; }
+      .gallery-load-btn:active { box-shadow: 0 1px 0 #1a4d1d; transform: translateY(2px); }
+      .gallery-load-btn:disabled { opacity: 0.6; cursor: default; box-shadow: none; }
     </style>
   </head>
 
@@ -1090,15 +1080,6 @@ s.start();</div>
         <p style="margin:20px 0 0; color:#555; font-size:11px; text-align:right;">Press <kbd style="background:#333;padding:2px 5px;border-radius:3px;border:1px solid #555;">?</kbd> or <kbd style="background:#333;padding:2px 5px;border-radius:3px;border:1px solid #555;">Esc</kbd> to close</p>
       </div>
     </div>
-
-    <!-- Gallery modal -->
-    <dialog id="galleryModal">
-      <div class="gallery-header">
-        <h2><i class="fa-solid fa-film" style="margin-right:8px;color:#cba6f7;"></i>Demo Gallery</h2>
-        <button class="gallery-close-btn" id="galleryCloseBtn" aria-label="Close">×</button>
-      </div>
-      <div id="galleryGrid" class="gallery-grid"></div>
-    </dialog>
 
     <!-- App JavaScript -->
     <script type="module" src="/src/runtime/app.js"></script>

@@ -277,13 +277,13 @@ export function mountWidgetShell(opts) {
   // If widget was born fresh and closed without any real interaction (only the
   // init autosave ran), remove the desktop icon — mirrors empty-editor behavior.
   // keepIconOnClose skips deletion for widgets with meaningful default content (Drumpad).
-  win._wmCleanup = () => {
+  window.wm?.window?.(win.id)?.onDispose(() => {
     onDestroy?.();
     if (!keepIconOnClose && _wasFresh && _saveCallCount <= 1) {
       const id = saveCfg.getIconId();
       if (id) window.desktop?.remove(id);
     }
-  };
+  });
 
   onMount?.();
   return { winId, win, body, save, history };

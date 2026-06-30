@@ -1,6 +1,6 @@
 // Piano — polyphonic piano widget with chord-per-step sequencer, backed by Tone.js.
 // Exposed as: new Piano(opts) — window global wired in app.js separately.
-// Spawns a WM window; cleanup on window close via _wmCleanup.
+// Spawns a WM window; cleanup on window close via wm.window(id).onDispose().
 //
 // Event/signal API (per-instance):
 //   piano.onNote(fn)          — fn({note, midi, velocity, source, step}) on any note played

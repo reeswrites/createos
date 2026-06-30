@@ -559,11 +559,11 @@ function _ensurePanel() {
   body.appendChild(root);
   _panel = { winId, root, rafId: null, live: null };
   if (win)
-    win._wmCleanup = () => {
+    window.wm?.window?.(win.id)?.onDispose(() => {
       _stopPanelLoop();
       _changeListeners.delete(_renderPanel);
       _panel = null;
-    };
+    });
   win._widgetType = 'mixer';
   _renderPanel();
   _changeListeners.add(_renderPanel);

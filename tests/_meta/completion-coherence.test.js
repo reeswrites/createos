@@ -16,41 +16,15 @@ import * as esprima from 'esprima';
 // This catches API global renames silently leaving stale snippet references.
 // Method-level checking is deferred (Phase 4 Step 2 — "Manifest").
 
-// Derived from app.js _registerBuiltin() calls + editor-instance preamble.
-// Update when a new window global is added or renamed.
-const KNOWN_GLOBALS = new Set([
-  // Core API objects
-  'audio', 'wm', 'midi', 'external', 'shell', 'desktop',
-  'video', 'vision', 'pipe', 'route', 'timeline', 'ascii', 'monitor', 'signalGraph', 'library',
-  // Constructors / classes
-  'Shader', 'GLShader', 'ShaderFX', 'GLSL_PRESETS', 'Canvas',
-  'Camera', 'Media', 'Source',
-  'ThreeScene', 'THREE',
-  'Sprite', 'SpriteEditor', 'spriteEditor',
-  'Paint', 'paint',
-  'AsciiEditor', 'asciiEditor',
-  'Drumpad', 'Piano', 'Notepad', 'notepad',
-  'Recording', 'recordStream', 'compositeCanvasStream', 'recordWindow', 'snapshot',
-  'PIXI', 'pixi', 'Stage',
-  'PluginHost',
-  'Color', 'tween', 'randUni',
-  // Event bus
-  'on', 'emit', 'any', 'tick', 'hold',
-  // Strudel pattern engine globals (ADR 035) — registered in app.js
-  'note', 's', 'n', 'sound', 'silence',
-  'stack', 'cat', 'slowcat', 'fastcat', 'seq', 'sequence', 'timeCat', 'arrange',
-  'polymeter', 'polyrhythm', 'run',
-  'rand', 'rand2', 'perlin', 'irand', 'choose', 'wchoose', 'chooseCycles', 'randcat',
-  'sine', 'cosine', 'saw', 'isaw', 'square', 'tri', 'signal', 'steady',
-  'pure', 'reify', 'mini', 'samples', 'setcps', 'setcpm', 'hush',
-  // (ADR 040: global draw/getCanvas/getLayer/getDraw deleted — use new Canvas())
-  // Other registered names
-  'editImage', 'captureWindow', 'statusBar', 'registerAPI',
-  'vec2', 'vec3', 'vec4',
-  // Viz constructors registered in initApp
-  'AudioViz', 'SpectrogramCanvas', 'PianoRollViz',
-  'mixer',
-]);
+// KNOWN_GLOBALS is DERIVED from app.js's _registerBuiltin('name') calls — the same
+// registrations that put each API on window — rather than hand-copied (ADR 008 "list
+// → derived"; CONTEXT.md "API Descriptor"). The regex is indentation-agnostic, so it
+// catches both top-level and nested registrations. This retires the old hand-list and
+// the separate drift gate that existed only to police that the hand-list matched.
+const APP_SRC = readFileSync(resolve(process.cwd(), 'src/runtime/app.js'), 'utf8');
+const KNOWN_GLOBALS = new Set(
+  [...APP_SRC.matchAll(/_registerBuiltin\(\s*'([^']+)'/g)].map((m) => m[1]),
+);
 
 // Standard JS built-ins + DOM APIs + patterns OK in snippets (not createOS APIs).
 const JS_BUILTINS = new Set([
@@ -193,30 +167,5 @@ describe('completion snippet coherence — API identifier gate', () => {
   });
 });
 
-// ── Gate: app.js _registerBuiltin names ↔ KNOWN_GLOBALS ─────────────────────
-
-describe('completion snippet coherence — registry ↔ KNOWN_GLOBALS gate', () => {
-  it('all names in app.js _registerBuiltin calls are in KNOWN_GLOBALS or JS_BUILTINS', () => {
-    const src = readFileSync(resolve(process.cwd(), 'src/runtime/app.js'), 'utf8');
-    const registered = [...src.matchAll(/_registerBuiltin\(\s*'([^']+)'/g)].map((m) => m[1]);
-    const unknown = registered.filter((n) => !KNOWN_GLOBALS.has(n) && !JS_BUILTINS.has(n));
-    expect(
-      unknown,
-      `Names registered in app.js but missing from KNOWN_GLOBALS in completion-coherence.test.js: ${unknown.join(', ')}. ` +
-      `Add them to KNOWN_GLOBALS.`,
-    ).toEqual([]);
-  });
-
-  it('no stale names in KNOWN_GLOBALS (every name is registered in app.js or is a preamble global)', () => {
-    const src = readFileSync(resolve(process.cwd(), 'src/runtime/app.js'), 'utf8');
-    const registered = new Set([...src.matchAll(/_registerBuiltin\(\s*'([^']+)'/g)].map((m) => m[1]));
-    // Preamble globals set directly on window (not via _registerBuiltin)
-    const PREAMBLE_GLOBALS = new Set();   // ADR 040: draw/getCanvas/getLayer/getDraw removed from preamble
-    const stale = [...KNOWN_GLOBALS].filter((n) => !registered.has(n) && !PREAMBLE_GLOBALS.has(n));
-    expect(
-      stale,
-      `Names in KNOWN_GLOBALS that are no longer registered: ${stale.join(', ')}. ` +
-      `Remove from KNOWN_GLOBALS or add to PREAMBLE_GLOBALS.`,
-    ).toEqual([]);
-  });
-});
+// The former "registry ↔ KNOWN_GLOBALS" drift gate is gone: KNOWN_GLOBALS is now
+// derived from the registrations above, so there is no parallel list to drift against.

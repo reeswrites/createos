@@ -16,7 +16,7 @@ import { TextLayer } from './text-layer.js';
 // ctx.overlayEvents / ctx.textLayers: wm's registries (for reset cleanup).
 // ctx.snapshot(win, body, visualEl): the window-capture snapshot fn.
 export function addPaintOverlay(win, body, visualEl, ctx = {}) {
-  const { overlayEvents, textLayers, snapshot } = ctx;
+  const { overlayEvents, textLayers, snapshot, onDispose } = ctx;
   const tb = win.querySelector('.wm-titlebar');
   if (!tb || !visualEl) return;
 
@@ -450,8 +450,7 @@ export function addPaintOverlay(win, body, visualEl, ctx = {}) {
   tb.insertBefore(paintBtn, firstBtn);
 
   // Cleanup: remove overlay + minibar + text layer when window closes
-  const prevCleanup = win._wmCleanup;
-  win._wmCleanup = (...args) => {
+  onDispose?.(() => {
     removeOverlay();
     removeMiniBar();
     events.clear();
@@ -461,6 +460,5 @@ export function addPaintOverlay(win, body, visualEl, ctx = {}) {
       textLayer.destroy();
       textLayer = null;
     }
-    if (typeof prevCleanup === 'function') prevCleanup(...args);
-  };
+  });
 }

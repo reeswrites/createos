@@ -7,7 +7,7 @@
 // Usage (window-scoped, e.g. WM window):
 //   const lease = acquireCamera();
 //   // ... use #camera canvas / window.__ar_video ...
-//   win._wmCleanup = () => { lease.release(); prevCleanup?.(); };
+//   wm.window(win.id).onDispose(() => lease.release());
 //
 // Usage (run-scoped, i.e. user code consumers):
 //   acquireCameraRunScoped();   // released automatically on reset — no manual release needed

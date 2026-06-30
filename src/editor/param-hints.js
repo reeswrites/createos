@@ -41,62 +41,23 @@ const CANVAS_METHOD_HINTS = {
 
 // ── Param tables ──────────────────────────────────────────────────────────────
 
+// Residual manual hints — entries that have NO single API-Descriptor home, so they
+// can't migrate to a registration's `params` (CONTEXT.md "API Descriptor"). Two kinds:
+//   1. `on` is dual-shape — both a bare call `on('event')` AND chained methods
+//      `on(...).when/every/after/within(...)`. A descriptor's `params` is one shape
+//      (array OR method-map), not both, so the whole `on` cluster stays here.
+//   2. `file.*` are methods on an AudioFile INSTANCE returned by `audio.load()`, not a
+//      registered global — like the `CANVAS_METHOD_HINTS` instance methods below.
+// Every other API's param signatures now live beside its `_registerBuiltin(...)` call
+// in app.js and resolve via deriveParamHints().
 export const PARAM_HINTS = {
-  // Draw — 2D methods are on a Canvas instance; see CANVAS_METHOD_HINTS (ADR 040).
-  Canvas: ['opts?'],
-  // Shader / GLShader
-  Shader: ['fragmentBody', 'opts?'],
-  GLShader: ['fragmentBody', 'opts?'],
-  ShaderFX: ['fragmentBody', 'opts?'],
-  // PIXI — 'pixi.tick' migrated to pixi's API Descriptor (app.js); resolves via deriveParamHints()
-  // Input / Events (ADR 014 — sensors replaced by bus)
+  // Event bus — `on` is callable and chainable (see note above)
   on: ['event'],
-  tick: ['ms'],
-  hold: ['event'],
   'on.when': ['patternOrFn', 'map?'],
   'on.every': ['n'],
   'on.after': ['event'],
   'on.within': ['ms'],
-  // Audio
-  'audio.onLevel': ['threshold', 'onEnter', 'onExit?'],
-  'audio.onWord': ['word', 'fn'],
-  'audio.onSpeech': ['fn'],
-  'audio.say': ['text', 'opts?'],
-  // Strudel pattern engine (ADR 035)
-  note: ['pattern'],
-  s: ['pattern'],
-  n: ['pattern'],
-  sound: ['pattern'],
-  stack: ['...patterns'],
-  seq: ['...patterns'],
-  cat: ['...patterns'],
-  setcps: ['cps'],
-  samples: ['urlOrMap'],
-  // Video signal
-  'video.signal': ['source', 'opts?'],
-  'video.onMotion': ['source', 'threshold', 'onEnter', 'onExit?'],
-  'video.onBrightness': ['source', 'threshold', 'onEnter', 'onExit?'],
-  // WM
-  'wm.spawn': ['title', 'opts?'],
-  'wm.move': ['id', 'x', 'y'],
-  'wm.resize': ['id', 'w', 'h'],
-  'wm.show': ['id'],
-  'wm.hide': ['id'],
-  'wm.close': ['id'],
-  'wm.setZ': ['id', 'z'],
-  'wm.setOpacity': ['id', 'opacity'],
-  // Camera
-  Camera: ['opts?'],
-  // Desktop
-  'desktop.add': ['url', 'opts?'],
-  'desktop.remove': ['id'],
-  // Vision
-  'vision.onGesture': ['name', 'fn'],
-  'vision.onExpression': ['name', 'fn'],
-  // captureWindow
-  captureWindow: ['target', 'fps?'],
-  // AudioFile
-  'audio.load': ['url'],
+  // AudioFile instance (from audio.load()) — instance methods, no global descriptor
   'file.seek': ['seconds'],
   'file.play': ['offsetSeconds?'],
   'file.filter': ['type', 'freq?', 'Q?'],
@@ -108,12 +69,6 @@ export const PARAM_HINTS = {
   'file.onTime': ['seconds', 'fn'],
   'file.loop': ['enabled?'],
   'file.waveform': ['opts?'],
-  // Audio Viz Suite
-  'audio.spectrogram': ['source', 'opts?'],
-  'audio.pianoRoll': ['opts?'],
-  // Mixer (ADR 032)
-  'mixer.strip': ['name'],
-  'mixer.add': ['node', 'opts?'],
 };
 
 // ── AST helpers ───────────────────────────────────────────────────────────────

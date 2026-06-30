@@ -5,10 +5,24 @@
 
 import * as Tone from 'tone';
 import { addPaintOverlay } from '../widgets/paint-overlay.js';
+import {
+  registerWindowType,
+  getWindowAdapter,
+  geoOf,
+  titleOf,
+  readAudio,
+} from './window-registry.js';
+import {
+  storeWinHandle as _storeWinHandle,
+  loadWinHandle as _loadWinHandle,
+  deleteWinHandle as _deleteWinHandle,
+} from './file-handle-store.js';
+import { buildSensorWindow } from './sensor-window.js';
+import { buildVizWindow, addVizPanel } from './viz-window.js';
+import { makeFileEntry, renderFlatFiles, renderDirContents } from './file-browser.js';
 import { onReset } from '../../runtime/reset-registry.js';
 import { notify, registerCommand, tween, hasSubscribers } from '../../events/index.js';
 import { snapshotWindow, recordWindow } from '../media/window-capture.js';
-import { createSpectrumCore } from '../audio/audio-viz.js';
 import { acquireCamera } from '../media/media-lease.js';
 import { acquireStrip, releaseStrip } from '../audio/mixer.js';
 import { TextLayer } from '../widgets/text-layer.js';
@@ -27,83 +41,6 @@ export function cleanupPaintOverlays() {
 }
 
 // ── File browser helpers ──────────────────────────────────────────────────────
-
-function _fileIcon(ext) {
-  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico'].includes(ext)) return '🖼';
-  if (['mp4', 'webm', 'mov', 'avi', 'mkv'].includes(ext)) return '🎬';
-  if (['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a'].includes(ext)) return '🎵';
-  if (['js', 'ts', 'jsx', 'tsx', 'mjs'].includes(ext)) return '📜';
-  if (['wgsl', 'glsl'].includes(ext)) return '✨';
-  if (['json'].includes(ext)) return '{ }';
-  return '📄';
-}
-
-function _lcExt(name) {
-  return name.replace(/(\.[^.]+)$/, (m) => m.toLowerCase());
-}
-
-function _makeFileEntry(entry, depth, onSelect) {
-  const li = document.createElement('div');
-  li.style.cssText = 'font-family:monospace;font-size:11px;white-space:nowrap;user-select:none;';
-
-  const row = document.createElement('div');
-  row.style.cssText = `display:flex;align-items:center;gap:5px;padding:3px 8px 3px ${8 + depth * 14}px;cursor:pointer;`;
-
-  if (entry.kind === 'directory') {
-    const arrow = document.createElement('span');
-    arrow.textContent = '▶';
-    arrow.style.cssText =
-      'font-size:7px;color:#888;display:inline-block;width:8px;transition:transform 0.15s;flex-shrink:0;';
-    const icon = document.createElement('span');
-    icon.textContent = '📁';
-    const name = document.createElement('span');
-    name.textContent = entry.name;
-    name.style.color = '#333';
-    row.appendChild(arrow);
-    row.appendChild(icon);
-    row.appendChild(name);
-    li.appendChild(row);
-
-    let expanded = false;
-    let childContainer = null;
-    row.addEventListener('click', async () => {
-      expanded = !expanded;
-      arrow.style.transform = expanded ? 'rotate(90deg)' : '';
-      if (expanded && !childContainer) {
-        childContainer = document.createElement('div');
-        li.appendChild(childContainer);
-        await _renderDirContents(childContainer, entry, depth + 1, onSelect);
-      }
-      if (childContainer) childContainer.style.display = expanded ? '' : 'none';
-    });
-  } else {
-    const spacer = document.createElement('span');
-    spacer.style.cssText = 'width:8px;display:inline-block;flex-shrink:0;';
-    const icon = document.createElement('span');
-    icon.textContent = _fileIcon(entry.name.split('.').pop().toLowerCase());
-    const name = document.createElement('span');
-    name.textContent = _lcExt(entry.name);
-    name.style.color = '#222';
-    row.appendChild(spacer);
-    row.appendChild(icon);
-    row.appendChild(name);
-    li.appendChild(row);
-
-    row.addEventListener('click', async () => {
-      const file = await entry.getFile();
-      const url = URL.createObjectURL(file);
-      onSelect?.(url, _lcExt(entry.name), entry);
-    });
-  }
-
-  row.addEventListener('mouseenter', () => {
-    row.style.background = '#e8f0fe';
-  });
-  row.addEventListener('mouseleave', () => {
-    row.style.background = '';
-  });
-  return li;
-}
 
 function _pickDirViaInput() {
   return new Promise((resolve) => {
@@ -145,97 +82,6 @@ function _pickFileViaInput(opts = {}) {
     });
     input.click();
   });
-}
-
-function _renderFlatFiles(container, files, onSelect) {
-  const sorted = [...files].sort((a, b) => a.name.localeCompare(b.name));
-  for (const file of sorted) {
-    if (file.name.startsWith('.')) continue;
-    const row = document.createElement('div');
-    row.style.cssText =
-      'display:flex;align-items:center;gap:5px;padding:3px 8px;cursor:pointer;font-family:monospace;font-size:11px;white-space:nowrap;';
-    const icon = document.createElement('span');
-    icon.textContent = _fileIcon(file.name.split('.').pop().toLowerCase());
-    const name = document.createElement('span');
-    name.textContent = _lcExt(file.name);
-    name.style.color = '#222';
-    row.appendChild(icon);
-    row.appendChild(name);
-    row.addEventListener('click', () => {
-      const url = URL.createObjectURL(file);
-      onSelect?.(url, _lcExt(file.name), null);
-    });
-    row.addEventListener('mouseenter', () => {
-      row.style.background = '#e8f0fe';
-    });
-    row.addEventListener('mouseleave', () => {
-      row.style.background = '';
-    });
-    container.appendChild(row);
-  }
-}
-
-async function _renderDirContents(container, dirHandle, depth, onSelect) {
-  const entries = [];
-  for await (const entry of dirHandle.values()) entries.push(entry);
-  entries.sort((a, b) => {
-    if (a.kind !== b.kind) return a.kind === 'directory' ? -1 : 1;
-    return a.name.localeCompare(b.name);
-  });
-  for (const entry of entries) {
-    if (entry.name.startsWith('.')) continue;
-    container.appendChild(_makeFileEntry(entry, depth, onSelect));
-  }
-}
-
-// ── IndexedDB handle store (FileSystemFileHandle survives page reload) ────────
-const _IDB_NAME = 'vl-wm-handles';
-const _IDB_STORE = 'handles';
-
-function _openHandleDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(_IDB_NAME, 1);
-    req.onupgradeneeded = (e) => e.target.result.createObjectStore(_IDB_STORE);
-    req.onsuccess = (e) => resolve(e.target.result);
-    req.onerror = (e) => reject(e.target.error);
-  });
-}
-
-async function _storeWinHandle(winId, handle) {
-  try {
-    const db = await _openHandleDB();
-    await new Promise((res, rej) => {
-      const tx = db.transaction(_IDB_STORE, 'readwrite');
-      tx.objectStore(_IDB_STORE).put(handle, winId);
-      tx.oncomplete = res;
-      tx.onerror = rej;
-    });
-    db.close();
-  } catch (_) {}
-}
-
-async function _loadWinHandle(winId) {
-  try {
-    const db = await _openHandleDB();
-    const handle = await new Promise((res, rej) => {
-      const req = db.transaction(_IDB_STORE).objectStore(_IDB_STORE).get(winId);
-      req.onsuccess = () => res(req.result ?? null);
-      req.onerror = rej;
-    });
-    db.close();
-    return handle;
-  } catch (_) {
-    return null;
-  }
-}
-
-async function _deleteWinHandle(winId) {
-  try {
-    const db = await _openHandleDB();
-    const tx = db.transaction(_IDB_STORE, 'readwrite');
-    tx.objectStore(_IDB_STORE).delete(winId);
-    db.close();
-  } catch (_) {}
 }
 
 // Focused window id — set when any window comes to front (bringToFront choke point).
@@ -517,6 +363,15 @@ export function initWM(onContentResize) {
   // the strip input so it appears as a Strip in the console.
   const _winStrips = new Map();
 
+  // Context handed to the extracted viz-window builders so they never touch the wm
+  // closure's private state directly (desktop scan, mixer strips, dispose accumulator).
+  const _vizCtx = {
+    desktop,
+    hasStrip: (id) => _winStrips.has(id),
+    resolveChannel: (winStripId) => _winStrips.get(winStripId)?._channel,
+    onDispose: (win, fn) => _onDispose(win, fn),
+  };
+
   function _getWindowStrip(winId) {
     let strip = _winStrips.get(winId);
     if (!strip) {
@@ -644,14 +499,12 @@ export function initWM(onContentResize) {
     if (recBtn) tb.insertBefore(recBtn, firstBtn);
     tb.insertBefore(photoBtn, recBtn ?? firstBtn);
     // Stop any in-flight recording when window closes
-    const prevCleanup = win._wmCleanup;
-    win._wmCleanup = (...args) => {
+    _onDispose(win, () => {
       if (activeRec) {
         activeRec.stop();
         activeRec = null;
       }
-      if (typeof prevCleanup === 'function') prevCleanup(...args);
-    };
+    });
     // Public wm.snapshot/record/stopRecording hooks
     win._wmSnapshot = (opts) => _snapshotVisual(win, body, visualEl, opts);
     win._wmRecord = (opts) => {
@@ -687,6 +540,7 @@ export function initWM(onContentResize) {
       overlayEvents: _overlayEvents,
       textLayers: _textLayers,
       snapshot: _snapshotVisual,
+      onDispose: (fn) => _onDispose(win, fn),
     });
   }
 
@@ -879,6 +733,81 @@ export function initWM(onContentResize) {
     return document.getElementById(id);
   }
 
+  // ── Window handle: dispose accumulator + type + serialize (ADR: Window handle)
+  // Replaces the `win._wmCleanup` expando slot. `onDispose(fn)` accumulates; close
+  // fires every listener LIFO (matching the old prev?.() chain order). The per-type
+  // base cleanup registers first, so it fires last. Removes the clobber leak where a
+  // bare `win._wmCleanup = fn` silently dropped an earlier cleanup.
+  function _onDispose(win, fn) {
+    if (!win || typeof fn !== 'function') return;
+    (win._disposers ||= []).push(fn);
+  }
+  function _runDisposers(win) {
+    const fns = win?._disposers;
+    if (fns) {
+      win._disposers = null;
+      for (let i = fns.length - 1; i >= 0; i--) {
+        try {
+          fns[i]();
+        } catch (_) {}
+      }
+    }
+    // Safety net for any unmigrated slot — no known writer remains.
+    try {
+      win._wmCleanup?.();
+      win._wmCleanup = null;
+    } catch (_) {}
+  }
+
+  // The canonical type of a spawned window, for serialize + the handle's `type`.
+  function _winType(win) {
+    if (!win) return 'unknown';
+    if (win._wmIsEditor) return 'editor';
+    if (win.id?.startsWith('win-toolkit')) return 'toolkit';
+    if (win.id?.startsWith('win-canvas-')) return 'canvas';
+    return win._wmSpawnOpts?.type ?? 'unknown';
+  }
+
+  // wm.window(id) → handle facade over the .wm-win element. handle.id === id, so the
+  // id stays the stable DOM/IndexedDB/serialize key across all call sites.
+  function _windowHandle(win) {
+    if (!win) return null;
+    return {
+      id: win.id,
+      el: win,
+      get type() {
+        return _winType(win);
+      },
+      onDispose(fn) {
+        _onDispose(win, fn);
+        return this;
+      },
+      dispose() {
+        api.close(win.id);
+        return this;
+      },
+      serialize() {
+        return serializeWindowEl(win);
+      },
+    };
+  }
+
+  // Serialize one window element via its registered Window Type Adapter; null = skip.
+  function serializeWindowEl(win) {
+    if (!win) return null;
+    const type = _winType(win);
+    const adapter = getWindowAdapter(type);
+    if (!adapter?.serialize) return null;
+    return adapter.serialize(win, {
+      type,
+      geoOf,
+      titleOf,
+      readAudio,
+      opts: win._wmSpawnOpts,
+      wm: api,
+    });
+  }
+
   function bringToFront(win) {
     win.style.zIndex = String(zTop++);
     if (win.id && win.id !== _focusedWinId) {
@@ -1046,7 +975,7 @@ export function initWM(onContentResize) {
       }
       win._layerStack.clear();
     }
-    win._wmCleanup?.();
+    _runDisposers(win);
     win._wmRescueContent?.();
     _disposeChannel(win.id);
     _deleteWinHandle(win.id);
@@ -1291,275 +1220,6 @@ export function initWM(onContentResize) {
 
   // Pre-existing built-in windows have no audio output — no controls needed.
 
-  // ── Reusable spectrum/analyser core (F1) ──────────────────────────────────
-  // Factory that binds an audio source to a canvas with a draw loop.
-  // Returns { canvas, start, stop, setSource(id), setStyle(style), cleanup }
-  // Consumed by _buildVizWindow, EQ widget (Layer 2), and viz-in-video fold-out (Layer 2).
-
-  // Spectrum render core lives in audio-viz.js (ADR 042). Inject the wm-private
-  // window-strip → channel resolver so the core never reaches _winStrips itself.
-  function _createSpectrumCore(canvas, getStyle, opts = {}) {
-    return createSpectrumCore(canvas, getStyle, {
-      ...opts,
-      resolveChannel: (winStripId) => _winStrips.get(winStripId)?._channel,
-    });
-  }
-
-  function _buildSourceSelect(win, excludeSelf = true) {
-    const srcs = [
-      { id: 'master', label: 'Master Output' },
-      { id: 'mic', label: 'Mic' },
-    ];
-    desktop.querySelectorAll('.wm-win').forEach((w) => {
-      if (excludeSelf && w === win) return;
-      const title = w.querySelector('.wm-title')?.textContent?.trim() || w.id;
-      if (w.querySelector('video')) srcs.push({ id: 'vid:' + w.id, label: title + ' · video' });
-      if (_winStrips.has(w.id)) srcs.push({ id: 'ch:' + w.id, label: title + ' · channel' });
-    });
-    return srcs;
-  }
-
-  // ── Viz fold-out panel for video windows ──────────────────────────────────
-  // Injects a ♪ toolbar button + collapsible spectrum panel into a video window.
-  // Source defaults to the window's own video; source selector allows repurposing.
-
-  function _addVizPanel(win, body, winId, opts = {}) {
-    const tb = win.querySelector('.wm-titlebar');
-    if (!tb) return;
-
-    // Fold-out panel (initially hidden)
-    const panel = document.createElement('div');
-    panel.style.cssText =
-      'flex-shrink:0;height:80px;background:#0d0d1a;display:none;flex-direction:column;position:relative;';
-    // Insert after body in the window flex column
-    body.insertAdjacentElement('afterend', panel);
-
-    // Source selector inside panel
-    const srcBar = document.createElement('div');
-    srcBar.style.cssText =
-      'display:flex;align-items:center;gap:4px;padding:3px 6px;background:#13131f;flex-shrink:0;';
-    const srcSel = document.createElement('select');
-    srcSel.style.cssText =
-      'flex:1;font-size:10px;background:#1e1e2e;color:#cdd6f4;border:1px solid #313244;border-radius:3px;padding:1px 3px;';
-    const styleSel = document.createElement('select');
-    styleSel.style.cssText =
-      'font-size:10px;background:#1e1e2e;color:#cdd6f4;border:1px solid #313244;border-radius:3px;padding:1px 3px;';
-    for (const s of ['wave', 'bars', 'ring']) {
-      const o = document.createElement('option');
-      o.value = s;
-      o.textContent = s;
-      styleSel.appendChild(o);
-    }
-    if (!opts.locked) srcBar.appendChild(srcSel);
-    srcBar.appendChild(styleSel);
-
-    if (opts.locked) srcSel.style.display = 'none';
-
-    const popBtn = document.createElement('button');
-    popBtn.title = 'Open in standalone window';
-    popBtn.style.cssText =
-      'font-size:10px;background:#1e1e2e;color:#cdd6f4;border:1px solid #313244;border-radius:3px;padding:1px 4px;cursor:pointer;flex-shrink:0;';
-    popBtn.innerHTML =
-      '<i class="fa-solid fa-arrow-up-right-from-square" style="font-size:9px;"></i>';
-    popBtn.addEventListener('click', () => {
-      window.wm?.spawn('Visualizer', {
-        type: 'viz',
-        source: 'master',
-        style: styleSel.value,
-        w: 300,
-        h: 160,
-      });
-    });
-    srcBar.appendChild(popBtn);
-    panel.appendChild(srcBar);
-
-    // Canvas
-    const canvas = document.createElement('canvas');
-    canvas.style.cssText = 'flex:1;width:100%;min-height:0;display:block;';
-    panel.appendChild(canvas);
-
-    const ro = new ResizeObserver(() => {
-      canvas.width = canvas.offsetWidth * devicePixelRatio;
-      canvas.height = canvas.offsetHeight * devicePixelRatio;
-    });
-    ro.observe(canvas);
-
-    let core = null;
-
-    function refreshSources() {
-      const prev = srcSel.value;
-      srcSel.innerHTML = '';
-      for (const { id, label } of _buildSourceSelect(win)) {
-        const o = document.createElement('option');
-        o.value = id;
-        o.textContent = label;
-        o.selected = id === prev;
-        srcSel.appendChild(o);
-      }
-      // Also add this window's own video as option if not already present
-      const selfVid = 'vid:' + winId;
-      if (![...srcSel.options].some((o) => o.value === selfVid)) {
-        const o = document.createElement('option');
-        o.value = selfVid;
-        o.textContent = 'This video';
-        srcSel.insertBefore(o, srcSel.firstChild);
-      }
-      if (!srcSel.value || srcSel.value !== prev) {
-        const defaultSrc = [...srcSel.options].find((o) => o.value === selfVid)
-          ? selfVid
-          : 'master';
-        srcSel.value = defaultSrc;
-      }
-    }
-
-    function startCore() {
-      if (core) {
-        core.cleanup();
-        core = null;
-      }
-      core = _createSpectrumCore(canvas, () => styleSel.value);
-      core.setSource(opts.locked ? 'mic' : srcSel.value);
-    }
-
-    srcSel.addEventListener('mousedown', refreshSources);
-    srcSel.addEventListener('change', () => core?.setSource(srcSel.value));
-    styleSel.addEventListener('change', () => core?.setStyle(styleSel.value));
-
-    // Toolbar toggle button
-    const vizBtn = document.createElement('span');
-    vizBtn.className = 'wm-btn';
-    vizBtn.title = 'Toggle audio visualizer';
-    vizBtn.innerHTML = '<i class="fa-solid fa-wave-square"></i>';
-    let open = false;
-    vizBtn.addEventListener('click', () => {
-      open = !open;
-      panel.style.display = open ? 'flex' : 'none';
-      vizBtn.classList.toggle('active', open);
-      if (open && !core) {
-        if (!opts.locked) refreshSources();
-        startCore();
-      } else if (!open && core) {
-        core.cleanup();
-        core = null;
-      }
-    });
-
-    const firstBtn = tb.querySelector('.wm-btn');
-    tb.insertBefore(vizBtn, firstBtn);
-
-    // Cleanup when window closes
-    const prev = win._wmCleanup;
-    win._wmCleanup = () => {
-      core?.cleanup();
-      core = null;
-      ro.disconnect();
-      prev?.();
-    };
-  }
-
-  // ── Audio visualizer window builder ───────────────────────────────────────
-
-  function _buildVizWindow(win, body, opts = {}) {
-    body.style.cssText += 'flex-direction:column;padding:0;overflow:hidden;background:#0d0d1a;';
-
-    const ctrl = document.createElement('div');
-    ctrl.style.cssText =
-      'display:flex;align-items:center;gap:5px;padding:4px 8px;background:#13131f;border-bottom:1px solid #2a2a3e;flex-shrink:0;';
-
-    const sourceSelect = document.createElement('select');
-    sourceSelect.style.cssText =
-      'flex:1;min-width:0;font-size:11px;background:#1e1e2e;color:#cdd6f4;border:1px solid #313244;border-radius:3px;padding:2px 4px;';
-
-    const styleSelect = document.createElement('select');
-    styleSelect.style.cssText =
-      'font-size:11px;background:#1e1e2e;color:#cdd6f4;border:1px solid #313244;border-radius:3px;padding:2px 4px;';
-    for (const s of ['wave', 'bars', 'ring']) {
-      const o = document.createElement('option');
-      o.value = s;
-      o.textContent = s;
-      styleSelect.appendChild(o);
-    }
-
-    ctrl.appendChild(sourceSelect);
-    ctrl.appendChild(styleSelect);
-
-    const bgPicker = document.createElement('input');
-    bgPicker.type = 'color';
-    bgPicker.value = opts.colors?.bg ?? '#0d0d1a';
-    bgPicker.title = 'Background color';
-    bgPicker.style.cssText =
-      'width:22px;height:22px;padding:0;border:none;border-radius:3px;cursor:pointer;background:transparent;';
-
-    const fgPicker = document.createElement('input');
-    fgPicker.type = 'color';
-    fgPicker.value = opts.colors?.wave ?? '#89dceb';
-    fgPicker.title = 'Wave / ring color';
-    fgPicker.style.cssText =
-      'width:22px;height:22px;padding:0;border:none;border-radius:3px;cursor:pointer;background:transparent;';
-
-    ctrl.appendChild(bgPicker);
-    ctrl.appendChild(fgPicker);
-    body.appendChild(ctrl);
-
-    const canvas = document.createElement('canvas');
-    canvas.style.cssText = 'flex:1;width:100%;min-height:0;display:block;';
-    body.appendChild(canvas);
-
-    new ResizeObserver(() => {
-      canvas.width = canvas.offsetWidth * devicePixelRatio;
-      canvas.height = canvas.offsetHeight * devicePixelRatio;
-    }).observe(canvas);
-
-    function refreshSources() {
-      const prev = sourceSelect.value;
-      sourceSelect.innerHTML = '';
-      for (const { id, label } of _buildSourceSelect(win)) {
-        const o = document.createElement('option');
-        o.value = id;
-        o.textContent = label;
-        o.selected = id === prev;
-        sourceSelect.appendChild(o);
-      }
-      if (!sourceSelect.value) sourceSelect.selectedIndex = 0;
-    }
-
-    const _colors = { bg: bgPicker.value, wave: fgPicker.value, ring: fgPicker.value };
-    bgPicker.addEventListener('input', () => {
-      _colors.bg = bgPicker.value;
-    });
-    fgPicker.addEventListener('input', () => {
-      _colors.wave = _colors.ring = fgPicker.value;
-    });
-    win._vizColors = _colors;
-
-    const core = _createSpectrumCore(canvas, () => styleSelect.value, {
-      autoStart: false,
-      getColors: () => win._vizColors,
-    });
-
-    win._vizSourceEl = sourceSelect;
-    win._vizStyleEl = styleSelect;
-
-    sourceSelect.addEventListener('mousedown', refreshSources);
-    sourceSelect.addEventListener('change', () => core.setSource(sourceSelect.value));
-    styleSelect.addEventListener('change', () => core.setStyle(styleSelect.value));
-
-    refreshSources();
-    const initSrc = opts.source ?? 'master';
-    styleSelect.value = opts.style ?? 'wave';
-    if ([...sourceSelect.options].some((o) => o.value === initSrc)) sourceSelect.value = initSrc;
-    if (opts.colors) {
-      _colors.bg = opts.colors.bg ?? _colors.bg;
-      _colors.wave = _colors.ring = opts.colors.wave ?? _colors.wave;
-      bgPicker.value = _colors.bg;
-      fgPicker.value = _colors.wave;
-    }
-    core.setSource(sourceSelect.value);
-    core.start();
-
-    win._wmCleanup = () => core.cleanup();
-  }
-
   // Restore a file-backed window from IndexedDB handle
   async function _restoreFileWindow(s) {
     const handle = await _loadWinHandle(s.id);
@@ -1637,218 +1297,6 @@ export function initWM(onContentResize) {
     if (s.transparent) win?.classList.add('wm-transparent');
   }
 
-  // ── Sensor gauge window builder ───────────────────────────────────────────
-
-  function _buildSensorWindow(win, body, opts = {}) {
-    const source = opts.source || 'motion'; // 'motion' | 'gamepad' | 'geo' | 'battery'
-    body.style.cssText += 'flex-direction:column;padding:0;overflow:hidden;background:#0d0d1a;';
-
-    const canvas = document.createElement('canvas');
-    canvas.style.cssText = 'flex:1;width:100%;min-height:0;display:block;';
-    body.appendChild(canvas);
-
-    new ResizeObserver(() => {
-      canvas.width = canvas.offsetWidth * devicePixelRatio;
-      canvas.height = canvas.offsetHeight * devicePixelRatio;
-    }).observe(canvas);
-
-    const dpr = () => devicePixelRatio;
-    let rafId;
-
-    function _gauge(ctx, cx, cy, r, value, min, max, label, color) {
-      const pct = Math.max(0, Math.min(1, (value - min) / (max - min)));
-      const startA = Math.PI * 0.75,
-        endA = Math.PI * 2.25;
-      const angle = startA + pct * (endA - startA);
-      ctx.save();
-      ctx.strokeStyle = '#1e1e2e';
-      ctx.lineWidth = r * 0.22;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.arc(cx, cy, r * 0.78, startA, endA);
-      ctx.stroke();
-      ctx.strokeStyle = color;
-      ctx.beginPath();
-      ctx.arc(cx, cy, r * 0.78, startA, angle);
-      ctx.stroke();
-      ctx.fillStyle = color;
-      ctx.font = `bold ${Math.round(r * 0.34)}px monospace`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(value.toFixed(value < 100 ? 1 : 0), cx, cy - r * 0.08);
-      ctx.fillStyle = '#6c7086';
-      ctx.font = `${Math.round(r * 0.22)}px sans-serif`;
-      ctx.fillText(label, cx, cy + r * 0.35);
-      ctx.restore();
-    }
-
-    function _bar(ctx, x, y, w, h, value, min, max, label, color) {
-      const pct = Math.max(0, Math.min(1, (value - min) / (max - min)));
-      ctx.fillStyle = '#1e1e2e';
-      ctx.fillRect(x, y, w, h);
-      ctx.fillStyle = color;
-      ctx.fillRect(x, y + h * (1 - pct), w, h * pct);
-      ctx.fillStyle = '#6c7086';
-      ctx.font = `${Math.round(h * 0.09)}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.fillText(label, x + w / 2, y + h + h * 0.12);
-    }
-
-    function draw() {
-      rafId = requestAnimationFrame(draw);
-      const W = canvas.width,
-        H = canvas.height;
-      if (!W || !H) return;
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, W, H);
-      ctx.fillStyle = '#0d0d1a';
-      ctx.fillRect(0, 0, W, H);
-
-      const sensors = window.sensors;
-
-      if (source === 'motion') {
-        const m = sensors?.motion?.() ?? {
-          ax: 0,
-          ay: 0,
-          az: 0,
-          alpha: 0,
-          beta: 0,
-          gamma: 0,
-          magnitude: 0,
-        };
-        const cols = ['#f38ba8', '#a6e3a1', '#89b4fa', '#fab387', '#cba6f7', '#f9e2af'];
-        const fields = [
-          { v: m.ax ?? 0, mn: -20, mx: 20, lbl: 'ax (m/s²)' },
-          { v: m.ay ?? 0, mn: -20, mx: 20, lbl: 'ay (m/s²)' },
-          { v: m.az ?? 0, mn: -20, mx: 20, lbl: 'az (m/s²)' },
-          { v: m.alpha ?? 0, mn: 0, mx: 360, lbl: 'α (yaw)' },
-          { v: m.beta ?? 0, mn: -180, mx: 180, lbl: 'β (pitch)' },
-          { v: m.gamma ?? 0, mn: -90, mx: 90, lbl: 'γ (roll)' },
-        ];
-        const n = fields.length;
-        const colW = W / n;
-        const barW = colW * 0.5;
-        const barH = H * 0.78;
-        const barY = H * 0.06;
-        fields.forEach(({ v, mn, mx, lbl }, i) => {
-          _bar(
-            ctx,
-            colW * i + (colW - barW) / 2,
-            barY,
-            barW,
-            barH,
-            v,
-            mn,
-            mx,
-            lbl,
-            cols[i % cols.length],
-          );
-        });
-      } else if (source === 'gamepad') {
-        const pad = sensors?.gamepad?.(0) ?? {};
-        const axes = [0, 1, 2, 3].map((i) => pad.axis?.(i) ?? 0);
-        const btns = [0, 1, 2, 3].map((i) => pad.pressed?.(i) ?? false);
-        const n = axes.length;
-        const r = Math.min(W / (n * 2.4), H * 0.34);
-        const cols = ['#89b4fa', '#a6e3a1', '#f38ba8', '#fab387'];
-        axes.forEach((v, i) => {
-          _gauge(ctx, (W * (i + 0.5)) / n, H * 0.42, r, v, -1, 1, `axis ${i}`, cols[i]);
-        });
-        btns.forEach((pressed, i) => {
-          const bx = (W * (i + 0.5)) / n;
-          ctx.beginPath();
-          ctx.arc(bx, H * 0.82, r * 0.22, 0, Math.PI * 2);
-          ctx.fillStyle = pressed ? '#a6e3a1' : '#1e1e2e';
-          ctx.fill();
-          ctx.fillStyle = '#6c7086';
-          ctx.font = `${Math.round(r * 0.22)}px sans-serif`;
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(`btn${i}`, bx, H * 0.82);
-        });
-      } else if (source === 'geo') {
-        const geo = sensors?.geo?.() ?? {};
-        const lines = [
-          `lat:  ${geo.lat?.toFixed(5) ?? '—'}`,
-          `lon:  ${geo.lon?.toFixed(5) ?? '—'}`,
-          `alt:  ${geo.altitude != null ? geo.altitude.toFixed(1) + ' m' : '—'}`,
-          `spd:  ${geo.speed != null ? geo.speed.toFixed(1) + ' m/s' : '—'}`,
-          `hdg:  ${geo.heading != null ? geo.heading.toFixed(0) + '°' : '—'}`,
-          `acc:  ${geo.accuracy != null ? '±' + geo.accuracy.toFixed(0) + ' m' : '—'}`,
-          !geo.ready ? '⟳ acquiring…' : geo.error ? `⚠ ${geo.error}` : '✓ ready',
-        ];
-        const fs = Math.min(H * 0.1, W * 0.06, 18 * dpr());
-        ctx.fillStyle = '#cdd6f4';
-        ctx.font = `${fs}px monospace`;
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'top';
-        lines.forEach((l, i) => ctx.fillText(l, W * 0.08, H * 0.1 + i * fs * 1.5));
-      } else if (source === 'battery') {
-        const bat = window.__ar_battery_last ?? {};
-        const pct = bat.level ?? 0;
-        const charging = bat.charging ?? false;
-        const bw = W * 0.55,
-          bh = H * 0.34;
-        const bx = (W - bw) / 2,
-          by = (H - bh) / 2;
-        ctx.strokeStyle = '#cdd6f4';
-        ctx.lineWidth = 2 * dpr();
-        ctx.strokeRect(bx, by, bw, bh);
-        const tipW = bw * 0.06,
-          tipH = bh * 0.35;
-        ctx.fillStyle = '#cdd6f4';
-        ctx.fillRect(bx + bw, by + (bh - tipH) / 2, tipW, tipH);
-        const fill = bw * pct;
-        ctx.fillStyle = charging ? '#a6e3a1' : pct < 0.2 ? '#f38ba8' : '#89b4fa';
-        ctx.fillRect(bx, by, fill, bh);
-        const fs = Math.min(bh * 0.42, 18 * dpr());
-        ctx.fillStyle = '#cdd6f4';
-        ctx.font = `bold ${fs}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(`${Math.round(pct * 100)}%${charging ? ' ⚡' : ''}`, W / 2, H / 2);
-        if (bat.timeToFull > 0) {
-          ctx.font = `${fs * 0.55}px sans-serif`;
-          ctx.fillText(`~${Math.round(bat.timeToFull / 60)} min to full`, W / 2, H / 2 + fs * 0.9);
-        } else if (bat.timeToEmpty > 0 && bat.timeToEmpty !== Infinity) {
-          ctx.font = `${fs * 0.55}px sans-serif`;
-          ctx.fillText(`~${Math.round(bat.timeToEmpty / 60)} min left`, W / 2, H / 2 + fs * 0.9);
-        }
-      }
-    }
-
-    rafId = requestAnimationFrame(draw);
-    win._wmCleanup = () => cancelAnimationFrame(rafId);
-
-    // For battery: subscribe to bus event to cache latest reading for the RAF draw loop
-    if (source === 'battery') {
-      if (!navigator.getBattery) return;
-      navigator
-        .getBattery()
-        .then((b) => {
-          const update = () => {
-            window.__ar_battery_last = {
-              level: b.level,
-              charging: b.charging,
-              timeToFull: b.chargingTime,
-              timeToEmpty: b.dischargingTime,
-            };
-          };
-          update();
-          b.addEventListener('levelchange', update);
-          b.addEventListener('chargingchange', update);
-          // Cleanup on window close
-          const prevCleanup = win._wmCleanup;
-          win._wmCleanup = () => {
-            prevCleanup?.();
-            b.removeEventListener('levelchange', update);
-            b.removeEventListener('chargingchange', update);
-          };
-        })
-        .catch(() => {});
-    }
-  }
-
   // ── Public API (exposed as window.wm) ────────────────────────────────────
 
   const api = {
@@ -1870,7 +1318,7 @@ export function initWM(onContentResize) {
       const _type = win._wmSpawnOpts?.type ?? 'unknown';
       if (spawnedIds.has(id)) {
         _releaseWin(win);
-        win._wmCleanup?.();
+        _runDisposers(win);
         win.remove();
         spawnedIds.delete(id);
         notify('wm:close', { id, title: _title, type: _type });
@@ -1930,7 +1378,7 @@ export function initWM(onContentResize) {
           return;
         }
         _releaseWin(win);
-        win._wmCleanup?.();
+        _runDisposers(win);
         _disposeChannel(id);
         _deleteWinHandle(id);
         win.remove();
@@ -2141,6 +1589,15 @@ export function initWM(onContentResize) {
     },
 
     /**
+     * Window handle for `id` — a facade over the .wm-win element. handle.id === id.
+     * Use handle.onDispose(fn) to register teardown (accumulates, fires LIFO on close)
+     * instead of writing win._wmCleanup. Returns null if no such window.
+     */
+    window(id) {
+      return _windowHandle(getWin(id));
+    },
+
+    /**
      * Return the WidgetEvents instance for the paint overlay on window `id`, or null.
      * The overlay may not yet exist (it is created lazily on first activation), but
      * events are registered eagerly — so hooks registered early will fire correctly.
@@ -2239,11 +1696,7 @@ export function initWM(onContentResize) {
           tl.updateRect(0, 0, body.clientWidth || 400, body.clientHeight || 300),
         );
         ro.observe(body);
-        const prevClose = win._wmCleanup;
-        win._wmCleanup = () => {
-          ro.disconnect();
-          prevClose?.();
-        };
+        _onDispose(win, () => ro.disconnect());
       }
       const handle = win._ensureTextLayer().addText(text, x, y, opts, { runScoped: true });
       if (!handle) return null;
@@ -2383,9 +1836,9 @@ export function initWM(onContentResize) {
           vid.src = '';
         };
       } else if (type === 'viz') {
-        _buildVizWindow(win, body, opts);
+        buildVizWindow(win, body, opts, _vizCtx);
       } else if (type === 'sensor') {
-        _buildSensorWindow(win, body, opts);
+        buildSensorWindow(win, body, opts, { onDispose: (fn) => _onDispose(win, fn) });
       } else if (type === 'camera' || type === 'canvas' || type === 'shader') {
         let src;
         let _camLease = null;
@@ -2440,7 +1893,7 @@ export function initWM(onContentResize) {
         }
       }
 
-      if (_cleanup) win._wmCleanup = _cleanup;
+      if (_cleanup) _onDispose(win, _cleanup);
       win._wmSpawnOpts = { title, ...opts };
 
       if (['image', 'video', 'camera', 'canvas', 'shader', 'viz', 'sensor'].includes(type)) {
@@ -2454,11 +1907,11 @@ export function initWM(onContentResize) {
         _addAudioControls(win, videoEl);
         if (videoEl) {
           _addVideoControls(win, videoEl);
-          _addVizPanel(win, body, id);
+          addVizPanel(win, body, id, {}, _vizCtx);
         }
       }
       // Camera windows get the audio viz panel too (source locked while embedded)
-      if (type === 'camera') _addVizPanel(win, body, id, { locked: true });
+      if (type === 'camera') addVizPanel(win, body, id, { locked: true }, _vizCtx);
 
       if (['image', 'video'].includes(type) && opts.src) _addCopyPathBtn(win, opts.src);
       if (
@@ -2635,13 +2088,13 @@ export function initWM(onContentResize) {
           'padding:5px 8px 2px;font-size:9px;font-weight:bold;letter-spacing:0.6px;text-transform:uppercase;color:#888;border-top:1px solid #e8e8e8;margin-top:2px;';
         header.textContent = dh.name;
         container.appendChild(header);
-        await _renderDirContents(container, dh, 0, onSelect);
+        await renderDirContents(container, dh, 0, onSelect);
       }
 
       async function renderAll() {
         list.innerHTML = '';
         if (fallback) {
-          _renderFlatFiles(list, fallback.files, onSelect);
+          renderFlatFiles(list, fallback.files, onSelect);
         } else {
           for (const h of handles) await renderFolderSection(h, list);
         }
@@ -2652,17 +2105,15 @@ export function initWM(onContentResize) {
           hdr.textContent = 'Dropped';
           list.appendChild(hdr);
           for (const fh of _droppedFileHandles) {
-            list.appendChild(_makeFileEntry(fh, 0, onSelect));
+            list.appendChild(makeFileEntry(fh, 0, onSelect));
           }
         }
       }
 
       _browseRefreshCbs.add(renderAll);
-      const prevCleanup = win._wmCleanup;
-      win._wmCleanup = () => {
+      _onDispose(win, () => {
         _browseRefreshCbs.delete(renderAll);
-        prevCleanup?.();
-      };
+      });
 
       addBtn.addEventListener('click', async () => {
         if (window.showDirectoryPicker) {
@@ -2989,6 +2440,125 @@ export function initWM(onContentResize) {
   });
   registerCommand('wm:restore', ({ id }) => {
     api.restore(id);
+  });
+
+  // ── Window Type Adapters owned by the WM (media / html / canvas-output) ──────
+  // viz lives in viz.js, toolkit in app.js, editor inline in project.js.
+  const _mediaAdapter = {
+    serialize(win, ctx) {
+      const opts = win._wmSpawnOpts;
+      const isBlobSrc = opts.src?.startsWith('blob:');
+      const entry = {
+        type: ctx.type,
+        title: ctx.titleOf(win, opts.title),
+        ...ctx.geoOf(win),
+        loop: opts.loop,
+      };
+      if (isBlobSrc) {
+        const key = api.fileKey(win.id);
+        if (key) entry.fileKey = key;
+      } else if (opts.src) {
+        entry.src = opts.src;
+      }
+      if (ctx.type === 'video') entry.audio = ctx.readAudio(win);
+      return entry;
+    },
+    restore(w, ctx) {
+      if (w.fileKey) {
+        ctx.wm.restoreFileWindow({
+          id: w.fileKey,
+          title: w.title,
+          type: w.type,
+          x: w.x,
+          y: w.y,
+          w: w.w,
+          h: w.h,
+          nochrome: w.nochrome,
+          transparent: w.transparent,
+        });
+      } else if (w.src) {
+        const id = ctx.wm.spawn(w.title, {
+          type: w.type,
+          src: w.src,
+          loop: w.loop,
+          x: w.x,
+          y: w.y,
+          w: w.w,
+          h: w.h,
+        });
+        const win = document.getElementById(id);
+        if (win && !w.visible) win.style.display = 'none';
+      }
+    },
+  };
+  registerWindowType('image', _mediaAdapter);
+  registerWindowType('video', _mediaAdapter);
+
+  // viz window: buildVizWindow (viz-window.js) sets win._vizSourceEl/_vizStyleEl on the
+  // element, which this adapter reads. Registered under both the window type ('viz',
+  // used by serialize via _winType) and the legacy record type ('visualizer', used by
+  // restore via record.type).
+  const _vizAdapter = {
+    serialize(win, ctx) {
+      const opts = win._wmSpawnOpts;
+      return {
+        type: 'visualizer',
+        title: ctx.titleOf(win, 'Visualizer'),
+        ...ctx.geoOf(win),
+        source: win._vizSourceEl?.value ?? opts.source ?? 'master',
+        style: win._vizStyleEl?.value ?? opts.style ?? 'wave',
+      };
+    },
+    restore(w, ctx) {
+      const id = ctx.wm.spawn(w.title ?? 'Visualizer', {
+        type: 'viz',
+        source: w.source,
+        style: w.style,
+        x: w.x,
+        y: w.y,
+        w: w.w,
+        h: w.h,
+      });
+      const win = document.getElementById(id);
+      if (win && !w.visible) win.style.display = 'none';
+    },
+  };
+  registerWindowType('viz', _vizAdapter);
+  registerWindowType('visualizer', _vizAdapter);
+
+  registerWindowType('html', {
+    serialize(win, ctx) {
+      const opts = win._wmSpawnOpts;
+      if (opts?.html === undefined) return null;
+      return {
+        type: 'html',
+        title: ctx.titleOf(win, opts.title ?? ''),
+        ...ctx.geoOf(win),
+        html: opts.html ?? '',
+      };
+    },
+    restore(w, ctx) {
+      const id = ctx.wm.spawn(w.title ?? '', {
+        type: 'html',
+        html: w.html ?? '',
+        x: w.x,
+        y: w.y,
+        w: w.w,
+        h: w.h,
+      });
+      const win = document.getElementById(id);
+      if (win && !w.visible) win.style.display = 'none';
+    },
+  });
+
+  // Canvas output windows serialize their geo only; ADR 040 ignores them on restore.
+  registerWindowType('canvas', {
+    serialize(win, ctx) {
+      const editorId = parseInt(win.id.replace('win-canvas-', ''));
+      if (isNaN(editorId)) return null;
+      return { type: 'output', editorId, ...ctx.geoOf(win) };
+    },
+    // No restore: a project's `new Canvas()` code respawns its own window (ADR 040).
   });
 
   return api;

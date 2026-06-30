@@ -19,6 +19,7 @@
 
 import { onReset } from './reset-registry.js';
 import { liveOutput } from './keep-alive.js';
+import { activeEditorId } from './run-context.js';
 
 const _handles = new Set();
 
@@ -33,7 +34,7 @@ const _handles = new Set();
  * @param {function?} opts.onStop  Teardown body. Runs once, on dispose.
  * @returns {{ owner:number|null, dispose:()=>void, get disposed():boolean }}
  */
-export function runScoped({ owner = window.__ar_active_editor_id, onStop } = {}) {
+export function runScoped({ owner = activeEditorId(), onStop } = {}) {
   const h = {
     owner: owner ?? null,
     _disposed: false,
@@ -66,7 +67,7 @@ export function runScoped({ owner = window.__ar_active_editor_id, onStop } = {})
  *                                because the Signal Graph labels entries by
  *                                token.constructor.name and audio/mixer tag markers.
  */
-export function runScopedOutput({ owner = window.__ar_active_editor_id, onStop, token } = {}) {
+export function runScopedOutput({ owner = activeEditorId(), onStop, token } = {}) {
   const live = liveOutput(token ?? {});
   return runScoped({
     owner,

@@ -5,11 +5,11 @@
 
 ## Context
 
-The global `draw` object renders to a single layer-0 canvas with a **fixed 1600×900 logical backing store, CSS-stretched** to fill its output window (ADR 001; `mountLayerCanvas` in `src/api/layer.js`). Two limits follow from "one fixed canvas":
+The global `draw` object renders to a single layer-0 canvas with a **fixed 1600×900 logical backing store, CSS-stretched** to fill its output window (ADR 001; `mountLayerCanvas` in `src/api/visual/layer.js`). Two limits follow from "one fixed canvas":
 
 1. **One size for everyone.** Every sketch shares the same 1600×900 space. There is no way to open a second drawing surface, or one with a different aspect ratio, without leaving the `draw` API.
 
-2. **Pointer coordinates don't match draw coordinates.** `window:mouse:*` reports `e.clientX/clientY` — **viewport pixels** (`src/api/input.js`). `draw` lives in fixed 1600×900. The two are different coordinate systems related only by the output window's current rect. Every interactive sketch (a game, a paint tool, the billiards break demo) must re-derive `getBoundingClientRect()` scaling by hand to turn a click into a canvas coordinate. This is boilerplate, and it is the kind of math the platform should do once.
+2. **Pointer coordinates don't match draw coordinates.** `window:mouse:*` reports `e.clientX/clientY` — **viewport pixels** (`src/api/io/input.js`). `draw` lives in fixed 1600×900. The two are different coordinate systems related only by the output window's current rect. Every interactive sketch (a game, a paint tool, the billiards break demo) must re-derive `getBoundingClientRect()` scaling by hand to turn a click into a canvas coordinate. This is boilerplate, and it is the kind of math the platform should do once.
 
 A tempting "fix" is to make the global canvas *resize its logical space* to the window (the way `Shader`/`GLShader` layers already do via a `devicePixelRatio` `ResizeObserver`). That is the wrong direction for 2D: shaders are written in normalized `uv` 0..1 + a `res` uniform and are resolution-independent by construction, whereas `draw` is absolute-pixel. If the logical space tracked the window, `draw.circle(800, 450, …)` would only be centered at one specific window size, and every sketch's layout would drift on resize. The "Canvas is 1600×900" contract in API.md exists precisely so art reproduces identically across screens and embeds.
 
@@ -37,7 +37,7 @@ The surface subscribes to the **window-scoped** mouse events for its own window 
 
 ### Reuse `DrawTarget` unchanged
 
-`DrawTarget` (`src/api/draw.js`) is already parameterized by `(z, getLayerCanvas)` — it resolves its canvas through a getter and reads `width`/`height` off whatever canvas comes back. `Canvas` constructs `new DrawTarget(0, () => myCanvas)` over its own `<canvas>`; the full fluent API works against it with no change to `draw.js`. `Canvas` adds only the window + pointer + lifecycle wrapper.
+`DrawTarget` (`src/api/visual/draw.js`) is already parameterized by `(z, getLayerCanvas)` — it resolves its canvas through a getter and reads `width`/`height` off whatever canvas comes back. `Canvas` constructs `new DrawTarget(0, () => myCanvas)` over its own `<canvas>`; the full fluent API works against it with no change to `draw.js`. `Canvas` adds only the window + pointer + lifecycle wrapper.
 
 ### Body-drag yields to a mouse-claiming sketch (enabling sub-decision)
 

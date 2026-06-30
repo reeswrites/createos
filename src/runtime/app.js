@@ -1,4 +1,4 @@
-import { vision, preloadVision } from '../api/vision.js';
+import { vision, preloadVision } from '../api/media/vision.js';
 import { TOOLKIT_CATEGORIES, addToolkitEntries } from '../editor/completions.js';
 import {
   _registerBuiltin,
@@ -6,52 +6,52 @@ import {
   _setToolkitApplier,
   _setBlocksApplier,
 } from './api-registry.js';
-import { initCamera, Camera } from '../api/camera.js';
-import { initMic } from '../api/mic.js';
-import { audio } from '../api/audio.js';
-import { initStrudel, strudelGlobals } from '../api/strudel.js';
-import { Shader, ShaderFX } from '../api/shader.js';
-import { GLShader, GLSL_PRESETS } from '../api/glsl-shader.js';
-import { Canvas } from '../api/canvas.js';
-import { initPixi, PIXI } from '../api/pixi.js';
-import { AudioViz, SpectrogramCanvas, PianoRollViz } from '../api/viz.js';
-import { mixer, openMixerPanel } from '../api/mixer.js';
-import { Drumpad } from '../api/drumpad.js';
-import { Piano } from '../api/piano.js';
-import { Notepad } from '../api/notepad.js';
-import { Recording, recordStream, compositeCanvasStream } from '../api/recorder.js';
-import { Media } from '../api/media.js';
-import { VideoSignalAPI } from '../api/video-signal.js';
-import '../api/device-sources.js'; // lazy device event sources (no exported API)
-import '../api/serial.js'; // WebSerial + GPIO on the bus (ADR 020, no window API)
+import { initCamera, Camera } from '../api/media/camera.js';
+import { initMic } from '../api/media/mic.js';
+import { audio } from '../api/audio/audio.js';
+import { initStrudel, strudelGlobals } from '../api/audio/strudel.js';
+import { Shader, ShaderFX } from '../api/shader/shader.js';
+import { GLShader, GLSL_PRESETS } from '../api/shader/glsl-shader.js';
+import { Canvas } from '../api/visual/canvas.js';
+import { initPixi, PIXI } from '../api/visual/pixi.js';
+import { AudioViz, SpectrogramCanvas, PianoRollViz } from '../api/visual/viz.js';
+import { mixer, openMixerPanel } from '../api/audio/mixer.js';
+import { Drumpad } from '../api/audio/drumpad.js';
+import { Piano } from '../api/audio/piano.js';
+import { Notepad } from '../api/widgets/notepad.js';
+import { Recording, recordStream, compositeCanvasStream } from '../api/media/recorder.js';
+import { Media } from '../api/media/media.js';
+import { VideoSignalAPI } from '../api/signal/video-signal.js';
+import '../api/io/device-sources.js'; // lazy device event sources (no exported API)
+import '../api/io/serial.js'; // WebSerial + GPIO on the bus (ADR 020, no window API)
 import {
   DesktopAPI,
   initDesktop,
   addFolderIcon,
   getIconSerializedData,
   removeIconById,
-} from '../api/desktop-files.js';
-import { initProjectManager } from '../api/project-manager.js';
+} from '../api/platform/desktop-files.js';
+import { initProjectManager } from '../api/platform/project-manager.js';
 import { initDOMCaptures, captureWindow as _captureWindow } from '../editor/editor-capture.js';
-import { pipe, Source } from '../api/render-pipeline.js';
-import { route } from '../api/route.js';
-import { timeline } from '../api/timeline.js';
+import { pipe, Source } from '../api/visual/render-pipeline.js';
+import { route } from '../api/signal/route.js';
+import { timeline } from '../api/signal/timeline.js';
 import {
   armGlobal,
   disarmGlobal,
   isGlobalArmed,
   buildTimelineCode,
-} from '../api/performance-recorder.js';
+} from '../api/signal/performance-recorder.js';
 import { insertSnippet } from '../editor/active-editor.js';
 import {
   library,
   initLibrary,
   populateLibraryToolkit,
   populateLibraryBlocks,
-} from '../api/library.js';
-import { initWM } from '../api/wm.js';
-import { initTooltips } from '../api/tooltips.js';
-import { installWidgetHistoryKeys } from '../api/widget-history.js';
+} from '../api/platform/library.js';
+import { initWM } from '../api/wm/wm.js';
+import { initTooltips } from '../api/wm/tooltips.js';
+import { installWidgetHistoryKeys } from '../api/widgets/widget-history.js';
 import {
   initPaletteWorkspace,
   onPaletteClick,
@@ -61,25 +61,30 @@ import {
   applyExternalBlocks,
   addBlockToCategoryMeta,
 } from '../blocks/blocks.js';
-import { editImage } from '../api/image-edit.js';
-import { ThreeScene, THREE } from '../api/three-scene.js';
-import { signalGraph } from '../api/signal-graph.js';
-import { ascii } from '../api/ascii.js';
-import { Sprite } from '../api/sprite.js';
-import { SpriteEditor } from '../api/sprite-editor.js';
-import { Paint } from '../api/paint.js';
-import { AsciiEditor } from '../api/asciiEditor.js';
-import { PluginHost } from '../api/plugin-host.js';
-import { shell } from '../api/shell.js';
-import { midi } from '../api/midi.js';
-import { external } from '../api/external.js';
-import { statusBar } from '../api/status-bar.js';
+import { editImage } from '../api/media/image-edit.js';
+import { ThreeScene, THREE } from '../api/visual/three-scene.js';
+import { signalGraph } from '../api/signal/signal-graph.js';
+import { ascii } from '../api/widgets/ascii.js';
+import { Sprite } from '../api/widgets/sprite.js';
+import { SpriteEditor } from '../api/widgets/sprite-editor.js';
+import { Paint } from '../api/widgets/paint.js';
+import { AsciiEditor } from '../api/widgets/asciiEditor.js';
+import { PluginHost } from '../api/platform/plugin-host.js';
+import { shell } from '../api/io/shell.js';
+import { midi } from '../api/audio/midi.js';
+import { external } from '../api/io/external.js';
+import { statusBar } from '../api/wm/status-bar.js';
 import { EditorInstance } from '../editor/editor-instance.js';
-import { saveProject, loadProject, serializeProject, applyProject } from '../api/project.js';
+import {
+  saveProject,
+  loadProject,
+  serializeProject,
+  applyProject,
+} from '../api/platform/project.js';
 import { on, emit, any, tick, hold, tween, subscribe } from '../events/index.js';
-import { openEventPanel } from '../api/event-panel.js';
-import { openTutorial } from '../api/tutorial.js';
-import '../api/input.js'; // keyboard + mouse → bus (must load after events/index.js)
+import { openEventPanel } from '../api/wm/event-panel.js';
+import { openTutorial } from '../api/platform/tutorial.js';
+import '../api/io/input.js'; // keyboard + mouse → bus (must load after events/index.js)
 
 // ── Capture native timer/event functions before any user-code patching ────────
 const _nativeSetInterval = window.setInterval.bind(window);

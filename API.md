@@ -1047,7 +1047,7 @@ desktop.open(id)
 
 ## Art-widget events — `WidgetEvents` (shared helper)
 
-All interactive art widgets (Drumpad, Paint, SpriteEditor, AsciiEditor) share a common **WidgetEvents** plumbing class (`src/api/widget-events.js`). It is used internally — you never construct it directly — but the contract it provides appears on every widget's public API:
+All interactive art widgets (Drumpad, Paint, SpriteEditor, AsciiEditor) share a common **WidgetEvents** plumbing class (`src/api/widgets/widget-events.js`). It is used internally — you never construct it directly — but the contract it provides appears on every widget's public API:
 
 ```js
 // Hook registration (returns widget instance for chaining)

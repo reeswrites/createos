@@ -62,10 +62,10 @@ haptics:stop    {}            commandable
 
 ### What changed
 
-- `src/api/sensors.js` → deleted. Replaced by `src/api/device-sources.js` (lazy `registerSource` emitters + haptic commands).
+- `src/api/io/sensors.js` → deleted. Replaced by `src/api/io/device-sources.js` (lazy `registerSource` emitters + haptic commands).
 - `window.sensors` → removed entirely.
-- `src/api/input.js` → new. Sole keyboard+mouse DOM listener layer. Attaches via native `addEventListener` (captured before harness patch). All key/mouse events flow through the bus.
-- `src/api/wm.js` → added `_focusedWinId` tracking in `bringToFront`. `wm:blur` now actually emits (was declared but never fired).
+- `src/api/io/input.js` → new. Sole keyboard+mouse DOM listener layer. Attaches via native `addEventListener` (captured before harness patch). All key/mouse events flow through the bus.
+- `src/api/wm/wm.js` → added `_focusedWinId` tracking in `bringToFront`. `wm:blur` now actually emits (was declared but never fired).
 - `src/events/bus.js` → added `registerSource`, `getLastPayload`, `_lastPayloads` Map, `_srcInc`/`_srcDec` subscription counting.
 - `src/events/event-selector.js` → `.when()` three modes, `.hold()` terminal, `tick()` factory, global `hold()`.
 

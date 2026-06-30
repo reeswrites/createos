@@ -7,7 +7,7 @@
 
 ## Context
 
-`src/api/wm.js` is one 3106-line `initWM` closure. `spawn()` is a god-function assembling every concern, and the window DOM element (`win._*` fields) is the de-facto shared mutable bag. The file has no unit tests, and three clusters inside it are self-contained enough to stand alone:
+`src/api/wm/wm.js` is one 3106-line `initWM` closure. `spawn()` is a god-function assembling every concern, and the window DOM element (`win._*` fields) is the de-facto shared mutable bag. The file has no unit tests, and three clusters inside it are self-contained enough to stand alone:
 
 1. **Snapshot/record compositing** (`_zSortedCanvases`/`_snapshotVisual`/`_recordVisual`) — already DOM-clean after ADR 040 (it walks z-sorted `<canvas>` planes, no `win._getOverlay` poking). Only outward dep is recorder.js.
 2. **Spectrum/analyser render core** (`_createSpectrumCore`) — already a `(canvas, getStyle, opts)` factory; the FFT normalization + three render styles are the deep, reusable part. Its only wm-private reach was `_winStrips` (the `ch:` source).

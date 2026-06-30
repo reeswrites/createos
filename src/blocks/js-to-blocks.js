@@ -3,7 +3,7 @@
 // Unrecognized statements are silently skipped.
 
 import esprima from 'esprima';
-import { SHADER_PRESETS, CAMERA_PRESETS } from '../api/shader.js';
+import { SHADER_PRESETS, CAMERA_PRESETS } from '../api/shader/shader.js';
 // Original source text for range-based extraction during jsToBlocks calls
 let _src = '';
 

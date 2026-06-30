@@ -6,7 +6,7 @@
 ## Decision
 
 Extract the non-GPU half of `Shader._init` and `GLShader._init` into one helper,
-`mountLayerCanvas(opts)` in `src/api/layer.js`. Both shader classes call it for
+`mountLayerCanvas(opts)` in `src/api/visual/layer.js`. Both shader classes call it for
 the canvas-mounting concern, then attach their own GPU context.
 
 ## Context

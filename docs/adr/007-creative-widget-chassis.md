@@ -9,10 +9,10 @@ Extract the cross-cutting machinery shared by the four creative widgets
 (Paint, SpriteEditor, AsciiEditor, Drumpad) into composable modules instead of
 leaving it copy-pasted in each widget:
 
-- **`src/api/frame-doc.js`** — `FrameDoc`, the DOM-free animation frame model
+- **`src/api/widgets/frame-doc.js`** — `FrameDoc`, the DOM-free animation frame model
   (frames + index + transport + onion), element-agnostic via hooks
   (`createBlank`/`copyFrame`/`clearFrame`/`drawThumb`).
-- **`src/api/widget-shell.js`** — `mountWidgetShell()` (WM window + body styling
+- **`src/api/widgets/widget-shell.js`** — `mountWidgetShell()` (WM window + body styling
   + debounced autosave→desktop + WidgetHistory wiring + lifecycle), plus
   `buildFrameStrip()` / `buildTransport()` UI built over a **FrameController**.
 - **`src/editor/active-editor.js`** — `insertSnippet()`, the single seam for

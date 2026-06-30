@@ -8,7 +8,7 @@ Widgets needed a way to export not just their final state (the existing **Snapsh
 
 Performance capture is a **separate, append-only log of timestamped actions** (`{ t, …action }`, wall-clock ms from take start), captured by subscribing to each widget's existing event stream — `WidgetEvents` `'*'` for Drumpad/Piano/Sprite/Ascii, the global bus `note:char` for Notepad, and **new** pointermove path capture in Paint (its `stroke` event carries only a bbox, not the brush path). It is **not** built on `WidgetHistory`.
 
-Replay schedules the log on the harness clock (patched `setTimeout`, run-scoped, self-registering a live output) via a shared leaf `src/api/replay-clock.js`, used by both per-widget `.replay(actions)` and the cross-widget `timeline().track(widget, actions, { at })`. Performances are never persisted to `.vljson`/IDB — the emitted code is their persistence, exactly like Snapshot export.
+Replay schedules the log on the harness clock (patched `setTimeout`, run-scoped, self-registering a live output) via a shared leaf `src/api/signal/replay-clock.js`, used by both per-widget `.replay(actions)` and the cross-widget `timeline().track(widget, actions, { at })`. Performances are never persisted to `.vljson`/IDB — the emitted code is their persistence, exactly like Snapshot export.
 
 ## Considered options
 

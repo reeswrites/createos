@@ -21,7 +21,7 @@ ML transcription engine that emits those events from an arbitrary stream, plus m
 
 ### 1. Extend the existing `route()`, do not build a parallel one
 
-The new capability is added to `src/api/route.js` and the existing `Source`. No `src/route/`
+The new capability is added to `src/api/signal/route.js` and the existing `Source`. No `src/route/`
 directory, no second `window.route`. This keeps one keep-alive / owner-tag / reset story (ADR 008/009)
 and means the canonical karaoke snippet — `route(Source.camera).tap('audio:word:interim', fn).show()`
 — already wires its listener through the existing `.tap()`/`.show()`; only the engine that *fires*

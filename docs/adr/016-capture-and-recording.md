@@ -57,7 +57,7 @@ The existing 📷 Snapshot button in the paint overlay mini-bar called `window.d
 
 ### 6. MediaRecorder + compositeCanvasStream for recording
 
-`MediaRecorder` is not used anywhere else in the codebase. New module `src/api/recorder.js`:
+`MediaRecorder` is not used anywhere else in the codebase. New module `src/api/media/recorder.js`:
 - `Recording` class: wraps one `MediaRecorder`, accumulates `ondataavailable` chunks, calls `onStop(blob)` from `onstop`
 - `recordStream(stream, { onStop })` — factory
 - `compositeCanvasStream(canvases, fps)` — for multi-layer output windows (draw z=0 / pixi z=25 / shader z=30): rAF loop draws each canvas in z-order onto an offscreen canvas, then `offscreen.captureStream(fps)`; returns `{ stream, stop }`
@@ -90,16 +90,16 @@ Three hooks are wired onto the window element (`_wmSnapshot`, `_wmRecord`, `_wmS
 ## Consequences
 
 **New files:**
-- `src/api/recorder.js` — `Recording`, `recordStream`, `compositeCanvasStream`, `cleanupRecorders` + `onReset`
+- `src/api/media/recorder.js` — `Recording`, `recordStream`, `compositeCanvasStream`, `cleanupRecorders` + `onReset`
 - `tests/recorder.test.js` — 10 tests
 - `tests/capture.test.js` — 12 tests
 - `docs/capture.md`
 
 **Modified files:**
-- `src/api/desktop-files.js` — IDB capture store, `desktop.addBlob`, `_download`, `serializeDesktop({forProject})`, `restoreDesktop` blobKey branch, blob cleanup on trash/remove
-- `src/api/camera.js` — `CameraStream.photo()`, `CameraStream.record()`
-- `src/api/wm.js` — `_snapshotVisual`, `_recordVisual`, `_addCaptureButtons`, `win._getOverlay`, `wm.snapshot/record/stopRecording`; `_doSnapshot` simplified to call `_snapshotVisual`
-- `src/api/project.js` — `serializeDesktop({ forProject: true })`
+- `src/api/platform/desktop-files.js` — IDB capture store, `desktop.addBlob`, `_download`, `serializeDesktop({forProject})`, `restoreDesktop` blobKey branch, blob cleanup on trash/remove
+- `src/api/media/camera.js` — `CameraStream.photo()`, `CameraStream.record()`
+- `src/api/wm/wm.js` — `_snapshotVisual`, `_recordVisual`, `_addCaptureButtons`, `win._getOverlay`, `wm.snapshot/record/stopRecording`; `_doSnapshot` simplified to call `_snapshotVisual`
+- `src/api/platform/project.js` — `serializeDesktop({ forProject: true })`
 - `src/runtime/app.js` — import recorder, register `Recording`/`recordStream`/`compositeCanvasStream`/`recordWindow`/`snapshot` globals
 - `src/editor/completions.js` — `"Capture"` toolkit category
 - `tests/blocks-coverage.test.js` — `'Capture'` in `BLOCKS_TODO`

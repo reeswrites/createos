@@ -6,7 +6,7 @@
 
 ## Context
 
-`src/api/audio.js` carried a ~250-line in-house mini-notation parser and `Pattern` class
+`src/api/audio/audio.js` carried a ~250-line in-house mini-notation parser and `Pattern` class
 ("Deep Strudel") — *inspired by* Strudel/TidalCycles but **not** compatible with real
 strudel.cc scripts. Every gap (pattern-rate effects, proper polymeter, `perlin`/`rand` as
 pattern signals, the full transform library) was a permanent support burden or a denied

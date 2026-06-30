@@ -34,6 +34,7 @@ import {
 import { initProjectManager } from '../api/platform/project-manager.js';
 import { initDOMCaptures, captureWindow as _captureWindow } from '../editor/editor-capture.js';
 import { pipe, Source } from '../api/visual/render-pipeline.js';
+import { registerWindowType } from '../api/wm/window-registry.js';
 import { route } from '../api/signal/route.js';
 import { timeline } from '../api/signal/timeline.js';
 import {
@@ -103,16 +104,36 @@ const nativeTimers = {
 // ── Shared globals exposed to all user code ───────────────────────────────────
 // All public APIs go through _registerBuiltin so the registry is the single source
 // of truth. Users call registerAPI() to override or extend any built-in.
-_registerBuiltin('vision', vision);
-_registerBuiltin('video', VideoSignalAPI);
+_registerBuiltin('vision', vision, {
+  params: { onGesture: ['name', 'fn'], onExpression: ['name', 'fn'] },
+});
+_registerBuiltin('video', VideoSignalAPI, {
+  params: {
+    signal: ['source', 'opts?'],
+    onMotion: ['source', 'threshold', 'onEnter', 'onExit?'],
+    onBrightness: ['source', 'threshold', 'onEnter', 'onExit?'],
+  },
+});
 // sensors global removed — use on('sensor:*') / hold('sensor:*') / emit('haptics:*') instead
-_registerBuiltin('desktop', DesktopAPI);
-_registerBuiltin('audio', audio);
-_registerBuiltin('Shader', Shader);
-_registerBuiltin('ShaderFX', ShaderFX);
-_registerBuiltin('GLShader', GLShader);
+_registerBuiltin('desktop', DesktopAPI, {
+  params: { add: ['url', 'opts?'], remove: ['id'] },
+});
+_registerBuiltin('audio', audio, {
+  params: {
+    onLevel: ['threshold', 'onEnter', 'onExit?'],
+    onWord: ['word', 'fn'],
+    onSpeech: ['fn'],
+    say: ['text', 'opts?'],
+    load: ['url'],
+    spectrogram: ['source', 'opts?'],
+    pianoRoll: ['opts?'],
+  },
+});
+_registerBuiltin('Shader', Shader, { params: ['fragmentBody', 'opts?'] });
+_registerBuiltin('ShaderFX', ShaderFX, { params: ['fragmentBody', 'opts?'] });
+_registerBuiltin('GLShader', GLShader, { params: ['fragmentBody', 'opts?'] });
 _registerBuiltin('GLSL_PRESETS', GLSL_PRESETS);
-_registerBuiltin('Canvas', Canvas);
+_registerBuiltin('Canvas', Canvas, { params: ['opts?'] });
 _registerBuiltin('pipe', pipe);
 _registerBuiltin('Source', Source);
 _registerBuiltin('route', route);
@@ -123,11 +144,13 @@ _registerBuiltin('PIXI', PIXI);
 _registerBuiltin('vec2', (x = 0, y = 0) => ({ x, y, _wgsl: 'vec2f' }));
 _registerBuiltin('vec3', (x = 0, y = 0, z = 0) => ({ x, y, z, _wgsl: 'vec3f' }));
 _registerBuiltin('vec4', (x = 0, y = 0, z = 0, w = 1) => ({ x, y, z, w, _wgsl: 'vec4f' }));
-_registerBuiltin('Camera', Camera);
+_registerBuiltin('Camera', Camera, { params: ['opts?'] });
 _registerBuiltin('AudioViz', AudioViz);
 _registerBuiltin('SpectrogramCanvas', SpectrogramCanvas);
 _registerBuiltin('PianoRollViz', PianoRollViz);
-_registerBuiltin('mixer', mixer);
+_registerBuiltin('mixer', mixer, {
+  params: { strip: ['name'], add: ['node', 'opts?'] },
+});
 _registerBuiltin('Drumpad', Drumpad);
 _registerBuiltin('Piano', Piano);
 _registerBuiltin('Notepad', Notepad);
@@ -147,17 +170,17 @@ _registerBuiltin('Media', Media);
 initStrudel();
 const _S = strudelGlobals();
 // sources
-_registerBuiltin('note', _S.note);
-_registerBuiltin('s', _S.s);
-_registerBuiltin('n', _S.n);
-_registerBuiltin('sound', _S.sound);
+_registerBuiltin('note', _S.note, { params: ['pattern'] });
+_registerBuiltin('s', _S.s, { params: ['pattern'] });
+_registerBuiltin('n', _S.n, { params: ['pattern'] });
+_registerBuiltin('sound', _S.sound, { params: ['pattern'] });
 _registerBuiltin('silence', _S.silence);
 // combinators
-_registerBuiltin('stack', _S.stack);
-_registerBuiltin('cat', _S.cat);
+_registerBuiltin('stack', _S.stack, { params: ['...patterns'] });
+_registerBuiltin('cat', _S.cat, { params: ['...patterns'] });
 _registerBuiltin('slowcat', _S.slowcat);
 _registerBuiltin('fastcat', _S.fastcat);
-_registerBuiltin('seq', _S.seq);
+_registerBuiltin('seq', _S.seq, { params: ['...patterns'] });
 _registerBuiltin('sequence', _S.sequence);
 _registerBuiltin('timeCat', _S.timeCat);
 _registerBuiltin('arrange', _S.arrange);
@@ -185,8 +208,8 @@ _registerBuiltin('steady', _S.steady);
 _registerBuiltin('pure', _S.pure);
 _registerBuiltin('reify', _S.reify);
 _registerBuiltin('mini', _S.mini);
-_registerBuiltin('samples', _S.samples);
-_registerBuiltin('setcps', _S.setcps);
+_registerBuiltin('samples', _S.samples, { params: ['urlOrMap'] });
+_registerBuiltin('setcps', _S.setcps, { params: ['cps'] });
 _registerBuiltin('setcpm', _S.setcpm);
 _registerBuiltin('hush', _S.hush);
 
@@ -208,8 +231,8 @@ _registerBuiltin('Color', Color);
 _registerBuiltin('on', on);
 _registerBuiltin('emit', emit);
 _registerBuiltin('any', any);
-_registerBuiltin('tick', tick);
-_registerBuiltin('hold', hold);
+_registerBuiltin('tick', tick, { params: ['ms'] });
+_registerBuiltin('hold', hold, { params: ['event'] });
 _registerBuiltin('tween', tween);
 _registerBuiltin('monitor', openEventPanel);
 _registerBuiltin('randUni', (lo, hi) => Math.random() * (hi - lo) + lo);
@@ -312,7 +335,9 @@ window.onload = () => {
 
   // ── DOM captures ──────────────────────────────────────────────────────────
   initDOMCaptures(_nativeSetInterval, _nativeClearInterval);
-  _registerBuiltin('captureWindow', (target, fps) => _captureWindow(target, fps));
+  _registerBuiltin('captureWindow', (target, fps) => _captureWindow(target, fps), {
+    params: ['target', 'fps?'],
+  });
 
   // ── Window manager ─────────────────────────────────────────────────────────
   window.__ar_widgetRestorers = {};
@@ -322,7 +347,18 @@ window.onload = () => {
       inst.inlineWidgets.refresh();
     });
   });
-  _registerBuiltin('wm', _wm);
+  _registerBuiltin('wm', _wm, {
+    params: {
+      spawn: ['title', 'opts?'],
+      move: ['id', 'x', 'y'],
+      resize: ['id', 'w', 'h'],
+      show: ['id'],
+      hide: ['id'],
+      close: ['id'],
+      setZ: ['id', 'z'],
+      setOpacity: ['id', 'opacity'],
+    },
+  });
   initDesktop(window.wm);
   // Wire project-manager bridge globals used by desktop-files.js context menus
   window.__ar_getIconSerializedData = getIconSerializedData;
@@ -755,6 +791,18 @@ window.onload = () => {
   }
   window.__ar_createEditor = createEditor;
   window.__ar_createToolkit = createToolkit;
+
+  // Window Type Adapter for toolkit windows — restore needs appAPI (createToolkit).
+  registerWindowType('toolkit', {
+    serialize(win, ctx) {
+      return { type: 'toolkit', title: ctx.titleOf(win, 'API Toolbox'), ...ctx.geoOf(win) };
+    },
+    restore(w, ctx) {
+      const id = ctx.appAPI.nextToolkitId();
+      const win = ctx.appAPI.createToolkit(id);
+      ctx.applyGeo(win, w);
+    },
+  });
   window.__ar_newEditorWithCode = (code) => {
     const id = ++editorIdCounter;
     try {

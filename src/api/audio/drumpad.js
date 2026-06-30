@@ -1,6 +1,6 @@
 // Drumpad — grid of pads backed by Tone.js synths + 16-step sequencer.
 // Exposed as: new Drumpad(opts) and audio.drumpad(opts).
-// Spawns a WM window; cleanup on window close via _wmCleanup.
+// Spawns a WM window; cleanup on window close via wm.window(id).onDispose().
 //
 // Event/signal API (per-instance):
 //   dp.onHit(fn)          — fn({vi,id,label,source,step}) on any pad hit

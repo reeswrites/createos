@@ -83,10 +83,11 @@ describe('API detection coherence — consumption classification', () => {
     expect(CONSUMED.filter((k) => DETECTED_UNCONSUMED.includes(k))).toEqual([]);
   });
 
-  test('every CONSUMED flag is actually read by execute() in editor-instance.js', () => {
-    const src = readFileSync(resolve(process.cwd(), 'src/editor/editor-instance.js'), 'utf8');
+  test('every CONSUMED flag is actually read by the run sequence in run.js', () => {
+    // The detection-consuming sequence lives in run.js (extracted from execute()).
+    const src = readFileSync(resolve(process.cwd(), 'src/runtime/run.js'), 'utf8');
     for (const key of CONSUMED) {
-      expect(src.includes(`_apiHints.${key}`)).toBe(true);
+      expect(src.includes(`hints.${key}`)).toBe(true);
     }
   });
 });

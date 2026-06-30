@@ -29,15 +29,8 @@ import {
 import { highlightSelectionMatches } from '@codemirror/search';
 import { linter, lintGutter } from '@codemirror/lint';
 import esprima from 'esprima';
-import {
-  transformCode,
-  makeLoopProtectionVisitor,
-  makeTraceVisitor,
-  friendlyError,
-  extractScriptLine,
-} from './live-patch.js';
-import { detectAPIUsage } from './api-detector.js';
-import { _beginRun, _endRun } from '../runtime/api-registry.js';
+import { extractScriptLine } from './live-patch.js';
+import { _endRun } from '../runtime/api-registry.js';
 import {
   initInlineWidgets,
   inlineWidgetsExtension,
@@ -48,7 +41,6 @@ import { searchMarksField, initSearch } from './cm-search.js';
 import { paramHintsExtension } from './param-hints.js';
 import { windowMemberCompletionSource } from './completions.js';
 import { shaderSignalPickerExtension } from './shader-signal-picker.js';
-import { startAudio } from '../api/audio/audio.js';
 import {
   addEditorIcon,
   removeEditorIcon,
@@ -61,6 +53,8 @@ import { runResetHandlers } from '../runtime/reset-registry.js';
 import { emit, clearRunScoped } from '../events/index.js';
 import { eventCompletionSource } from './event-completion.js';
 import { PauseController } from '../runtime/pause-controller.js';
+import { setActiveBlocksEditor, setPaused, setUsesAudio } from '../runtime/run-context.js';
+import { startRun } from '../runtime/run.js';
 import {
   initBlockly,
   getWorkspaceCode,
@@ -893,7 +887,7 @@ export class EditorInstance {
   _openBlocks() {
     this.blocksMode = true;
     activeBlocksEditor = this;
-    window.__ar_active_blocks_editor = this;
+    setActiveBlocksEditor(this);
     this.editorWrap.style.display = 'none';
     this.blocksArea.style.display = 'flex';
     this._textBtn.classList.remove('ar-toggle-active');
@@ -941,8 +935,10 @@ export class EditorInstance {
     }
     if (this._blocksMuteCtrl) this._blocksMuteCtrl.style.display = 'none';
     this.blocksMode = false;
-    if (activeBlocksEditor === this) activeBlocksEditor = null;
-    if (window.__ar_active_blocks_editor === this) window.__ar_active_blocks_editor = null;
+    if (activeBlocksEditor === this) {
+      activeBlocksEditor = null;
+      setActiveBlocksEditor(null);
+    }
     this.blocksArea.style.display = 'none';
     this.editorWrap.style.display = '';
     this._textBtn.classList.add('ar-toggle-active');
@@ -1086,12 +1082,12 @@ export class EditorInstance {
       this.idleWatcher = null;
     }
     this._pause.pause();
-    window.__ar_paused = true;
+    setPaused(true);
     this._setPaused();
   }
 
   resumeRunning() {
-    window.__ar_paused = false;
+    setPaused(false);
     this._pause.resume();
     this._setRunning();
     this._startIdleWatcher();
@@ -1103,8 +1099,8 @@ export class EditorInstance {
     _endRun(); // restore any registerAPI() overrides made during this run
     this.cm.dispatch({ effects: setErrorLineEffect.of(null) });
     this._clearTrace();
-    window.__ar_paused = false;
-    window.__ar_usesAudio = undefined;
+    setPaused(false);
+    setUsesAudio(undefined);
     this._pause.clear();
     this._listeners.forEach(({ target, type, handler, options }) =>
       target?.removeEventListener(type, handler, options),
@@ -1138,62 +1134,38 @@ export class EditorInstance {
       ? getWorkspaceCode(this.blocklyWorkspace)
       : this.cm.state.doc.toString();
 
-    // Camera/mic are demand-driven (ADR 023): consumers acquire leases when called,
-    // so no pre-run regex checks needed.
-    this._native.clearTimeout(this._autoExecTimer);
-    this._autoExecTimer = null;
-
-    this.reset({ soft });
-    _beginRun(); // snapshot API registry so run-scoped registerAPI() calls are reverted on reset
-
-    // Smart output detection: analyse user code before executing so we only start
-    // audio when it's needed. ADR 040: there is no auto-opened output window —
-    // visual output comes from `new Canvas()` / `.show()`, which spawn their own.
-    const _apiHints = detectAPIUsage(raw);
-
-    window.__ar_usesAudio = _apiHints.usesAudio;
-    window.__ar_audioReady = _apiHints.usesAudio ? startAudio() : Promise.resolve();
-    if (_apiHints.usesAudio) this._wm.ensureAudioChip?.(); // master audio control in taskbar (ADR 040)
-    if (!soft) {
-      this._keepAlive = new Set();
-      this._hadOutput = false;
-    }
-    window.__ar_keepAlive = this._keepAlive;
-    this.consoleEl.innerHTML = '';
-
-    // Tag listeners to this editor during synchronous setup
-    window.__ar_active_editor_id = this.id;
-    emit('session:start', { code: raw });
-
-    let protected_code;
-    try {
-      const visitors = [makeLoopProtectionVisitor()];
-      if (this._traceEnabled) visitors.push(makeTraceVisitor(this.id));
-      protected_code = transformCode(raw, visitors);
-    } catch (_) {
-      protected_code = raw;
-    }
-
-    const ns = `__ar_e${this.id}`;
-    const preamble = editorPreamble(this.id);
-
-    const code =
-      `(async function(){\n${preamble}\nawait window.__ar_audioReady;\n${protected_code}\n})()` +
-      `.catch(e => { const msg = window.__ar_friendlyError(e); window.${ns}_console.error('Error: ' + msg); window.__ar_instances?.get(${this.id})?._onError(e); })` +
-      `.then(() => { window.__ar_instances?.get(${this.id})?._checkLiveOrStop(); });`;
-
-    window.__ar_friendlyError = friendlyError;
-
-    this._setRunning();
-    const script = document.createElement('script');
-    try {
-      script.appendChild(document.createTextNode(code));
-    } catch {
-      script.text = code;
-    }
-    document.body.appendChild(script);
-    this.currentScript = script;
-    this._startIdleWatcher();
+    // Gather this instance's inputs + callbacks; the run sequence lives in run.js so
+    // it can be exercised with a fake injector (no CodeMirror/DOM). See run.js.
+    startRun({
+      raw,
+      id: this.id,
+      traceEnabled: this._traceEnabled,
+      soft,
+      preamble: editorPreamble(this.id),
+      deps: {
+        clearAutoExec: () => {
+          this._native.clearTimeout(this._autoExecTimer);
+          this._autoExecTimer = null;
+        },
+        reset: (s) => this.reset({ soft: s }),
+        ensureAudioChip: () => this._wm.ensureAudioChip?.(), // master audio control (ADR 040)
+        prepareKeepAlive: (s) => {
+          if (!s) {
+            this._keepAlive = new Set();
+            this._hadOutput = false;
+          }
+          return this._keepAlive;
+        },
+        clearConsole: () => {
+          this.consoleEl.innerHTML = '';
+        },
+        setRunning: () => this._setRunning(),
+        startIdleWatcher: () => this._startIdleWatcher(),
+        onScript: (script) => {
+          this.currentScript = script;
+        },
+      },
+    });
   }
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────

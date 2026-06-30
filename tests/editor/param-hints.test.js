@@ -2,6 +2,7 @@ import { describe, test, expect } from 'vitest';
 import { EditorView } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
 import { PARAM_HINTS, resolveParamHint, paramHintsField, paramHintsExtension } from '../../src/editor/param-hints.js';
+import { registerAPI, _beginRun, _endRun } from '../../src/runtime/api-registry.js';
 
 function makeView(doc, cursorPos) {
   const state = EditorState.create({
@@ -26,12 +27,21 @@ describe('PARAM_HINTS table', () => {
     expect(resolveParamHint('canvas.circle')).toEqual(['x', 'y', 'r', 'color']);
   });
 
-  test('contains wm.spawn', () => {
-    expect(PARAM_HINTS['wm.spawn']).toBeDefined();
+  test('migrated global hints resolve via the API Descriptor (not the manual table)', () => {
+    _beginRun();
+    registerAPI('wm', {}, { params: { spawn: ['title', 'opts?'] } });
+    registerAPI('audio', {}, { params: { onLevel: ['threshold', 'onEnter', 'onExit?'] } });
+    expect(resolveParamHint('wm.spawn')).toEqual(['title', 'opts?']);
+    expect(resolveParamHint('audio.onLevel')).toEqual(['threshold', 'onEnter', 'onExit?']);
+    _endRun();
   });
 
-  test('contains audio.onLevel', () => {
-    expect(PARAM_HINTS['audio.onLevel']).toBeDefined();
+  test('only the residual hints (dual-shape on + file.* instance methods) stay manual', () => {
+    expect(PARAM_HINTS['on']).toBeDefined();
+    expect(PARAM_HINTS['file.seek']).toBeDefined();
+    // migrated entries no longer live in the manual table — they resolve via descriptors
+    expect(PARAM_HINTS['wm.spawn']).toBeUndefined();
+    expect(PARAM_HINTS['audio.onLevel']).toBeUndefined();
   });
 });
 
@@ -128,12 +138,12 @@ describe('paramHintsField', () => {
     expect(() => tip?.create?.(view)).not.toThrow();
   });
 
-  test('tooltip present for wm.spawn', () => {
-    const code = `wm.spawn('Title', { type: 'html' })`;
-    const view = makeView(code, 11);
+  test('tooltip present for a manual-table call (file.filter)', () => {
+    const code = `file.filter('lowpass', 800)`;
+    const view = makeView(code, 13);
     const tip = tooltip(view);
     expect(tip).not.toBeNull();
     const { dom } = tip.create(view);
-    expect(dom.textContent).toContain('wm.spawn');
+    expect(dom.textContent).toContain('file.filter');
   });
 });

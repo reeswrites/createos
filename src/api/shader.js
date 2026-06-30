@@ -362,6 +362,9 @@ export class Shader extends ShaderLayerBase {
   // ── Public API ──────────────────────────────────────────────────────────
 
   start() {
+    // Detached (no .mount()/.show()) — spawn our own window so .start() works
+    // standalone, as the docs show. (The old editor-output fallback is gone — ADR 040.)
+    if (!this._container && !this._ownWinId) return this.show();
     this._registerLive();
     (async () => {
       if (!this._device) await this._init();

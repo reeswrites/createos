@@ -4,10 +4,11 @@
 // All windows are spawned (no built-in/special windows). Layouts position tiled windows; floating windows manage themselves.
 
 import * as Tone from 'tone';
-import { WidgetEvents } from './widget-events.js';
+import { addPaintOverlay } from './paint-overlay.js';
 import { onReset } from '../runtime/reset-registry.js';
 import { notify, registerCommand, tween, hasSubscribers } from '../events/index.js';
-import { recordStream, compositeCanvasStream } from './recorder.js';
+import { snapshotWindow, recordWindow } from './window-capture.js';
+import { createSpectrumCore } from './audio-viz.js';
 import { acquireCamera, acquireMic } from './media-lease.js';
 import { acquireStrip, releaseStrip } from './mixer.js';
 import { TextLayer } from './text-layer.js';
@@ -532,64 +533,10 @@ export function initWM(onContentResize) {
   // no frames, no undo, no onion skin.  Snapshot composites the live visual
   // frame + overlay into a PNG desktop icon; "Edit in Paint" opens the full
   // Paint editor with that composite as a backdrop.
-  // All <canvas> planes of a window body, z-sorted (ADR 040). Replaces the old
-  // base→overlay→text filter dance: every plane (draw@0, pixi@25, shader@30,
-  // overlay@50, text@51) composites in zIndex order through one mechanism.
-  function _zSortedCanvases(body) {
-    return [...body.querySelectorAll('canvas')]
-      .map(c => [c, parseInt(getComputedStyle(c).zIndex, 10) || 0])
-      .sort((a, b) => a[1] - b[1])
-      .map(e => e[0]);
-  }
-
-  // ── Snapshot visual to persistent desktop PNG ──────────────────────────────
-  function _snapshotVisual(win, body, visualEl, { name, download = false } = {}) {
-    const canvases = _zSortedCanvases(body);
-    let w, h;
-    if (canvases.length > 0) {
-      w = canvases[0].width || 320;
-      h = canvases[0].height || 240;
-    } else {
-      w = visualEl.videoWidth || visualEl.naturalWidth || visualEl.width || 320;
-      h = visualEl.videoHeight || visualEl.naturalHeight || visualEl.height || 240;
-    }
-    const c = document.createElement('canvas');
-    c.width = w; c.height = h;
-    const ctx = c.getContext('2d');
-    if (canvases.length > 0) {
-      for (const src of canvases) { try { ctx.drawImage(src, 0, 0, w, h); } catch (_) {} }
-    } else {
-      try { ctx.drawImage(visualEl, 0, 0, w, h); } catch (_) {}
-    }
-    const snapName = name ?? (win.querySelector('.wm-title')?.textContent?.trim() || 'snapshot') + '.png';
-    c.toBlob(blob => {
-      if (!blob) return;
-      window.desktop?.addBlob(blob, { name: snapName, type: 'image', download });
-    }, 'image/png');
-  }
-
-  // ── Start recording a visual window → desktop WebM ─────────────────────────
-  function _recordVisual(win, body, visualEl, { fps = 30, name } = {}) {
-    // All canvases, z-sorted → composite order (base → … → overlay → text).
-    const all = _zSortedCanvases(body);
-    let stream, stopCompositor = null;
-    if (all.length > 1) {
-      const comp = compositeCanvasStream(all, fps);
-      stream = comp.stream;
-      stopCompositor = comp.stop;
-    } else if (all.length === 1) {
-      stream = all[0].captureStream?.(fps);
-    } else if (visualEl?.tagName === 'VIDEO') {
-      stream = visualEl.captureStream?.() ?? visualEl.mozCaptureStream?.();
-    }
-    if (!stream) return null;
-    const recName = name ?? (win.querySelector('.wm-title')?.textContent?.trim() || 'recording') + '.webm';
-    const rec = recordStream(stream, {
-      onStop: blob => window.desktop?.addBlob(blob, { name: recName, type: 'video' }),
-    });
-    if (stopCompositor) rec._stopCompositor = stopCompositor;
-    return rec;
-  }
+  // Snapshot/record compositing lives in window-capture.js (ADR 042). The wrapper
+  // names below keep the call sites in this closure short.
+  const _snapshotVisual = (win, body, visualEl, opts) => snapshotWindow(win, body, visualEl, opts);
+  const _recordVisual   = (win, body, visualEl, opts) => recordWindow(win, body, visualEl, opts);
 
   // ── Add 📷 / 🔴 capture buttons to a visual window's titlebar ──────────────
   function _addCaptureButtons(win, body, visualEl) {
@@ -648,390 +595,14 @@ export function initWM(onContentResize) {
   // `visualEl` — the <img>, <video>, or <canvas> element inside the window body.
   // The overlay is sized and stacked to cover it exactly.
 
+  // The in-window paint overlay lives in paint-overlay.js (ADR 045). wm owns the
+  // overlay registries + snapshot compositing and injects them as context.
   function _addPaintOverlay(win, body, visualEl) {
-    const tb = win.querySelector('.wm-titlebar');
-    if (!tb || !visualEl) return;
-
-    let active    = false;
-    let drawing   = false;
-    let lastX     = 0, lastY  = 0;
-    let prevX     = null, prevY = null;
-    let tool      = 'pen';  // 'pen' | 'eraser' | 'text'
-    let color     = '#ff0000';
-    let brushSize = 6;
-
-    // ── WidgetEvents ─────────────────────────────────────────────────────────
-    const events = new WidgetEvents();
-    win._paintEvents = events;
-    _overlayEvents.add(events);
-
-    // stroke bbox tracking
-    let _bbox = null;
-    const _bboxExpand = (x, y) => {
-      if (!_bbox) { _bbox = { minX: x, minY: y, maxX: x, maxY: y }; return; }
-      if (x < _bbox.minX) _bbox.minX = x;
-      if (y < _bbox.minY) _bbox.minY = y;
-      if (x > _bbox.maxX) _bbox.maxX = x;
-      if (y > _bbox.maxY) _bbox.maxY = y;
-    };
-
-    // overlay canvas (created lazily when first activated)
-    let overlay   = null;
-    let miniBar   = null;
-    let colorIn   = null;
-    let textLayer = null;
-    win._getOverlay     = () => overlay;
-    win._getTextCanvas  = () => textLayer?.canvas ?? null;
-
-    // Create (or return) the TextLayer for this window — deferred so we run
-    // after the window is in the DOM and getBoundingClientRect is valid.
-    win._ensureTextLayer = () => {
-      if (textLayer) return textLayer;
-      body.style.position = 'relative';
-      const r = getVisualRect();
-      textLayer = new TextLayer({
-        container: body,
-        left:   r.left,
-        top:    r.top,
-        width:  Math.round(r.w) || 320,
-        height: Math.round(r.h) || 240,
-      });
-      _textLayers.add(textLayer);
-      return textLayer;
-    };
-
-    // ── Undo / Redo ───────────────────────────────────────────────────────────
-    let _undoStack = [];
-    let _undoPos   = -1;
-    let _updateHistBtns = null;
-
-    const _histPush = () => {
-      if (!overlay) return;
-      const snap = overlay.getContext('2d').getImageData(0, 0, overlay.width, overlay.height);
-      _undoStack = _undoStack.slice(0, _undoPos + 1);
-      _undoStack.push(snap);
-      _undoPos = _undoStack.length - 1;
-      _updateHistBtns?.();
-    };
-
-    const _histUndo = () => {
-      if (!overlay || _undoPos <= 0) return;
-      _undoPos--;
-      const ctx = overlay.getContext('2d');
-      ctx.clearRect(0, 0, overlay.width, overlay.height);
-      ctx.putImageData(_undoStack[_undoPos], 0, 0);
-      _updateHistBtns?.();
-    };
-
-    const _histRedo = () => {
-      if (!overlay || _undoPos >= _undoStack.length - 1) return;
-      _undoPos++;
-      overlay.getContext('2d').putImageData(_undoStack[_undoPos], 0, 0);
-      _updateHistBtns?.();
-    };
-
-    const _onKey = (e) => {
-      if (!overlay) return;
-      const mod = e.metaKey || e.ctrlKey;
-      if (!mod) return;
-      if (e.key === 'z' && !e.shiftKey)                        { e.preventDefault(); _histUndo(); }
-      else if ((e.key === 'z' && e.shiftKey) || e.key === 'y') { e.preventDefault(); _histRedo(); }
-    };
-
-    // ── Cursor ────────────────────────────────────────────────────────────────
-    const _makeCursor = () => {
-      if (tool === 'text') return 'text';
-      const r = Math.max(2, brushSize / 2);
-      const d = Math.ceil(r * 2 + 4);
-      const c = d / 2;
-      const stroke = tool === 'eraser' ? 'rgba(255,120,120,0.9)' : 'rgba(255,255,255,0.85)';
-      const dash   = tool === 'eraser' ? 'stroke-dasharray="3 2"' : '';
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${d}" height="${d}"><circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${stroke}" stroke-width="1.5" ${dash}/></svg>`;
-      return `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${c} ${c}, crosshair`;
-    };
-
-    const _updateCursor = () => { if (overlay) overlay.style.cursor = _makeCursor(); };
-
-    // ── Helpers ──────────────────────────────────────────────────────────────
-
-    const getVisualRect = () => {
-      const vr = visualEl.getBoundingClientRect();
-      const br = body.getBoundingClientRect();
-      return { left: vr.left - br.left, top: vr.top - br.top, w: vr.width, h: vr.height };
-    };
-
-    const getPos = (e) => {
-      if (!overlay) return { x: 0, y: 0 };
-      const rect = overlay.getBoundingClientRect();
-      return {
-        x: (e.clientX - rect.left) * (overlay.width  / rect.width),
-        y: (e.clientY - rect.top)  * (overlay.height / rect.height),
-      };
-    };
-
-    const buildOverlay = () => {
-      if (overlay) return;
-      const r = getVisualRect();
-      // Ensure text layer exists and is correctly sized/positioned.
-      const tl = win._ensureTextLayer();
-      tl.updateRect(r.left, r.top, Math.round(r.w) || 320, Math.round(r.h) || 240);
-
-      overlay = document.createElement('canvas');
-      overlay.width  = Math.round(r.w) || 320;
-      overlay.height = Math.round(r.h) || 240;
-      Object.assign(overlay.style, {
-        position: 'absolute',
-        left: r.left + 'px',
-        top:  r.top  + 'px',
-        width:  r.w + 'px',
-        height: r.h + 'px',
-        cursor: _makeCursor(),
-        pointerEvents: 'auto',
-        zIndex: '50',
-        touchAction: 'none',
-      });
-      body.style.position = 'relative';
-      body.appendChild(overlay);
-
-      _undoStack = [overlay.getContext('2d').getImageData(0, 0, overlay.width, overlay.height)];
-      _undoPos = 0;
-      _updateHistBtns?.();
-
-      overlay.addEventListener('pointerdown',  onDown);
-      overlay.addEventListener('pointermove',  onMove);
-      overlay.addEventListener('pointerup',    onUp);
-      overlay.addEventListener('pointerleave', onUp);
-      document.addEventListener('keydown', _onKey);
-    };
-
-    const removeOverlay = () => {
-      if (!overlay) return;
-      overlay.removeEventListener('pointerdown',  onDown);
-      overlay.removeEventListener('pointermove',  onMove);
-      overlay.removeEventListener('pointerup',    onUp);
-      overlay.removeEventListener('pointerleave', onUp);
-      overlay.remove();
-      overlay = null;
-      document.removeEventListener('keydown', _onKey);
-    };
-
-    const buildMiniBar = () => {
-      if (miniBar) return;
-      miniBar = document.createElement('div');
-      miniBar.style.cssText = [
-        'position:absolute;bottom:6px;left:50%;transform:translateX(-50%);',
-        'display:flex;gap:5px;align-items:center;padding:4px 8px;',
-        'background:rgba(18,18,30,0.88);border:1px solid #45475a;',
-        'border-radius:8px;z-index:51;backdrop-filter:blur(4px);flex-wrap:wrap;',
-      ].join('');
-
-      const mkBtn = (label, title, fn) => {
-        const b = document.createElement('button');
-        b.innerHTML = label; b.title = title;
-        b.style.cssText = [
-          'background:#313244;color:#cdd6f4;border:1px solid #45475a;border-radius:5px;',
-          'padding:3px 7px;font-size:11px;cursor:pointer;white-space:nowrap;',
-        ].join('');
-        b.addEventListener('click', fn);
-        return b;
-      };
-
-      // Tool buttons
-      let penBtn, eraserBtn, textBtn;
-      const _setTool = (t) => {
-        tool = t;
-        penBtn.style.borderColor    = t === 'pen'    ? '#cba6f7' : '#45475a';
-        eraserBtn.style.borderColor = t === 'eraser' ? '#cba6f7' : '#45475a';
-        textBtn.style.borderColor   = t === 'text'   ? '#cba6f7' : '#45475a';
-        if (t === 'text') {
-          const tl = win._ensureTextLayer();
-          tl.setDefaults({ color, fontSize: Math.max(12, brushSize * 2) });
-          tl.setActive(true);
-        } else {
-          textLayer?.setActive(false);
-        }
-        _updateCursor();
-        events.emit('tool', { tool: t, winId: win.id });
-      };
-      penBtn    = mkBtn('<i class="fa-solid fa-pen"></i>',    'Pen (P)',    () => _setTool('pen'));
-      eraserBtn = mkBtn('<i class="fa-solid fa-eraser"></i>', 'Eraser (E)', () => _setTool('eraser'));
-      textBtn   = mkBtn('T', 'Text (T)', () => _setTool('text'));
-      penBtn.style.borderColor = '#cba6f7';
-
-      // Color picker — hidden native input + visible swatch
-      colorIn = document.createElement('input');
-      colorIn.type  = 'color';
-      colorIn.value = color;
-      colorIn.style.cssText = 'position:absolute;width:0;height:0;opacity:0;pointer-events:none;';
-
-      let _pickerOpen = false;
-      const colorSwatch = document.createElement('div');
-      colorSwatch.title = 'Stroke color';
-      colorSwatch.style.cssText = `width:22px;height:22px;border-radius:4px;cursor:pointer;border:2px solid #45475a;background:${color};flex-shrink:0;`;
-      colorSwatch.addEventListener('click', () => {
-        if (_pickerOpen) { colorIn.blur(); _pickerOpen = false; }
-        else             { colorIn.click(); _pickerOpen = true;  }
-      });
-      colorIn.addEventListener('input', () => {
-        const prev = color; color = colorIn.value;
-        colorSwatch.style.background = color;
-        textLayer?.setDefaults({ color });
-        events.emit('color', { color, prev, winId: win.id });
-      });
-      colorIn.addEventListener('change', () => { _pickerOpen = false; });
-      colorIn.addEventListener('blur',   () => { _pickerOpen = false; });
-
-      // Brush size
-      const sizeSlider = document.createElement('input');
-      sizeSlider.type  = 'range'; sizeSlider.min = '1'; sizeSlider.max = '48'; sizeSlider.value = String(brushSize);
-      sizeSlider.title = 'Brush size';
-      sizeSlider.style.cssText = 'width:55px;accent-color:#cba6f7;flex-shrink:0;';
-      sizeSlider.addEventListener('input', () => {
-        brushSize = parseInt(sizeSlider.value, 10);
-        textLayer?.setDefaults({ fontSize: Math.max(12, brushSize * 2) });
-        _updateCursor();
-      });
-
-      // Undo / Redo
-      let undoBtn, redoBtn;
-      _updateHistBtns = () => {
-        if (undoBtn) undoBtn.style.opacity = _undoPos > 0                     ? '1' : '0.35';
-        if (redoBtn) redoBtn.style.opacity = _undoPos < _undoStack.length - 1 ? '1' : '0.35';
-      };
-      undoBtn = mkBtn('<i class="fa-solid fa-rotate-left"></i>',  'Undo (⌘Z)',   _histUndo);
-      redoBtn = mkBtn('<i class="fa-solid fa-rotate-right"></i>', 'Redo (⌘⇧Z)', _histRedo);
-      _updateHistBtns();
-
-      // Clear
-      const clearBtn = mkBtn('<i class="fa-solid fa-trash"></i>', 'Clear drawing', () => {
-        if (!overlay) return;
-        overlay.getContext('2d').clearRect(0, 0, overlay.width, overlay.height);
-        _histPush();
-        events.emit('clear', { winId: win.id });
-      });
-
-      // Snapshot
-      const snapBtn = mkBtn('<i class="fa-solid fa-camera"></i> Snap', 'Composite visual + drawing → PNG on desktop', () => _doSnapshot());
-
-      miniBar.appendChild(penBtn);
-      miniBar.appendChild(eraserBtn);
-      miniBar.appendChild(textBtn);
-      miniBar.appendChild(colorIn);
-      miniBar.appendChild(colorSwatch);
-      miniBar.appendChild(sizeSlider);
-      miniBar.appendChild(undoBtn);
-      miniBar.appendChild(redoBtn);
-      miniBar.appendChild(clearBtn);
-      miniBar.appendChild(snapBtn);
-
-      body.appendChild(miniBar);
-    };
-
-    const removeMiniBar = () => { miniBar?.remove(); miniBar = null; _updateHistBtns = null; };
-
-    // ── Drawing ──────────────────────────────────────────────────────────────
-    // Text tool clicks are handled by TextLayer's posDiv — onDown ignores them.
-
-    const onDown = (e) => {
-      if (tool === 'text') return;
-      e.preventDefault();
-      overlay.setPointerCapture(e.pointerId);
-      drawing = true;
-      _bbox = null;
-      const { x, y } = getPos(e);
-      lastX = x; lastY = y; prevX = null; prevY = null;
-      _bboxExpand(x, y);
-      const ctx = overlay.getContext('2d');
-      ctx.save();
-      ctx.lineCap  = 'round';
-      ctx.lineJoin = 'round';
-      ctx.lineWidth = brushSize;
-      if (tool === 'eraser') { ctx.globalCompositeOperation = 'destination-out'; ctx.strokeStyle = 'rgba(0,0,0,1)'; }
-      else                   { ctx.globalCompositeOperation = 'source-over';     ctx.strokeStyle = color; }
-      ctx.beginPath();
-      ctx.arc(x, y, brushSize / 2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    };
-
-    const onMove = (e) => {
-      if (!drawing) return;
-      const { x, y } = getPos(e);
-      _bboxExpand(x, y);
-      const ctx = overlay.getContext('2d');
-      ctx.save();
-      ctx.lineCap  = 'round';
-      ctx.lineJoin = 'round';
-      ctx.lineWidth = brushSize;
-      if (tool === 'eraser') { ctx.globalCompositeOperation = 'destination-out'; ctx.strokeStyle = 'rgba(0,0,0,1)'; }
-      else                   { ctx.globalCompositeOperation = 'source-over';     ctx.strokeStyle = color; }
-      ctx.beginPath();
-      if (prevX !== null) {
-        const mx = (lastX + x) / 2, my = (lastY + y) / 2;
-        ctx.moveTo((prevX + lastX) / 2, (prevY + lastY) / 2);
-        ctx.quadraticCurveTo(lastX, lastY, mx, my);
-      } else {
-        ctx.moveTo(lastX, lastY);
-        ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-      ctx.restore();
-      prevX = lastX; prevY = lastY;
-      lastX = x;     lastY = y;
-    };
-
-    const onUp = () => {
-      if (!drawing) return;
-      drawing = false; prevX = null; prevY = null;
-      _histPush();
-      if (_bbox) {
-        events.emit('stroke', {
-          tool, color, winId: win.id,
-          bbox: { x: _bbox.minX, y: _bbox.minY, w: _bbox.maxX - _bbox.minX, h: _bbox.maxY - _bbox.minY },
-        });
-        _bbox = null;
-      }
-    };
-
-    // ── Snapshot ─────────────────────────────────────────────────────────────
-
-    const _doSnapshot = () => _snapshotVisual(win, body, visualEl);
-
-    // ── Toggle ────────────────────────────────────────────────────────────────
-
-    const toggle = () => {
-      active = !active;
-      paintBtn.classList.toggle('active', active);
-      if (active) {
-        buildOverlay();
-        buildMiniBar();
-      } else {
-        removeOverlay();
-        removeMiniBar();
-      }
-    };
-
-    // ── Titlebar button ───────────────────────────────────────────────────────
-
-    const paintBtn = document.createElement('span');
-    paintBtn.className = 'wm-btn';
-    paintBtn.title = 'Paint overlay — draw on top of this window';
-    paintBtn.innerHTML = '🖌️';
-    paintBtn.style.fontSize = '13px';
-    paintBtn.addEventListener('click', toggle);
-    const firstBtn = tb.querySelector('.wm-btn');
-    tb.insertBefore(paintBtn, firstBtn);
-
-    // Cleanup: remove overlay + minibar + text layer when window closes
-    const prevCleanup = win._wmCleanup;
-    win._wmCleanup = (...args) => {
-      removeOverlay();
-      removeMiniBar();
-      events.clear();
-      _overlayEvents.delete(events);
-      if (textLayer) { _textLayers.delete(textLayer); textLayer.destroy(); textLayer = null; }
-      if (typeof prevCleanup === 'function') prevCleanup(...args);
-    };
+    return addPaintOverlay(win, body, visualEl, {
+      overlayEvents: _overlayEvents,
+      textLayers:    _textLayers,
+      snapshot:      _snapshotVisual,
+    });
   }
 
   // Inject per-widget undo/redo buttons into a window's titlebar.
@@ -1106,14 +677,22 @@ export function initWM(onContentResize) {
 
     function _apply() {
       const linear = parseFloat(volSlider.value) / 100;
+      const db = linear <= 0 ? -60 : (linear - 1) * 40;
       if (videoEl) {
-        // Keep element volume as a fallback for cross-origin media the graph can't capture.
+        // Media window: drive this window's mixer strip (the media is bridged into
+        // it). Keep element volume too as a fallback for cross-origin media the
+        // graph can't capture.
         videoEl.muted = _muted;
         videoEl.volume = _muted ? 0 : linear;
+        const strip = _getWindowStrip(win.id);
+        window.mixer?.strip(strip.name).volume(db).mute(_muted);
+      } else {
+        // Sketch window (canvas/html): instruments route straight to MASTER (their
+        // own instrument strips), NOT through this window's strip — so muting the
+        // window strip would be silent-but-useless. Drive master so the titlebar
+        // control actually mutes what you hear (matches the taskbar Audio chip).
+        window.mixer?.master?.volume(db).mute(_muted);
       }
-      // Drive the mixer strip (persists by name, consistent solo/ducking).
-      const strip = _getWindowStrip(win.id);
-      window.mixer?.strip(strip.name).volume(linear <= 0 ? -60 : (linear - 1) * 40).mute(_muted);
     }
 
     muteBtn.addEventListener('click', e => {
@@ -1512,6 +1091,11 @@ export function initWM(onContentResize) {
   });
   desktop.addEventListener('drop', async e => {
     if (!e.dataTransfer || ![...e.dataTransfer.items].some(i => i.kind === 'file')) return;
+    // A drop that lands ON a window belongs to that window (e.g. a sketch that
+    // takes a dropped video), not the desktop — swallow it here so we don't ALSO
+    // spawn an image/video window + open the file browser. Drops on bare desktop
+    // (target is #desktop or an icon, not inside a .wm-win) still spawn.
+    if (e.target?.closest?.('.wm-win')) { e.preventDefault(); return; }
     e.preventDefault();
     // Capture handles synchronously before event clears (getAsFileSystemHandle is async but must be initiated now)
     const items = [...e.dataTransfer.items];
@@ -1561,129 +1145,13 @@ export function initWM(onContentResize) {
   // Returns { canvas, start, stop, setSource(id), setStyle(style), cleanup }
   // Consumed by _buildVizWindow, EQ widget (Layer 2), and viz-in-video fold-out (Layer 2).
 
+  // Spectrum render core lives in audio-viz.js (ADR 042). Inject the wm-private
+  // window-strip → channel resolver so the core never reaches _winStrips itself.
   function _createSpectrumCore(canvas, getStyle, opts = {}) {
-    const getColors = opts.getColors ?? (() => ({}));
-    const audioCtx = Tone.getContext().rawContext;
-    const c2d = canvas.getContext('2d');
-    let rafId = null;
-    let toneAn = null;
-    let rawAn  = null;
-    let _currentSrc = null;
-    let _micLease = null; // window-scoped mic lease (ADR 023)
-
-    function disconnect() {
-      if (toneAn) { try { toneAn.dispose(); } catch (_) {} toneAn = null; }
-      if (rawAn && rawAn !== window.__ar_mic_analyser) {
-        try { rawAn.disconnect(); } catch (_) {}
-      }
-      rawAn = null;
-      // Release mic lease when switching away from 'mic' source
-      if (_micLease) { _micLease.release(); _micLease = null; }
-    }
-
-    function setSource(id) {
-      _currentSrc = id;
-      disconnect();
-      const style = getStyle();
-      if (id === 'master') {
-        toneAn = new Tone.Analyser({ type: style === 'wave' ? 'waveform' : 'fft', size: 128 });
-        Tone.getDestination().connect(toneAn);
-      } else if (id === 'mic') {
-        _micLease = acquireMic(); // window-scoped (ADR 023)
-        rawAn = window.__ar_mic_analyser; // may be null until mic:ready fires (self-heals in frame())
-      } else if (id.startsWith('vid:')) {
-        const vid = document.getElementById(id.slice(4))?.querySelector('video');
-        if (vid) {
-          if (!vid._ar_mediaSource) {
-            vid._ar_mediaSource = audioCtx.createMediaElementSource(vid);
-            // Only send straight to destination if the window strip isn't already
-            // routing this element (ADR 032) — avoids doubling / silent capture.
-            if (!vid._ar_routedToStrip) vid._ar_mediaSource.connect(audioCtx.destination);
-          }
-          const an = audioCtx.createAnalyser();
-          an.fftSize = 256; an.smoothingTimeConstant = 0.8;
-          vid._ar_mediaSource.connect(an);
-          rawAn = an;
-        }
-      } else if (id.startsWith('ch:')) {
-        const ch = _winStrips.get(id.slice(3))?._channel;
-        if (ch) {
-          toneAn = new Tone.Analyser({ type: style === 'wave' ? 'waveform' : 'fft', size: 128 });
-          ch.connect(toneAn);
-        }
-      }
-    }
-
-    function setStyle(style) {
-      if (toneAn) toneAn.type = style === 'wave' ? 'waveform' : 'fft';
-    }
-
-    function frame() {
-      rafId = requestAnimationFrame(frame);
-      const W = canvas.width, H = canvas.height;
-      if (!W || !H) return;
-      if (_currentSrc === 'mic' && !rawAn) rawAn = window.__ar_mic_analyser;
-
-      c2d.fillStyle = getColors().bg ?? '#0d0d1a';
-      c2d.fillRect(0, 0, W, H);
-
-      let vals;
-      const style = getStyle();
-      if (toneAn) {
-        const raw = toneAn.getValue();
-        vals = Float32Array.from(raw, v => Math.max(0, Math.min(1, (v + 100) / 100)));
-      } else if (rawAn) {
-        const buf = new Uint8Array(rawAn.frequencyBinCount);
-        style === 'wave' ? rawAn.getByteTimeDomainData(buf) : rawAn.getByteFrequencyData(buf);
-        vals = Float32Array.from(buf, v => style === 'wave' ? v / 128 - 1 : v / 255);
-      } else return;
-
-      const n = vals.length;
-      const dpr = devicePixelRatio;
-
-      if (style === 'bars') {
-        const bw = W / n;
-        for (let i = 0; i < n; i++) {
-          const v = vals[i];
-          c2d.fillStyle = `hsl(${(i / n) * 240 + 180},80%,${30 + v * 35}%)`;
-          c2d.fillRect(i * bw, H - v * H, Math.max(1, bw - 1), v * H);
-        }
-      } else if (style === 'wave') {
-        c2d.beginPath();
-        c2d.strokeStyle = getColors().wave ?? '#89dceb';
-        c2d.lineWidth = 2 * dpr;
-        for (let i = 0; i < n; i++) {
-          const x = (i / (n - 1)) * W;
-          const y = H / 2 - vals[i] * (H / 2);
-          i === 0 ? c2d.moveTo(x, y) : c2d.lineTo(x, y);
-        }
-        c2d.stroke();
-      } else {
-        const cx = W / 2, cy = H / 2, r = Math.min(W, H) * 0.28;
-        c2d.beginPath();
-        c2d.strokeStyle = getColors().ring ?? '#cba6f7';
-        c2d.lineWidth = 2 * dpr;
-        for (let i = 0; i <= n; i++) {
-          const a = (i / n) * Math.PI * 2 - Math.PI / 2;
-          const v = vals[i % n];
-          const rad = r + v * r * 0.7;
-          const x = cx + Math.cos(a) * rad, y = cy + Math.sin(a) * rad;
-          i === 0 ? c2d.moveTo(x, y) : c2d.lineTo(x, y);
-        }
-        c2d.closePath();
-        c2d.stroke();
-      }
-    }
-
-    function start() { if (!rafId) frame(); }
-    function stop()  { cancelAnimationFrame(rafId); rafId = null; }
-    function cleanup() {
-      stop();
-      disconnect(); // also releases _micLease if set
-    }
-
-    if (opts.autoStart !== false) start();
-    return { canvas, start, stop, setSource, setStyle, cleanup };
+    return createSpectrumCore(canvas, getStyle, {
+      ...opts,
+      resolveChannel: (winStripId) => _winStrips.get(winStripId)?._channel,
+    });
   }
 
   function _buildSourceSelect(win, excludeSelf = true) {

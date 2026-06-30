@@ -74,6 +74,8 @@ vi.mock('../src/api/render-pipeline.js', () => {
       camera: Object.freeze({ _src: 'camera' }),
       mic:    Object.freeze({ _src: 'mic' }),
     }),
+    sourceKind:  (x) => (x && typeof x === 'object' && typeof x._src === 'string') ? x._src : null,
+    sourceField: (x) => x?.field,
     __pipelineObj: pipelineObj,
   };
 });
@@ -127,6 +129,12 @@ function makeShaderStub(id = 'test-shader') {
         _uniforms[name] = val;
       }
       return stub;
+    },
+    getUniform(name) {
+      if (name === 'uCustom' || name === 'custom') {
+        return _uniforms.uCustom ?? { x: 0, y: 0, z: 0, w: 0 };
+      }
+      return _uniforms[name];
     },
   };
   return stub;

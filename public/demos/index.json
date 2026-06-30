@@ -4,48 +4,131 @@
     "title": "Plasma Shader",
     "desc": "Animated GLSL fragment shader — rainbow plasma effect driven by time",
     "file": "plasma-shader.vljson",
-    "tags": ["shader", "glsl", "visual"]
+    "tags": [
+      "shader",
+      "glsl",
+      "visual"
+    ]
   },
   {
     "id": "bouncing-circles",
     "title": "Bouncing Circles",
     "desc": "Canvas animation using the draw API — colorful physics balls",
     "file": "bouncing-circles.vljson",
-    "tags": ["draw", "animation", "2d"]
+    "tags": [
+      "draw",
+      "animation",
+      "2d"
+    ]
   },
   {
     "id": "beat-pattern",
     "title": "Beat Pattern",
     "desc": "Live drum pattern using mini-notation + audio visualizer",
     "file": "beat-pattern.vljson",
-    "tags": ["audio", "pattern", "music"]
+    "tags": [
+      "audio",
+      "pattern",
+      "music"
+    ]
   },
   {
     "id": "spiral-trail",
     "title": "Spiral Trail",
     "desc": "Lissajous-style spiral with glowing trails on the canvas",
     "file": "spiral-trail.vljson",
-    "tags": ["canvas", "animation", "visual"]
+    "tags": [
+      "canvas",
+      "animation",
+      "visual"
+    ]
   },
   {
     "id": "reactive-ripples",
     "title": "Reactive Ripples",
     "desc": "Beat-driven interference rings — showcases on/any/every/when event bus modifiers",
     "file": "reactive-ripples.vljson",
-    "tags": ["events", "audio", "draw", "reactive"]
+    "tags": [
+      "events",
+      "audio",
+      "draw",
+      "reactive"
+    ]
   },
   {
     "id": "gaze-garden",
     "title": "Gaze Garden",
     "desc": "Eye-tracking brush — calibrate gaze, then paint by looking; wink to burst, blink to flash",
     "file": "gaze-garden.vljson",
-    "tags": ["vision", "gaze", "camera", "draw"]
+    "tags": [
+      "vision",
+      "gaze",
+      "camera",
+      "draw"
+    ]
   },
   {
     "id": "billiards-pool",
     "title": "Billiards",
     "desc": "Fling the cue ball to break the rack — window-scoped Canvas with pre-mapped pointer, elastic ball + rail collisions, impact-scaled sounds",
     "file": "billiards-pool.vljson",
-    "tags": ["canvas", "physics", "audio", "interactive"]
+    "tags": [
+      "canvas",
+      "physics",
+      "audio",
+      "interactive"
+    ]
+  },
+  {
+    "id": "hand-pong",
+    "title": "Hand Pong",
+    "desc": "Your hands are the paddles — webcam + hand tracking. Invisible skeleton bats the ball; swing for speed, rotate your hand for spin (Magnus curve). Two-handed.",
+    "file": "hand-pong.vljson",
+    "tags": [
+      "vision",
+      "hands",
+      "camera",
+      "canvas",
+      "physics"
+    ]
+  },
+  {
+    "id": "finger-guns",
+    "title": "Finger Guns",
+    "desc": "Make a finger-gun, drop the thumb to fire — self-calibrating two-hand gesture detection triggers a noise burst. Camera + vision + audio via pipe.",
+    "file": "finger-guns.vljson",
+    "tags": [
+      "vision",
+      "hands",
+      "camera",
+      "audio",
+      "interactive"
+    ]
+  },
+  {
+    "id": "karaoke-words",
+    "title": "Karaoke",
+    "desc": "Speak and your words bloom in random colors over your camera feed — speech-to-text drives floating text.",
+    "file": "karaoke-words.vljson",
+    "tags": [
+      "stt",
+      "speech",
+      "audio",
+      "camera",
+      "text"
+    ]
+  },
+  {
+    "id": "traffic-music",
+    "title": "Traffic → Music",
+    "desc": "BYO traffic video — a trip line across the road turns each lane into a note as vehicles cross. Orientation auto-detects (head-on or side view). After Jarbas Agnelli.",
+    "file": "traffic-music.vljson",
+    "tags": [
+      "video",
+      "audio",
+      "vision",
+      "interactive",
+      "canvas"
+    ]
   }
 ]

@@ -120,21 +120,22 @@ export function buildTransport(ctrl, { onFpsChange, extraButtons = [] } = {}) {
   const row = document.createElement('div');
   row.style.cssText = 'display:flex;align-items:center;gap:5px;padding:5px 8px;background:#13131f;border-top:1px solid #2a2a3e;flex-shrink:0;flex-wrap:wrap;';
 
-  const mkBtn = (html, color, fn) => {
+  const mkBtn = (html, color, title, fn) => {
     const b = document.createElement('button');
     b.innerHTML = html;
+    b.title = title;
     b.style.cssText = `background:#1e1e2e;color:${color};border:1px solid #313244;
       border-radius:4px;padding:3px 8px;font-size:11px;cursor:pointer;`;
     b.addEventListener('click', fn);
     return b;
   };
 
-  const playBtn = mkBtn('<i class="fa-solid fa-play"></i>', '#a6e3a1', () => {
+  const playBtn = mkBtn('<i class="fa-solid fa-play"></i>', '#a6e3a1', 'Play animation', () => {
     const fps = parseInt(fpsIn.value, 10) || 8;
     ctrl.play(fps);
     playBtn.style.background = '#1a3d1a';
   });
-  const stopBtn = mkBtn('<i class="fa-solid fa-stop"></i>', '#f38ba8', () => {
+  const stopBtn = mkBtn('<i class="fa-solid fa-stop"></i>', '#f38ba8', 'Stop animation', () => {
     ctrl.stop();
     playBtn.style.background = '#1e1e2e';
   });

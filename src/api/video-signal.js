@@ -1,5 +1,6 @@
 import { onReset } from '../runtime/reset-registry.js';
 import { acquireCameraRunScoped } from './media-lease.js';
+import { isVideoSignal } from './signal-shape.js';
 // ── Video Signal Bus ──────────────────────────────────────────────────────────
 // Samples pixel data from any canvas/video source and exposes it as live
 // signal objects that can drive audio params, effects, or anything numeric.
@@ -24,11 +25,6 @@ function _resolveSource(source) {
   if (source === 'camera') return () => document.getElementById('camera');
   if (source instanceof HTMLCanvasElement || source instanceof HTMLVideoElement) return () => source;
   return () => null;
-}
-
-// Distinguish our signal objects from raw source values (string / canvas / video element)
-function _isSignal(v) {
-  return v !== null && typeof v === 'object' && 'motion' in v && 'brightness' in v;
 }
 
 export const VideoSignalAPI = {
@@ -127,7 +123,7 @@ export const VideoSignalAPI = {
   // sourceOrSig: 'camera' | HTMLCanvasElement | existing video.signal() object
   // opts: same as signal() — x, y, radius, fps
   onMotion(sourceOrSig, threshold, onEnter, onExit, opts = {}) {
-    const sig = _isSignal(sourceOrSig) ? sourceOrSig : this.signal(sourceOrSig, opts);
+    const sig = isVideoSignal(sourceOrSig) ? sourceOrSig : this.signal(sourceOrSig, opts);
     let wasAbove = false;
     const id = _nativeSetInterval(() => {
       const above = sig.motion >= threshold;
@@ -139,7 +135,7 @@ export const VideoSignalAPI = {
 
   // Edge-triggered brightness threshold. Fires onEnter when brightness >= threshold, onExit when below.
   onBrightness(sourceOrSig, threshold, onEnter, onExit, opts = {}) {
-    const sig = _isSignal(sourceOrSig) ? sourceOrSig : this.signal(sourceOrSig, opts);
+    const sig = isVideoSignal(sourceOrSig) ? sourceOrSig : this.signal(sourceOrSig, opts);
     let wasAbove = false;
     const id = _nativeSetInterval(() => {
       const above = sig.brightness >= threshold;

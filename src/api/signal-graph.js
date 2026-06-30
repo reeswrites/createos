@@ -84,8 +84,14 @@ function _esc(str) {
 }
 
 function _detectLiveNodes() {
+  // Prefer an explicit token.label (ADR 041) over the fragile constructor.name —
+  // minify/rename can't relabel a graph node, and run-scoped tokens ({label})
+  // carry a meaningful name where their constructor would just be 'Object'.
   const labels = [];
-  forEachLive(obj => { if (obj?.constructor?.name) labels.push(obj.constructor.name); });
+  forEachLive(obj => {
+    const label = obj?.label ?? obj?.constructor?.name;
+    if (label) labels.push(label);
+  });
   return [...new Set(labels)];
 }
 

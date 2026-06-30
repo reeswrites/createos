@@ -153,15 +153,6 @@ export class Layer {
   }
 }
 
-export function getLayerForZ(z) {
-  const reg = (window.__ar_layer_objects ??= new Map());
-  if (reg.has(z)) return reg.get(z);
-  const canvas = window.__ar_getLayerCanvas?.(z) ?? document.getElementById("turtle");
-  const layer = new Layer(canvas);
-  reg.set(z, layer);
-  return layer;
-}
-
 // Mount a managed <canvas> into the layer stack (the canvasWrapper/fsContainer
 // stack, or an explicit `container`). Owns the non-GPU half of Shader/GLShader
 // init: container resolution, the absolute-fill style, the static→relative fix,

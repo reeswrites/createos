@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "toolbar": {
+    "micOn": false,
+    "cameraOn": true
+  },
+  "windows": [
+    {
+      "type": "editor",
+      "editorId": 1,
+      "title": "Finger Guns",
+      "x": 20,
+      "y": 20,
+      "w": 560,
+      "h": 420,
+      "visible": true,
+      "nochrome": false,
+      "transparent": false,
+      "audio": {
+        "muted": false,
+        "volume": 1
+      },
+      "code": "// Finger guns → sound. Make a finger-gun (index out), drop the thumb to fire.\n// Self-calibrating: each hand learns its own cocked position, fires on the plunge.\nvision.configure({ hands: { numHands: 2 } });   // track both hands\n\naudio.start();\naudio.distort(0.3);\nconst sfx = audio.noise({ envelope:{ attack:0.001, decay:0.09, sustain:0, release:0.05 } });\n\nconst cam = await Camera.open();\nconst D = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);\nconst st = {};   // per-hand state: { hi, armed }\n\npipe(cam).use(src => {\n  const canvas = document.createElement('canvas');\n  canvas.width = 960; canvas.height = 540;\n  const ctx = canvas.getContext('2d');\n  const W = canvas.width, H = canvas.height;\n  return {\n    canvas,\n    read() {\n      ctx.drawImage(src, 0, 0, W, H);\n      vision.drawHands(ctx, { color: '#0ff', lineWidth: 3, pointSize: 5, mirror: false });\n\n      const hands = vision.hands();\n      ctx.font = '24px monospace'; ctx.textBaseline = 'top';\n      if (!hands.length) { ctx.fillStyle = '#fff'; ctx.fillText('show finger guns', 20, 20); return; }\n\n      hands.forEach((h, i) => {\n        if (!h.landmarks.length) return;\n        const key = h.handedness || ('h' + i);\n        const s = st[key] || (st[key] = { hi: 0, armed: false });\n\n        const L = h.landmarks, span = D(L[0], L[9]) || 1;\n        const idxExt = D(L[8], L[5]) / span;   // index extended?\n        const trig   = D(L[4], L[5]) / span;   // thumb tip → index base\n\n        const isGun   = idxExt > 0.4;\n        s.hi = Math.max(trig, s.hi * 0.99);     // learn the cocked (thumb-up) position\n        const cocked  = trig > 0.8 * s.hi;\n        const plunged = s.armed && trig < 0.6 * s.hi && (s.hi - trig) > 0.12;\n\n        ctx.fillStyle = isGun ? '#0ff' : '#888';\n        ctx.fillText(key + '  trig ' + trig.toFixed(2) + '/' + s.hi.toFixed(2) + (s.armed ? '  ARMED' : ''), 20, 20 + i * 30);\n\n        if (!isGun) { s.armed = false; return; }\n        if (cocked) s.armed = true;\n        else if (plunged) {\n          sfx.play(); s.armed = false;\n          ctx.fillStyle = 'red';\n          ctx.font = '64px monospace';\n          ctx.fillText('BANG', 20 + i * 240, 90);\n          ctx.font = '24px monospace';\n        }\n      });\n    },\n  };\n}).show('Finger Guns', { w: 960, h: 540 });\n",
+      "mode": "text",
+      "blocksJson": null,
+      "executionState": "running"
+    },
+    {
+      "type": "output",
+      "editorId": 1,
+      "x": 590,
+      "y": 20,
+      "w": 960,
+      "h": 540,
+      "visible": false
+    }
+  ],
+  "desktop": []
+}

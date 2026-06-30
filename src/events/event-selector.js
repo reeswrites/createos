@@ -15,6 +15,19 @@ import { subscribe, getLastPayload } from './bus.js';
 import { onReset } from '../runtime/reset-registry.js';
 import { SYSTEM_EVENTS } from './system-events.js';
 
+// Resolve the ACTIVE editor's tracked setInterval/clearInterval. Intervals made
+// here must land in that editor's `_intervals` map so reset/stop clears them —
+// otherwise they leak as untracked native timers (the global window.setInterval
+// is NOT patched; the tracker lives on window.__ar_e{id}_setInterval). Captured
+// at call time, so a tick/tween belongs to the editor that created it. Falls back
+// to native globals when there's no active editor (e.g. tests).
+function _trackedTimers() {
+  const id = window.__ar_active_editor_id;
+  const si = id != null ? window[`__ar_e${id}_setInterval`]   : null;
+  const ci = id != null ? window[`__ar_e${id}_clearInterval`] : null;
+  return { setInterval: si || window.setInterval, clearInterval: ci || window.clearInterval };
+}
+
 // Build lookup maps from the catalog at module load.
 const _eventsMap = new Map(SYSTEM_EVENTS.map(e => [e.name, e]));
 
@@ -192,10 +205,10 @@ export function any(...events) {
 }
 
 // ── TickSelector ─────────────────────────────────────────────────────────────
-// tick(ms) — composable interval source. Uses window.setInterval (the PATCHED one)
-// so it is tracked and cleaned up by the harness like user setInterval calls.
-// This is an intentional exception to the "use _nativeSetInterval for harness timers" rule —
-// tick() IS user-visible, not a harness-internal timer.
+// tick(ms) — composable interval source. Uses the active editor's TRACKED
+// setInterval (via _trackedTimers) so it lands in _intervals and is cleared on
+// reset/stop like user setInterval calls. This is an intentional exception to the
+// "use _nativeSetInterval for harness timers" rule — tick() IS user-visible.
 
 class TickSelector {
   constructor(ms) {
@@ -226,7 +239,8 @@ class TickSelector {
     }
 
     let count = 0;
-    const id = window.setInterval(() => {
+    const T = _trackedTimers();
+    const id = T.setInterval(() => {
       count++;
       if (this._every  !== null && count % this._every !== 0) return;
       if (this._when   !== null && !this._when())              return;
@@ -239,7 +253,7 @@ class TickSelector {
       fn();
     }, this._ms);
 
-    cleanups.push(() => window.clearInterval(id));
+    cleanups.push(() => T.clearInterval(id));
     return () => cleanups.forEach(c => c());
   }
 }
@@ -251,18 +265,19 @@ export function tick(ms) {
 // ── tween() ───────────────────────────────────────────────────────────────────
 // tween(duration, fn(t), { easing?, onDone? }) → cancel
 // Calls fn with t in [0,1] every ~16ms for `duration` ms, then calls onDone.
-// Uses patched window.setInterval so it pauses/cleans with the harness (ADR 027).
+// Uses the active editor's tracked setInterval so it pauses/cleans with the harness (ADR 027).
 export function tween(duration, fn, { easing = t => t, onDone } = {}) {
   const start = Date.now();
-  const id = window.setInterval(() => {
+  const T = _trackedTimers();
+  const id = T.setInterval(() => {
     const raw = Math.min(1, (Date.now() - start) / duration);
     fn(easing(raw));
     if (raw >= 1) {
-      window.clearInterval(id);
+      T.clearInterval(id);
       if (onDone) onDone();
     }
   }, 16);
-  return () => window.clearInterval(id);
+  return () => T.clearInterval(id);
 }
 
 // ── Global hold() ─────────────────────────────────────────────────────────────

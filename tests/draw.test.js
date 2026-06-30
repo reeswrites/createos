@@ -1,4 +1,4 @@
-import { getDraw, cleanupDraw, cleanupBackdrops } from '../src/api/draw.js';
+import { DrawTarget, cleanupBackdrops } from '../src/api/draw.js';
 
 // ── Canvas mock ───────────────────────────────────────────────────────────────
 
@@ -48,12 +48,12 @@ function makeCanvas(w = 800, h = 600) {
   return { canvas, ctx };
 }
 
-// Each test gets a fresh layer at a unique z to avoid getDraw cache collisions.
+// Each test gets a fresh DrawTarget at a unique z.
 let _zSeed = 1000;
 function freshDraw() {
   const z = _zSeed++;
   const { canvas, ctx } = makeCanvas();
-  const draw = getDraw(z, () => canvas);
+  const draw = new DrawTarget(z, () => canvas);
   return { draw, ctx, canvas };
 }
 
@@ -322,48 +322,6 @@ describe('DrawTarget.toASCII', () => {
   });
 });
 
-// ── getDraw caching ───────────────────────────────────────────────────────────
-
-describe('getDraw', () => {
-  test('returns a new instance when getLayerCanvas is provided', () => {
-    const { canvas } = makeCanvas();
-    const a = getDraw(500, () => canvas);
-    const b = getDraw(500, () => canvas);
-    expect(a).not.toBe(b);
-  });
-
-  test('caches by z when getLayerCanvas is null', () => {
-    // Inject a global canvas getter so it doesn't crash on null
-    window.__ar_getLayerCanvas = () => makeCanvas().canvas;
-    const a = getDraw(501);
-    const b = getDraw(501);
-    expect(a).toBe(b);
-    delete window.__ar_getLayerCanvas;
-  });
-});
-
-// ── cleanupDraw ───────────────────────────────────────────────────────────────
-
-describe('cleanupDraw', () => {
-  test('is callable without error', () => {
-    expect(() => cleanupDraw()).not.toThrow();
-  });
-  test('idempotent — safe to call multiple times', () => {
-    expect(() => { cleanupDraw(); cleanupDraw(); }).not.toThrow();
-  });
-  test('clears the targets cache', () => {
-    window.__ar_getLayerCanvas = () => makeCanvas().canvas;
-    getDraw(600);
-    cleanupDraw();
-    // After cleanup, a new getDraw call should create a fresh instance
-    const a = getDraw(600);
-    cleanupDraw();
-    const b = getDraw(600);
-    expect(a).not.toBe(b);
-    delete window.__ar_getLayerCanvas;
-  });
-});
-
 // ── backdrop ──────────────────────────────────────────────────────────────────
 
 describe('DrawTarget.backdrop', () => {
@@ -376,7 +334,7 @@ describe('DrawTarget.backdrop', () => {
   test('returns handle with stop() and layer', () => {
     const bdCanvas = makeCanvas(200, 100).canvas;
     const getLayerCanvas = () => bdCanvas;
-    const draw = getDraw(2000, getLayerCanvas);
+    const draw = new DrawTarget(2000, getLayerCanvas);
 
     const img = new Image();
     Object.defineProperty(img, 'complete',     { get: () => true  });
@@ -393,7 +351,7 @@ describe('DrawTarget.backdrop', () => {
     const { canvas } = makeCanvas(200, 100);
     const bdCanvas   = makeCanvas(200, 100).canvas;
     const getLayerCanvas = (z) => z === 0 ? canvas : bdCanvas;
-    const draw = getDraw(2001, getLayerCanvas);
+    const draw = new DrawTarget(2001, getLayerCanvas);
 
     // Live source (canvas) — starts a raf loop
     window.__ar_keepAlive.add = vi.fn(window.__ar_keepAlive.add.bind(window.__ar_keepAlive));
@@ -415,7 +373,7 @@ describe('DrawTarget.backdrop', () => {
     const { canvas } = makeCanvas(200, 100);
     const bdCanvas   = makeCanvas(200, 100).canvas;
     const getLayerCanvas = (z) => z === 0 ? canvas : bdCanvas;
-    const draw = getDraw(2002, getLayerCanvas);
+    const draw = new DrawTarget(2002, getLayerCanvas);
 
     const handle = draw.backdrop(bdCanvas, { loop: true });
     const sizeBefore = window.__ar_keepAlive.size;
@@ -427,7 +385,7 @@ describe('DrawTarget.backdrop', () => {
     const { canvas } = makeCanvas(200, 100);
     const bdCanvas   = makeCanvas(200, 100).canvas;
     const getLayerCanvas = (z) => z === 0 ? canvas : bdCanvas;
-    const draw = getDraw(2003, getLayerCanvas);
+    const draw = new DrawTarget(2003, getLayerCanvas);
 
     const handle = draw.backdrop('https://example.com/photo.jpg');
     expect(handle).toHaveProperty('stop');

@@ -3,7 +3,6 @@ import { onReset } from '../runtime/reset-registry.js';
 import { liveOutput } from '../runtime/keep-alive.js';
 import { acquireCameraRunScoped } from './media-lease.js';
 
-const _targets   = new Map();
 const _backdrops = [];
 
 // ── Fit helper (cover / contain / stretch) ────────────────────────────────────
@@ -327,9 +326,15 @@ export class DrawTarget {
         _cameraLease?.release(); _cameraLease = null;
         const i = _backdrops.indexOf(h);
         if (i !== -1) _backdrops.splice(i, 1);
+        const j = this._ownBackdrops?.indexOf(h) ?? -1;
+        if (j !== -1) this._ownBackdrops.splice(j, 1);
       },
     };
     _backdrops.push(h);
+    // Also track on THIS surface so a window-scoped surface (Canvas) can stop its
+    // own backdrops when it tears down — otherwise the backdrop's keep-alive + raf
+    // outlive the closed window and pin the run alive (idle watcher never stops it).
+    (this._ownBackdrops ??= []).push(h);
 
     // Resolve to a drawable
     let drawable = null;
@@ -380,34 +385,18 @@ export class DrawTarget {
     return h;
   }
 
+  // Stop every backdrop started on THIS surface (releases their keep-alive + raf).
+  // Called by window-scoped surfaces on teardown so closing the window stops the
+  // footage loop and lets the idle watcher auto-stop the run.
+  stopBackdrops() {
+    if (!this._ownBackdrops) return;
+    for (const h of [...this._ownBackdrops]) { try { h.stop?.(); } catch { /* gone */ } }
+    this._ownBackdrops = [];
+  }
+
   // ── Layer targeting ───────────────────────────────────────────────────────
 
   at(z) { return new DrawTarget(z, this.#gc); }
-}
-
-export function getDraw(z = 0, getLayerCanvas = null) {
-  if (!getLayerCanvas) {
-    if (_targets.has(z)) return _targets.get(z);
-    const t = new DrawTarget(z, null);
-    _targets.set(z, t);
-    return t;
-  }
-  return new DrawTarget(z, getLayerCanvas);
-}
-
-export function cleanupDraw() {
-  for (const [z] of _targets) {
-    const canvas = window.__ar_getLayerCanvas?.(z);
-    if (!canvas) continue;
-    const ctx = canvas.getContext("2d");
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.globalAlpha = 1;
-    ctx.globalCompositeOperation = "source-over";
-    ctx.shadowColor = "transparent";
-    ctx.shadowBlur = 0;
-    ctx.lineWidth = 1;
-  }
-  _targets.clear();
 }
 
 // Register teardown with the reset registry (ADR 008).

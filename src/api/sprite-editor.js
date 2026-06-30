@@ -36,34 +36,23 @@ class SpriteFrameAdapter {
   go(i) { this.sp.frame(i); this._events.emit('select', { index: i, count: this.count }); }
   add() { this.sp.addFrame(); this.sp.frame(this.count - 1); this._mutate('add'); }
   duplicate() {
-    const sp = this.sp, fi = sp._fi, ni = sp.addFrame();
-    sp._frames[ni].getContext('2d').drawImage(sp._frames[fi], 0, 0);
-    sp.frame(ni);
+    this.sp.duplicateFrame();
     this._mutate('duplicate');
   }
   clearCurrent() { this.sp.clear(); this._mutate('clear'); }
   remove() {
-    const sp = this.sp;
-    if (sp.frameCount <= 1) return;
-    sp._frames.splice(sp._fi, 1);
-    sp._fi = Math.min(sp._fi, sp.frameCount - 1);
-    sp._render();
+    if (this.sp.frameCount <= 1) return;
+    this.sp.removeFrame();
     this._mutate('delete');
   }
   move(dir) {
-    const sp = this.sp, fi = sp._fi, to = fi + dir;
-    if (to < 0 || to >= sp.frameCount) return;
-    [sp._frames[fi], sp._frames[to]] = [sp._frames[to], sp._frames[fi]];
-    sp._fi = to;
-    sp._render();
-    this._mutate('move');
+    const before = this.index;
+    this.sp.moveFrame(dir);
+    if (this.index !== before) this._mutate('move');
   }
   play(fps) { this.sp.play(fps); }
   stop() { this.sp.stop(); }
-  drawThumb(tc, i) {
-    tc.width = this.sp._w; tc.height = this.sp._h;
-    tc.getContext('2d').drawImage(this.sp._frames[i], 0, 0);
-  }
+  drawThumb(tc, i) { this.sp.drawFrameTo(tc, i); }
   on(evt, fn) { this._events.on(evt, fn); }
 }
 
@@ -88,7 +77,12 @@ const TOOLS = [
   { id: 'line',     icon: '<i class="fa-solid fa-minus"></i>',       title: 'Line' },
   { id: 'rect',     icon: '<i class="fa-regular fa-square"></i>',    title: 'Rectangle (outline)' },
   { id: 'rectfill', icon: '<i class="fa-solid fa-square"></i>',      title: 'Rectangle (filled)' },
+  { id: 'circle',   icon: '<i class="fa-regular fa-circle"></i>',    title: 'Circle (outline) — drag from center' },
+  { id: 'circlefill', icon: '<i class="fa-solid fa-circle"></i>',    title: 'Circle (filled) — drag from center' },
 ];
+
+// Drag-shape tools: pointerdown sets a start cell, drag previews, pointerup commits.
+const SHAPE_TOOLS = ['line', 'rect', 'rectfill', 'circle', 'circlefill'];
 
 const ACTIVE_COLOR  = '#cba6f7';
 const INACTIVE_BORDER = '#45475a';
@@ -120,6 +114,7 @@ export class SpriteEditor {
     this._strokeBbox     = null;
     this._winId          = null;
     this._overlay        = null;
+    this._gridOn         = true;
     this._gridSnap       = null;
     this._colorInput     = null;
     this._title          = title;
@@ -158,9 +153,10 @@ export class SpriteEditor {
     const fd    = this._fd;
     const strip = buildFrameStrip(fd);
 
-    const mkExport = (html, color, fn) => {
+    const mkExport = (html, color, title, fn) => {
       const b = document.createElement('button');
       b.innerHTML = html;
+      b.title = title;
       b.style.cssText = `background:#1e1e2e;color:${color};border:1px solid #313244;
         border-radius:4px;padding:3px 8px;font-size:11px;cursor:pointer;`;
       b.addEventListener('click', fn);
@@ -169,10 +165,11 @@ export class SpriteEditor {
     const transport = buildTransport(fd, {
       onFpsChange: () => this._autoSave(),
       extraButtons: [
-        mkExport('<i class="fa-solid fa-code"></i> Code',    '#89b4fa', () => this._exportCode()),
-        mkExport('<i class="fa-solid fa-download"></i> PNG', '#a6e3a1', () => this._exportPng(false)),
-        mkExport('<i class="fa-solid fa-film"></i> Sheet',   '#f9e2af', () => this._exportPng(true)),
-        wireCaptureButton(mkExport('<i class="fa-solid fa-circle"></i> Rec', '#f38ba8', () => {}),
+        mkExport('<i class="fa-solid fa-file-import"></i> Import', '#cba6f7', 'Import a PNG or sprite sheet', () => this._importImage()),
+        mkExport('<i class="fa-solid fa-code"></i> Code',    '#89b4fa', 'Insert sprite as code into the editor', () => this._exportCode()),
+        mkExport('<i class="fa-solid fa-download"></i> PNG', '#a6e3a1', 'Download current frame as PNG', () => this._exportPng(false)),
+        mkExport('<i class="fa-solid fa-film"></i> Sheet',   '#f9e2af', 'Download all frames as a sprite sheet PNG', () => this._exportPng(true)),
+        wireCaptureButton(mkExport('<i class="fa-solid fa-circle"></i> Rec', '#f38ba8', 'Capture a performance → replay code', () => {}),
                           { take: this._take, widget: this, idleLabel: '⏺ Rec' }),
       ],
     });
@@ -286,6 +283,38 @@ export class SpriteEditor {
       row.appendChild(btn);
     });
 
+    // Divider between tools and view controls.
+    const sep = document.createElement('span');
+    sep.style.cssText = 'width:1px;background:#45475a;margin:2px 3px;align-self:stretch;';
+    row.appendChild(sep);
+
+    const mkCtrl = (icon, title, fn) => {
+      const b = document.createElement('button');
+      b.title = title;
+      b.innerHTML = icon;
+      b.style.cssText = [
+        'background:#313244;border:2px solid ' + INACTIVE_BORDER + ';',
+        'border-radius:5px;color:#cdd6f4;font-size:14px;width:30px;height:28px;',
+        'cursor:pointer;display:flex;align-items:center;justify-content:center;',
+        'padding:0;transition:border-color 0.1s;',
+      ].join('');
+      b.addEventListener('click', () => fn(b));
+      return b;
+    };
+
+    // Grid toggle — starts active (grid on).
+    const gridBtn = mkCtrl('<i class="fa-solid fa-border-all"></i>', 'Toggle pixel grid', (b) => {
+      this._gridOn = !this._gridOn;
+      b.style.borderColor = this._gridOn ? ACTIVE_COLOR : INACTIVE_BORDER;
+      this._drawGrid();
+    });
+    gridBtn.style.borderColor = ACTIVE_COLOR;
+    row.appendChild(gridBtn);
+
+    // Resize the pixel grid (resolution).
+    row.appendChild(mkCtrl('<i class="fa-solid fa-up-right-and-down-left-from-center"></i>',
+      'Resize the pixel grid', () => this._promptResize()));
+
     return row;
   }
 
@@ -369,6 +398,7 @@ export class SpriteEditor {
       }
     }
     checker.style.cssText = 'position:absolute;top:0;left:0;image-rendering:pixelated;';
+    this._checker = checker;
 
     // Sprite display canvas
     sp.canvas.style.position       = 'absolute';
@@ -388,11 +418,13 @@ export class SpriteEditor {
     hit.width  = sp.canvas.width;
     hit.height = sp.canvas.height;
     hit.style.cssText = 'position:absolute;top:0;left:0;cursor:crosshair;opacity:0;';
+    this._hit = hit;
 
     wrap.appendChild(checker);
     wrap.appendChild(sp.canvas);
     wrap.appendChild(ov);
     wrap.appendChild(hit);
+    this._wrap = wrap;
 
     this._bindPointer(hit);
     return wrap;
@@ -450,7 +482,7 @@ export class SpriteEditor {
         this._eyedrop(p.x, p.y);
         return;
       }
-      if (this._tool === 'line' || this._tool === 'rect' || this._tool === 'rectfill') {
+      if (SHAPE_TOOLS.includes(this._tool)) {
         this._startPx = p;
         this._expandBbox(p.x, p.y);
         return;
@@ -464,7 +496,7 @@ export class SpriteEditor {
     el.addEventListener('pointermove', (e) => {
       if (!this._drawing) return;
       const p = this._pxCoord(e);
-      if (this._tool === 'line' || this._tool === 'rect' || this._tool === 'rectfill') {
+      if (SHAPE_TOOLS.includes(this._tool)) {
         if (this._startPx) this._drawPreview(this._startPx, p);
         return;
       }
@@ -478,7 +510,7 @@ export class SpriteEditor {
     el.addEventListener('pointerup', (e) => {
       if (!this._drawing) return;
       this._drawing = false;
-      if (this._startPx && (this._tool === 'line' || this._tool === 'rect' || this._tool === 'rectfill')) {
+      if (this._startPx && SHAPE_TOOLS.includes(this._tool)) {
         const p = this._pxCoord(e);
         this._expandBbox(p.x, p.y);
         this._commitShape(this._startPx, p);
@@ -586,21 +618,47 @@ export class SpriteEditor {
     const ctx = ov.getContext('2d');
     ctx.clearRect(0, 0, ov.width, ov.height);
     const sc  = this._scale;
-    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
-    ctx.lineWidth   = 0.5;
-    for (let x = sc; x < ov.width; x += sc) {
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, ov.height); ctx.stroke();
+    if (this._gridOn) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+      ctx.lineWidth   = 0.5;
+      for (let x = sc; x < ov.width; x += sc) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, ov.height); ctx.stroke();
+      }
+      for (let y = sc; y < ov.height; y += sc) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(ov.width, y); ctx.stroke();
+      }
     }
-    for (let y = sc; y < ov.height; y += sc) {
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(ov.width, y); ctx.stroke();
-    }
-    this._gridSnap = ov.getContext('2d').getImageData(0, 0, ov.width, ov.height);
+    this._gridSnap = ctx.getImageData(0, 0, ov.width, ov.height);
   }
 
   _restoreGrid() {
     if (this._overlay && this._gridSnap) {
       this._overlay.getContext('2d').putImageData(this._gridSnap, 0, 0);
     }
+  }
+
+  // Midpoint circle / filled disc — pixel coords centered on (cx,cy), radius r.
+  _circlePixels(cx, cy, r, filled) {
+    const pts = [];
+    if (r <= 0) { pts.push([cx, cy]); return pts; }
+    if (filled) {
+      for (let dy = -r; dy <= r; dy++) {
+        const dx = Math.round(Math.sqrt(r * r - dy * dy));
+        for (let x = cx - dx; x <= cx + dx; x++) pts.push([x, cy + dy]);
+      }
+      return pts;
+    }
+    let x = r, y = 0, err = 1 - r;
+    while (x >= y) {
+      pts.push(
+        [cx + x, cy + y], [cx - x, cy + y], [cx + x, cy - y], [cx - x, cy - y],
+        [cx + y, cy + x], [cx - y, cy + x], [cx + y, cy - x], [cx - y, cy - x],
+      );
+      y++;
+      if (err < 0) err += 2 * y + 1;
+      else { x--; err += 2 * (y - x) + 1; }
+    }
+    return pts;
   }
 
   _drawPreview(start, end) {
@@ -612,6 +670,13 @@ export class SpriteEditor {
     ctx.strokeStyle = previewColor;
     ctx.lineWidth   = sc;
     ctx.lineCap     = 'square';
+
+    if (this._tool === 'circle' || this._tool === 'circlefill') {
+      const r   = Math.round(Math.hypot(end.x - start.x, end.y - start.y));
+      const pts = this._circlePixels(start.x, start.y, r, this._tool === 'circlefill');
+      for (const [px, py] of pts) ctx.fillRect(px * sc, py * sc, sc, sc);
+      return;
+    }
 
     const x1 = start.x * sc + sc / 2, y1 = start.y * sc + sc / 2;
     const x2 = end.x   * sc + sc / 2, y2 = end.y   * sc + sc / 2;
@@ -637,7 +702,12 @@ export class SpriteEditor {
     const color = this._color;
     const x0 = start.x, y0 = start.y, x1 = end.x, y1 = end.y;
 
-    if (this._tool === 'line') {
+    if (this._tool === 'circle' || this._tool === 'circlefill') {
+      const r = Math.round(Math.hypot(x1 - x0, y1 - y0));
+      for (const [x, y] of this._circlePixels(x0, y0, r, this._tool === 'circlefill')) {
+        if (x >= 0 && x < sp._w && y >= 0 && y < sp._h) sp.pixel(x, y, color);
+      }
+    } else if (this._tool === 'line') {
       // Bresenham
       let dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
       let sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
@@ -660,6 +730,108 @@ export class SpriteEditor {
         for (let y = ty + 1; y < by; y++) { sp.pixel(lx, y, color); sp.pixel(rx, y, color); }
       }
     }
+  }
+
+  // ── Resize / Import ───────────────────────────────────────────────────────────
+
+  _paintChecker() {
+    const ch = this._checker;
+    if (!ch) return;
+    const cctx = ch.getContext('2d');
+    const cs = 4;
+    for (let y = 0; y < ch.height; y += cs) {
+      for (let x = 0; x < ch.width; x += cs) {
+        cctx.fillStyle = ((x / cs + y / cs) % 2 === 0) ? '#888' : '#aaa';
+        cctx.fillRect(x, y, cs, cs);
+      }
+    }
+  }
+
+  // Resize the pixel grid to w×h. Existing art is kept top-left aligned (clipped).
+  // Pass `replaceFrames` to swap the frame set wholesale (used by import).
+  _resize(w, h, replaceFrames = null) {
+    const sp = this.sprite;
+    w = Math.max(1, Math.min(256, Math.floor(w)));
+    h = Math.max(1, Math.min(256, Math.floor(h)));
+
+    if (replaceFrames) {
+      sp._frames = replaceFrames;
+      sp._fi = Math.min(sp._fi, replaceFrames.length - 1);
+    } else {
+      sp._frames = sp._frames.map(old => {
+        const nc = document.createElement('canvas');
+        nc.width = w; nc.height = h;
+        nc.getContext('2d').drawImage(old, 0, 0);  // top-left, clips overflow
+        return nc;
+      });
+    }
+    sp._w = w; sp._h = h;
+
+    const cw = w * sp._scale, ch = h * sp._scale;
+    sp.canvas.width = cw; sp.canvas.height = ch;
+    sp._dctx.imageSmoothingEnabled = false;       // reset by canvas resize
+
+    for (const el of [this._checker, this._overlay, this._hit]) {
+      if (el) { el.width = cw; el.height = ch; }
+    }
+    this._paintChecker();
+    if (this._wrap) { this._wrap.style.width = cw + 'px'; this._wrap.style.height = ch + 'px'; }
+    this._fd.thumbAspect = w / h;
+
+    if (this._winId && window.wm) {
+      window.wm.resize(this._winId, cw + 28, 40 + 30 + ch + 14 + 78 + 38);
+    }
+
+    sp._render();
+    this._drawGrid();
+    this._refreshThumbs();
+    this._history?.commit();
+    this._autoSave();
+  }
+
+  _promptResize() {
+    const sp = this.sprite;
+    const ans = window.prompt('Grid size (width × height):', `${sp._w} x ${sp._h}`);
+    if (!ans) return;
+    const m = ans.match(/(\d+)\s*[x×,\s]\s*(\d+)/i);
+    if (!m) return;
+    this._resize(parseInt(m[1], 10), parseInt(m[2], 10));
+  }
+
+  // Import a PNG / sprite sheet. A multi-frame sheet is sliced horizontally into
+  // `frames` cells of equal width (each cell becomes a frame).
+  _importImage() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.addEventListener('change', () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(img.src);
+        const guess = (img.naturalWidth > img.naturalHeight && img.naturalWidth % img.naturalHeight === 0)
+          ? img.naturalWidth / img.naturalHeight : 1;
+        let frames = guess;
+        if (img.naturalWidth !== img.naturalHeight || guess > 1) {
+          const ans = window.prompt('How many frames in this image? (1 = single sprite)', String(guess));
+          if (ans === null) return;
+          frames = Math.max(1, parseInt(ans, 10) || 1);
+        }
+        const fw = Math.floor(img.naturalWidth / frames);
+        const fh = img.naturalHeight;
+        const newFrames = [];
+        for (let i = 0; i < frames; i++) {
+          const c = document.createElement('canvas');
+          c.width = fw; c.height = fh;
+          c.getContext('2d').drawImage(img, i * fw, 0, fw, fh, 0, 0, fw, fh);
+          newFrames.push(c);
+        }
+        this._resize(fw, fh, newFrames);
+      };
+      img.src = URL.createObjectURL(file);
+    });
+    input.click();
   }
 
   // ── Export ────────────────────────────────────────────────────────────────────

@@ -16,10 +16,9 @@
 // (tint/negative/solarize/posterize/duotone/grain/strobe) are pipe stages
 // accessible both via route() and directly via pipe().
 
-import { onReset } from '../runtime/reset-registry.js';
+import { runScopedOutput } from '../runtime/run-scoped.js';
 import { subscribe, notify } from '../events/bus.js';
-import { liveOutput } from '../runtime/keep-alive.js';
-import { pipe } from './render-pipeline.js';
+import { pipe, sourceKind, sourceField } from './render-pipeline.js';
 import { audio } from './audio.js';
 import { VideoSignalAPI } from './video-signal.js';
 import { _isCanvas, _isVideo } from './drawable-source.js';
@@ -97,19 +96,19 @@ function resolveSource(src) {
   }
 
   // Source.mic token
-  if (src?._src === 'mic') {
+  if (sourceKind(src) === 'mic') {
     return { kind: 'continuous', read: () => audio.level, label: 'mic', isMic: true };
   }
 
   // Source.camera token (sentinel {_src:'camera'} from render-pipeline.js)
-  if (src?._src === 'camera') {
+  if (sourceKind(src) === 'camera') {
     return { kind: 'frame', raw: src, label: 'camera' };
   }
 
   // Source.gaze.{x,y,vx,vy} token (ADR 034) — continuous scalar from vision gaze.
   // vx/vy need calibration; hold last-valid (default 0) and warn once if uncalibrated.
-  if (src?._src === 'gaze') {
-    const field = src.field;
+  if (sourceKind(src) === 'gaze') {
+    const field = sourceField(src);
     const isScreen = field === 'vx' || field === 'vy';
     let last = 0, warned = false;
     return {
@@ -187,7 +186,7 @@ function resolveSink(sink, uniformPath, opts = {}) {
         const component = uniformPath.slice(dot + 1);
         return {
           write: v => {
-            const cur = sink._uniforms?.[uname] ?? { x: 0, y: 0, z: 0, w: 0 };
+            const cur = sink.getUniform(uname) ?? { x: 0, y: 0, z: 0, w: 0 };
             sink.setUniform(uname, { ...cur, [component]: v });
           },
           immediate: false, // visual — display-bound
@@ -226,8 +225,7 @@ class Route {
     this._stateful   = false;   // any stateful transform in chain?
     this._sinks      = [];      // [{write, immediate, label}]
     this._raf        = null;
-    this._live       = null;    // liveOutput handle
-    this._sentinel   = {};      // token held in __ar_keepAlive
+    this._scoped     = null;    // runScopedOutput handle (owner-scoped + keep-alive)
     this._started    = false;
     this._destroyed  = false;
     this._subs       = [];      // unsubscribe fns (bus subscriptions)
@@ -318,7 +316,7 @@ class Route {
   brightness(opts) {
     this._assertBridgeable('brightness');
     const rawSrc = this._src.raw ?? this._src._signalObj;
-    const sig = (this._src._signalObj && 'brightness' in this._src._signalObj)
+    const sig = isVideoSignal(this._src._signalObj)
       ? this._src._signalObj
       : VideoSignalAPI.signal(rawSrc ?? 'camera', opts);
     this._src = { kind: 'continuous', read: () => sig.brightness, label: this._src.label + '.brightness' };
@@ -328,7 +326,7 @@ class Route {
   motion(opts) {
     this._assertBridgeable('motion');
     const rawSrc = this._src.raw ?? this._src._signalObj;
-    const sig = (this._src._signalObj && 'motion' in this._src._signalObj)
+    const sig = isVideoSignal(this._src._signalObj)
       ? this._src._signalObj
       : VideoSignalAPI.signal(rawSrc ?? 'camera', opts);
     this._src = { kind: 'continuous', read: () => sig.motion, label: this._src.label + '.motion' };
@@ -531,8 +529,8 @@ class Route {
     const stateless   = !this._stateful && !hasMix;
     const allImmediate = this._sinks.every(s => s.immediate);
 
-    // Register keep-alive: route is a live process
-    this._live = liveOutput(this._sentinel);
+    // Register as a run-scoped output: owner-scoped teardown + keep-alive.
+    this._register();
 
     // ── PUSH driver ──────────────────────────────────────────────────────────
     // Conditions: discrete + stateless chain + no fan-in + all sinks immediate
@@ -639,9 +637,21 @@ class Route {
   }
 
   _startFrameKeepAlive() {
-    if (this._live) return;
-    this._live = liveOutput(this._sentinel);
+    if (this._scoped) return;
+    this._register();
     this._registerGraph();
+  }
+
+  // Register once as a run-scoped output. owner captured at construction (passed
+  // explicitly so an async start can't drift it). token carries a label so the
+  // Signal Graph reads token.label, not the fragile token.constructor.name.
+  _register() {
+    if (this._scoped) return;
+    this._scoped = runScopedOutput({
+      owner: this._ownerEditorId,
+      token: { label: this._src?.label },
+      onStop: () => this._destroy(),
+    });
   }
 
   _runTimeline() {
@@ -732,8 +742,8 @@ class Route {
     this._subs   = [];
     this._onSubs = [];
 
-    this._live?.release();
-    this._live = null;
+    this._scoped?.dispose();   // releases keep-alive; onStop re-enters _destroy (guarded)
+    this._scoped = null;
 
     // Frame-route pipeline: cleanupPipelines() handles it on reset,
     // but stop it here in case route is destroyed before reset.
@@ -779,15 +789,7 @@ export function route(source) {
   return new Route(source);
 }
 
-// ── Reset cleanup (ADR 008) ───────────────────────────────────────────────────
-onReset((editorId) => {
-  // Scope teardown to the resetting editor so a route spawned by editor A
-  // survives editor B re-running. editorId == null → full global reset
-  // (no editor context; tests / hard global teardown).
-  for (const r of _routes) {
-    if (editorId == null || r._ownerEditorId == null || r._ownerEditorId === editorId) {
-      r._destroy();
-      _routes.delete(r);
-    }
-  }
-});
+// Reset cleanup is handled by run-scoped.js's single owner-filtered onReset
+// (ADR 008/041): each route registers via runScopedOutput in _register(), and
+// dispose() → onStop → _destroy() (which removes it from _routes). No per-module
+// reset handler here.

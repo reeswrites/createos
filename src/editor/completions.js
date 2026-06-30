@@ -2004,7 +2004,7 @@ setcps(0.5);`,
       },
       {
         label: "wm.bounds — live window size",
-        code: "route(Source.camera)\n  .tap('audio:word:interim', ({ word, final }, winId) => {\n    if (final) return;\n    const b = wm.bounds(winId);\n    if (!b) return;\n    wm.addText(winId, word, Math.random() * b.w, Math.random() * b.h, { decay: 4000 });\n  })\n  .show('Karaoke');",
+        code: "route(Source.camera)\n  .tap('audio:word:final', ({ word }, winId) => {\n    const b = wm.bounds(winId);\n    if (!b) return;\n    wm.addText(winId, word, Math.random() * b.w, Math.random() * b.h, { decay: 4000 });\n  })\n  .show('Karaoke');",
         hint: "wm.bounds(winId) — current inner size of a window's body as { w, h, left, top } in canvas px, or null. Re-read each call so it tracks live resizes. Pair with wm.addText to keep spawned text on-screen after a resize.",
         tags: ["wm", "bounds", "size", "resize", "addText", "overlay"],
       },

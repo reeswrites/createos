@@ -442,6 +442,40 @@ describe('tick(ms)', () => {
     stop();
     vi.useRealTimers();
   });
+
+  // Regression: tick MUST route through the active editor's TRACKED setInterval
+  // so its interval lands in _intervals and is cleared on reset/stop. Before the
+  // fix it used the unpatched global window.setInterval → untracked native timers
+  // that no reset ever cleared (zombie loops kept firing after window close).
+  it('routes through the active editor tracked setInterval (so reset can clear it)', () => {
+    const realSet = window.setInterval, realClear = window.clearInterval;
+    const trackedSet = vi.fn((cb, ms) => realSet(cb, ms));
+    const trackedClear = vi.fn((id) => realClear(id));
+    window.__ar_active_editor_id = 7;
+    window.__ar_e7_setInterval = trackedSet;
+    window.__ar_e7_clearInterval = trackedClear;
+    try {
+      const stop = tick(50).do(() => {});
+      expect(trackedSet).toHaveBeenCalledTimes(1);  // used the tracked one, not native global
+      stop();
+      expect(trackedClear).toHaveBeenCalledTimes(1);
+    } finally {
+      delete window.__ar_active_editor_id;
+      delete window.__ar_e7_setInterval;
+      delete window.__ar_e7_clearInterval;
+    }
+  });
+
+  it('falls back to native timers when there is no active editor (e.g. tests)', () => {
+    delete window.__ar_active_editor_id;
+    vi.useFakeTimers();
+    const fn = vi.fn();
+    const stop = tick(100).do(fn);     // must still work with no tracker present
+    vi.advanceTimersByTime(250);
+    expect(fn).toHaveBeenCalledTimes(2);
+    stop();
+    vi.useRealTimers();
+  });
 });
 
 // ── .hold() ───────────────────────────────────────────────────────────────────

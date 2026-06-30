@@ -39,11 +39,18 @@ let _stripWired = false;
 export function initStrudel() {
   if (_initDone) return _initDone;
 
-  // Share Tone's AudioContext with superdough BEFORE either lazily creates its own.
-  // rawContext is the native AudioContext underlying Tone's wrapper.
+  // Share ONE *native* AudioContext between Tone (master) and superdough, BEFORE
+  // either lazily creates its own. Tone's default context is a standardized-audio-
+  // context wrapper whose object fails `new ChannelMergerNode(ctx)` — superdough
+  // builds every voice with the native constructor, so the wrapper silenced ALL
+  // Strudel audio (ADR 035's owed browser-verify). A native context satisfies both:
+  // Tone creates nodes via ctx.createX() factory methods (fine on native) and
+  // superdough via native constructors. setContext wraps it; rawContext stays native.
   try {
-    const ctx = Tone.getContext().rawContext;
-    if (ctx) setAudioContext(ctx);
+    const Native = window.AudioContext || window.webkitAudioContext;
+    const ctx = new Native({ latencyHint: 'interactive' });
+    Tone.setContext(ctx);    // Tone master, on the shared native ctx
+    setAudioContext(ctx);    // superdough shares the exact same native ctx
   } catch (_) {}
 
   initAudioOnFirstClick();   // superdough resumes the (shared) ctx on first user gesture

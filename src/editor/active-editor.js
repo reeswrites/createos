@@ -27,7 +27,7 @@ export function insertSnippet(code) {
   if (inst?.cm) {
     const offset = inst.cm.state.doc.length;
     inst.cm.dispatch({
-      changes:   { from: offset, to: offset, insert: '\n' + code + '\n' },
+      changes: { from: offset, to: offset, insert: '\n' + code + '\n' },
       selection: { anchor: offset + code.length + 2 },
     });
     inst.cm.focus();

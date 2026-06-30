@@ -22,18 +22,28 @@ export function createSpectrumCore(canvas, getStyle, opts = {}) {
   const c2d = canvas.getContext('2d');
   let rafId = null;
   let toneAn = null;
-  let rawAn  = null;
+  let rawAn = null;
   let _currentSrc = null;
   let _micLease = null; // window-scoped mic lease (ADR 023)
 
   function disconnect() {
-    if (toneAn) { try { toneAn.dispose(); } catch (_) {} toneAn = null; }
+    if (toneAn) {
+      try {
+        toneAn.dispose();
+      } catch (_) {}
+      toneAn = null;
+    }
     if (rawAn && rawAn !== window.__ar_mic_analyser) {
-      try { rawAn.disconnect(); } catch (_) {}
+      try {
+        rawAn.disconnect();
+      } catch (_) {}
     }
     rawAn = null;
     // Release mic lease when switching away from 'mic' source
-    if (_micLease) { _micLease.release(); _micLease = null; }
+    if (_micLease) {
+      _micLease.release();
+      _micLease = null;
+    }
   }
 
   function setSource(id) {
@@ -56,7 +66,8 @@ export function createSpectrumCore(canvas, getStyle, opts = {}) {
           if (!vid._ar_routedToStrip) vid._ar_mediaSource.connect(audioCtx.destination);
         }
         const an = audioCtx.createAnalyser();
-        an.fftSize = 256; an.smoothingTimeConstant = 0.8;
+        an.fftSize = 256;
+        an.smoothingTimeConstant = 0.8;
         vid._ar_mediaSource.connect(an);
         rawAn = an;
       }
@@ -75,7 +86,8 @@ export function createSpectrumCore(canvas, getStyle, opts = {}) {
 
   function frame() {
     rafId = requestAnimationFrame(frame);
-    const W = canvas.width, H = canvas.height;
+    const W = canvas.width,
+      H = canvas.height;
     if (!W || !H) return;
     if (_currentSrc === 'mic' && !rawAn) rawAn = window.__ar_mic_analyser;
 
@@ -86,11 +98,11 @@ export function createSpectrumCore(canvas, getStyle, opts = {}) {
     const style = getStyle();
     if (toneAn) {
       const raw = toneAn.getValue();
-      vals = Float32Array.from(raw, v => Math.max(0, Math.min(1, (v + 100) / 100)));
+      vals = Float32Array.from(raw, (v) => Math.max(0, Math.min(1, (v + 100) / 100)));
     } else if (rawAn) {
       const buf = new Uint8Array(rawAn.frequencyBinCount);
       style === 'wave' ? rawAn.getByteTimeDomainData(buf) : rawAn.getByteFrequencyData(buf);
-      vals = Float32Array.from(buf, v => style === 'wave' ? v / 128 - 1 : v / 255);
+      vals = Float32Array.from(buf, (v) => (style === 'wave' ? v / 128 - 1 : v / 255));
     } else return;
 
     const n = vals.length;
@@ -114,7 +126,9 @@ export function createSpectrumCore(canvas, getStyle, opts = {}) {
       }
       c2d.stroke();
     } else {
-      const cx = W / 2, cy = H / 2, r = Math.min(W, H) * 0.28;
+      const cx = W / 2,
+        cy = H / 2,
+        r = Math.min(W, H) * 0.28;
       c2d.beginPath();
       c2d.strokeStyle = getColors().ring ?? '#cba6f7';
       c2d.lineWidth = 2 * dpr;
@@ -122,7 +136,8 @@ export function createSpectrumCore(canvas, getStyle, opts = {}) {
         const a = (i / n) * Math.PI * 2 - Math.PI / 2;
         const v = vals[i % n];
         const rad = r + v * r * 0.7;
-        const x = cx + Math.cos(a) * rad, y = cy + Math.sin(a) * rad;
+        const x = cx + Math.cos(a) * rad,
+          y = cy + Math.sin(a) * rad;
         i === 0 ? c2d.moveTo(x, y) : c2d.lineTo(x, y);
       }
       c2d.closePath();
@@ -130,8 +145,13 @@ export function createSpectrumCore(canvas, getStyle, opts = {}) {
     }
   }
 
-  function start() { if (!rafId) frame(); }
-  function stop()  { cancelAnimationFrame(rafId); rafId = null; }
+  function start() {
+    if (!rafId) frame();
+  }
+  function stop() {
+    cancelAnimationFrame(rafId);
+    rafId = null;
+  }
   function cleanup() {
     stop();
     disconnect(); // also releases _micLease if set

@@ -76,7 +76,7 @@ describe('liveCount', () => {
   it('returns current Set size', () => {
     window.__ar_keepAlive = new Set();
     const h1 = liveOutput({});
-    const h2 = liveOutput({});
+    liveOutput({});
     expect(liveCount()).toBe(2);
     h1.release();
     expect(liveCount()).toBe(1);

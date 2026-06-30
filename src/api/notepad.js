@@ -13,7 +13,7 @@
 
 import { notify, subscribe } from '../events/index.js';
 import { mountWidgetShell, wireCaptureButton } from './widget-shell.js';
-import { onReset }           from '../runtime/reset-registry.js';
+import { onReset } from '../runtime/reset-registry.js';
 import { Take } from './performance-recorder.js';
 import { replayActions } from './replay-clock.js';
 
@@ -43,7 +43,10 @@ function _cleanNode(el) {
   for (let i = el.childNodes.length - 1; i >= 0; i--) {
     const child = el.childNodes[i];
     if (child.nodeType === 3) continue; // text node — keep
-    if (child.nodeType !== 1) { el.removeChild(child); continue; } // other — strip
+    if (child.nodeType !== 1) {
+      el.removeChild(child);
+      continue;
+    } // other — strip
     const tag = child.tagName.toLowerCase();
     if (!_ALLOWED_TAGS.has(tag)) {
       // Unwrap: lift children in place, remove wrapper
@@ -52,8 +55,11 @@ function _cleanNode(el) {
     } else {
       // Strip all attrs except whitelisted style props
       const rawStyle = child.getAttribute('style') ?? '';
-      const keepStyle = rawStyle.split(';')
-        .map(s => s.trim()).filter(s => /^(color|background-color)\s*:/i.test(s)).join(';');
+      const keepStyle = rawStyle
+        .split(';')
+        .map((s) => s.trim())
+        .filter((s) => /^(color|background-color)\s*:/i.test(s))
+        .join(';');
       while (child.attributes.length) child.removeAttribute(child.attributes[0].name);
       if (keepStyle) child.setAttribute('style', keepStyle);
       _cleanNode(child);
@@ -101,22 +107,37 @@ function _buildToolbar(note) {
   const bar = document.createElement('div');
   bar.className = 'np-toolbar';
   Object.assign(bar.style, {
-    display: 'flex', alignItems: 'center', gap: '4px',
-    padding: '4px 8px', background: '#f0ede6',
-    borderBottom: '1px solid #ddd8cc', flexShrink: '0',
-    fontFamily: 'system-ui,sans-serif', fontSize: '12px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+    padding: '4px 8px',
+    background: '#f0ede6',
+    borderBottom: '1px solid #ddd8cc',
+    flexShrink: '0',
+    fontFamily: 'system-ui,sans-serif',
+    fontSize: '12px',
     userSelect: 'none',
   });
 
   // Bold / Italic / Underline
-  for (const [label, cmd, title] of [['B', 'bold', 'Bold'], ['I', 'italic', 'Italic'], ['U', 'underline', 'Underline']]) {
+  for (const [label, cmd, title] of [
+    ['B', 'bold', 'Bold'],
+    ['I', 'italic', 'Italic'],
+    ['U', 'underline', 'Underline'],
+  ]) {
     const btn = document.createElement('button');
     btn.textContent = label;
     btn.title = title;
     Object.assign(btn.style, {
-      background: '#e8e4dc', border: '1px solid #ccc8be', borderRadius: '3px',
-      padding: '2px 6px', cursor: 'pointer', fontSize: '11px',
-      fontWeight: 'bold', minWidth: '22px', lineHeight: '1.4',
+      background: '#e8e4dc',
+      border: '1px solid #ccc8be',
+      borderRadius: '3px',
+      padding: '2px 6px',
+      cursor: 'pointer',
+      fontSize: '11px',
+      fontWeight: 'bold',
+      minWidth: '22px',
+      lineHeight: '1.4',
     });
     if (label === 'I') btn.style.fontStyle = 'italic';
     if (label === 'U') btn.style.textDecoration = 'underline';
@@ -138,56 +159,99 @@ function _buildToolbar(note) {
   // Text color
   const fgLabel = document.createElement('label');
   fgLabel.title = 'Text color';
-  Object.assign(fgLabel.style, { display: 'flex', alignItems: 'center', gap: '2px', cursor: 'pointer' });
+  Object.assign(fgLabel.style, {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '2px',
+    cursor: 'pointer',
+  });
   const fgIcon = document.createElement('span');
-  fgIcon.textContent = 'A'; Object.assign(fgIcon.style, { fontWeight: 'bold', fontSize: '12px', color: '#222' });
+  fgIcon.textContent = 'A';
+  Object.assign(fgIcon.style, { fontWeight: 'bold', fontSize: '12px', color: '#222' });
   const fgInput = document.createElement('input');
-  fgInput.type = 'color'; fgInput.value = '#000000';
-  Object.assign(fgInput.style, { width: '18px', height: '18px', border: 'none', padding: '0', cursor: 'pointer' });
+  fgInput.type = 'color';
+  fgInput.value = '#000000';
+  Object.assign(fgInput.style, {
+    width: '18px',
+    height: '18px',
+    border: 'none',
+    padding: '0',
+    cursor: 'pointer',
+  });
   fgInput.addEventListener('input', () => {
     note._el?.focus();
     document.execCommand('foreColor', false, fgInput.value);
   });
-  fgLabel.appendChild(fgIcon); fgLabel.appendChild(fgInput);
+  fgLabel.appendChild(fgIcon);
+  fgLabel.appendChild(fgInput);
   bar.appendChild(fgLabel);
 
   // Highlight color
   const hlLabel = document.createElement('label');
   hlLabel.title = 'Highlight';
-  Object.assign(hlLabel.style, { display: 'flex', alignItems: 'center', gap: '2px', cursor: 'pointer' });
+  Object.assign(hlLabel.style, {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '2px',
+    cursor: 'pointer',
+  });
   const hlIcon = document.createElement('span');
-  hlIcon.textContent = '◼'; Object.assign(hlIcon.style, { fontSize: '13px', color: '#ffeb3b', lineHeight: '1' });
+  hlIcon.textContent = '◼';
+  Object.assign(hlIcon.style, { fontSize: '13px', color: '#ffeb3b', lineHeight: '1' });
   const hlInput = document.createElement('input');
-  hlInput.type = 'color'; hlInput.value = '#ffeb3b';
-  Object.assign(hlInput.style, { width: '18px', height: '18px', border: 'none', padding: '0', cursor: 'pointer' });
+  hlInput.type = 'color';
+  hlInput.value = '#ffeb3b';
+  Object.assign(hlInput.style, {
+    width: '18px',
+    height: '18px',
+    border: 'none',
+    padding: '0',
+    cursor: 'pointer',
+  });
   hlInput.addEventListener('input', () => {
     note._el?.focus();
     document.execCommand('hiliteColor', false, hlInput.value);
   });
-  hlLabel.appendChild(hlIcon); hlLabel.appendChild(hlInput);
+  hlLabel.appendChild(hlIcon);
+  hlLabel.appendChild(hlInput);
   bar.appendChild(hlLabel);
 
   addSep();
 
   // Clear all
   const clearBtn = document.createElement('button');
-  clearBtn.textContent = '✕'; clearBtn.title = 'Clear all text';
+  clearBtn.textContent = '✕';
+  clearBtn.title = 'Clear all text';
   Object.assign(clearBtn.style, {
-    background: '#e8e4dc', border: '1px solid #ccc8be', borderRadius: '3px',
-    padding: '2px 6px', cursor: 'pointer', fontSize: '11px', color: '#888',
+    background: '#e8e4dc',
+    border: '1px solid #ccc8be',
+    borderRadius: '3px',
+    padding: '2px 6px',
+    cursor: 'pointer',
+    fontSize: '11px',
+    color: '#888',
     lineHeight: '1.4',
   });
-  clearBtn.addEventListener('mousedown', (e) => { e.preventDefault(); note.clear(); });
+  clearBtn.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    note.clear();
+  });
   bar.appendChild(clearBtn);
 
   addSep();
 
   // Capture ● (Performance recording → replay code)
   const capBtn = document.createElement('button');
-  capBtn.textContent = '● Rec'; capBtn.title = 'Capture a performance → replay code';
+  capBtn.textContent = '● Rec';
+  capBtn.title = 'Capture a performance → replay code';
   Object.assign(capBtn.style, {
-    background: '#e8e4dc', border: '1px solid #ccc8be', borderRadius: '3px',
-    padding: '2px 6px', cursor: 'pointer', fontSize: '11px', color: '#c0392b',
+    background: '#e8e4dc',
+    border: '1px solid #ccc8be',
+    borderRadius: '3px',
+    padding: '2px 6px',
+    cursor: 'pointer',
+    fontSize: '11px',
+    color: '#c0392b',
     lineHeight: '1.4',
   });
   wireCaptureButton(capBtn, { take: note._take, widget: note });
@@ -202,11 +266,19 @@ function _buildEditor() {
   el.contentEditable = 'true';
   el.setAttribute('spellcheck', 'false');
   Object.assign(el.style, {
-    flex: '1', overflowY: 'auto', padding: '12px 14px',
+    flex: '1',
+    overflowY: 'auto',
+    padding: '12px 14px',
     fontFamily: 'Georgia,"Times New Roman",serif',
-    fontSize: '14px', lineHeight: '1.7', color: '#2c2c2c',
-    background: '#faf8f3', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-    outline: 'none', cursor: 'text', minHeight: '60px',
+    fontSize: '14px',
+    lineHeight: '1.7',
+    color: '#2c2c2c',
+    background: '#faf8f3',
+    whiteSpace: 'pre-wrap',
+    wordBreak: 'break-word',
+    outline: 'none',
+    cursor: 'text',
+    minHeight: '60px',
     boxSizing: 'border-box',
   });
   return el;
@@ -226,16 +298,16 @@ export class Notepad {
    * @param {string}  [opts._desktopIconId]  internal: existing icon id for restore
    */
   constructor({ title = 'Notepad', x, y, w = 380, h = 300, content = '', _desktopIconId } = {}) {
-    this._title          = title;
-    this._winId          = null;
-    this._el             = null;          // the contenteditable div
-    this._desktopIconId  = _desktopIconId ?? null;
-    this._autoSave       = () => {};      // replaced by shell in _init
-    this._typingTimers   = new Set();     // active type()/backspace() setInterval ids
-    this._changeTimer    = null;          // debounce timer for note:change
-    this._selListener    = null;          // document selectionchange handler
-    this._take           = new Take(this);// Performance capture (ADR 031)
-    this._replaying      = false;         // gates capture during replay/programmatic apply
+    this._title = title;
+    this._winId = null;
+    this._el = null; // the contenteditable div
+    this._desktopIconId = _desktopIconId ?? null;
+    this._autoSave = () => {}; // replaced by shell in _init
+    this._typingTimers = new Set(); // active type()/backspace() setInterval ids
+    this._changeTimer = null; // debounce timer for note:change
+    this._selListener = null; // document selectionchange handler
+    this._take = new Take(this); // Performance capture (ADR 031)
+    this._replaying = false; // gates capture during replay/programmatic apply
 
     _notepads.push(this);
     this._init(title, x, y, w, h, content);
@@ -248,11 +320,15 @@ export class Notepad {
     if (!window.wm) return;
 
     const toolbar = _buildToolbar(this);
-    const editor  = _buildEditor();
+    const editor = _buildEditor();
     this._el = editor;
 
     const shell = mountWidgetShell({
-      title, x, y, w, h,
+      title,
+      x,
+      y,
+      w,
+      h,
       widgetType: 'note',
       bg: '#faf8f3',
       rows: [toolbar, editor],
@@ -262,10 +338,12 @@ export class Notepad {
         _desktopIconId: this._desktopIconId,
       }),
       save: {
-        name:       (this._title || 'Notepad') + '.note',
-        type:       'note',
-        getIconId:  () => this._desktopIconId,
-        setIconId:  (id) => { this._desktopIconId = id; },
+        name: (this._title || 'Notepad') + '.note',
+        type: 'note',
+        getIconId: () => this._desktopIconId,
+        setIconId: (id) => {
+          this._desktopIconId = id;
+        },
       },
       // No history hooks — native browser undo works for contenteditable (widget-history.js:33)
       onDestroy: () => this._destroy(),
@@ -343,7 +421,7 @@ export class Notepad {
 
     if (!sel.isCollapsed) {
       const from = pos;
-      const to   = _domToOffset(this._el, r.endContainer, r.endOffset);
+      const to = _domToOffset(this._el, r.endContainer, r.endOffset);
       notify('note:select', { winId: this._winId, from, to });
       if (this._winId) notify(`wm:${this._winId}:note:select`, { winId: this._winId, from, to });
     }
@@ -358,10 +436,14 @@ export class Notepad {
   /** Insert raw text at a flat offset (no execCommand — works in tests + preserves spans). */
   _insertRaw(text, pos) {
     const loc = _offsetToDOM(this._el, pos);
-    if (!loc) { if (this._el) this._el.textContent += text; return; }
+    if (!loc) {
+      if (this._el) this._el.textContent += text;
+      return;
+    }
     const { node, nodeOffset } = loc;
     if (node.nodeType === 3 /* TEXT_NODE */) {
-      node.textContent = node.textContent.slice(0, nodeOffset) + text + node.textContent.slice(nodeOffset);
+      node.textContent =
+        node.textContent.slice(0, nodeOffset) + text + node.textContent.slice(nodeOffset);
     } else {
       node.insertBefore(document.createTextNode(text), node.childNodes[nodeOffset] ?? null);
     }
@@ -370,7 +452,7 @@ export class Notepad {
   /** Delete [from, to) by building a Range and calling deleteContents(). */
   _deleteRaw(from, to) {
     const startLoc = _offsetToDOM(this._el, from);
-    const endLoc   = _offsetToDOM(this._el, to);
+    const endLoc = _offsetToDOM(this._el, to);
     if (!startLoc || !endLoc) return;
     const range = document.createRange();
     range.setStart(startLoc.node, startLoc.nodeOffset);
@@ -381,14 +463,17 @@ export class Notepad {
   /** Apply a selection [from, to) (for programmatic format/delete). */
   _applySelection(from, to) {
     const startLoc = _offsetToDOM(this._el, from);
-    const endLoc   = _offsetToDOM(this._el, to);
+    const endLoc = _offsetToDOM(this._el, to);
     if (!startLoc || !endLoc) return;
     const range = document.createRange();
     range.setStart(startLoc.node, startLoc.nodeOffset);
     range.setEnd(endLoc.node, endLoc.nodeOffset);
     try {
       const sel = window.getSelection?.();
-      if (sel) { sel.removeAllRanges(); sel.addRange(range); }
+      if (sel) {
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
     } catch (_) {}
   }
 
@@ -407,10 +492,14 @@ export class Notepad {
   // ── Public API — content ───────────────────────────────────────────────────
 
   /** Plain text content (read-only). */
-  get text()  { return this._el?.textContent ?? ''; }
+  get text() {
+    return this._el?.textContent ?? '';
+  }
 
   /** Sanitized HTML content (read-only). */
-  get html()  { return this._html(); }
+  get html() {
+    return this._html();
+  }
 
   /**
    * Replace all content. Pass plain text or an HTML string.
@@ -450,7 +539,10 @@ export class Notepad {
     range.collapse(true);
     try {
       const sel = window.getSelection?.();
-      if (sel) { sel.removeAllRanges(); sel.addRange(range); }
+      if (sel) {
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
     } catch (_) {}
     this._el.focus?.();
     return this;
@@ -515,11 +607,13 @@ export class Notepad {
       } else {
         this.insert(a.ch);
       }
-    } finally { this._replaying = false; }
+    } finally {
+      this._replaying = false;
+    }
   }
 
   replay(actions, opts) {
-    return replayActions(act => this._applyAction(act), actions, opts);
+    return replayActions((act) => this._applyAction(act), actions, opts);
   }
 
   _perfCtor() {
@@ -541,7 +635,10 @@ export class Notepad {
    */
   type(text, { cps = 20, at } = {}) {
     return new Promise((resolve) => {
-      if (!this._el) { resolve(); return; }
+      if (!this._el) {
+        resolve();
+        return;
+      }
       if (at != null) this.cursor(at);
 
       let i = 0;
@@ -555,7 +652,8 @@ export class Notepad {
           this._typingTimers.delete(timer);
           const done = this._el?.textContent ?? '';
           notify('note:done', { winId: this._winId, text: done });
-          if (this._winId) notify(`wm:${this._winId}:note:done`, { winId: this._winId, text: done });
+          if (this._winId)
+            notify(`wm:${this._winId}:note:done`, { winId: this._winId, text: done });
           this._autoSave();
           resolve();
           return;
@@ -565,7 +663,8 @@ export class Notepad {
         this._insertRaw(ch, pos);
         this.cursor(pos + ch.length);
         notify('note:char', { winId: this._winId, char: ch, index: i });
-        if (this._winId) notify(`wm:${this._winId}:note:char`, { winId: this._winId, char: ch, index: i });
+        if (this._winId)
+          notify(`wm:${this._winId}:note:char`, { winId: this._winId, char: ch, index: i });
         i++;
       }, ms);
 
@@ -582,7 +681,10 @@ export class Notepad {
    */
   backspace(n = 1, { cps = 20 } = {}) {
     return new Promise((resolve) => {
-      if (!this._el) { resolve(); return; }
+      if (!this._el) {
+        resolve();
+        return;
+      }
       let remaining = n;
       const ms = Math.max(16, Math.round(1000 / cps));
       notify('note:type', { winId: this._winId, text: '' });
@@ -593,7 +695,8 @@ export class Notepad {
           this._typingTimers.delete(timer);
           const done = this._el?.textContent ?? '';
           notify('note:done', { winId: this._winId, text: done });
-          if (this._winId) notify(`wm:${this._winId}:note:done`, { winId: this._winId, text: done });
+          if (this._winId)
+            notify(`wm:${this._winId}:note:done`, { winId: this._winId, text: done });
           this._autoSave();
           resolve();
           return;
@@ -603,7 +706,12 @@ export class Notepad {
           this._deleteRaw(pos - 1, pos);
           this.cursor(pos - 1);
           notify('note:char', { winId: this._winId, char: '\b', index: n - remaining });
-          if (this._winId) notify(`wm:${this._winId}:note:char`, { winId: this._winId, char: '\b', index: n - remaining });
+          if (this._winId)
+            notify(`wm:${this._winId}:note:char`, {
+              winId: this._winId,
+              char: '\b',
+              index: n - remaining,
+            });
         }
         remaining--;
       }, ms);
@@ -651,7 +759,9 @@ export class Notepad {
     if (!this._el) return this;
     if (from != null && to != null) this._applySelection(from, to);
     this._el.focus?.();
-    try { document.execCommand(cmd, false, value); } catch (_) {}
+    try {
+      document.execCommand(cmd, false, value);
+    } catch (_) {}
     this._mutate();
     this._autoSave();
     return this;

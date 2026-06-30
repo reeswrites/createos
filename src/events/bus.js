@@ -14,10 +14,10 @@
 import { onReset } from '../runtime/reset-registry.js';
 
 const _commandHandlers = new Map(); // event → handler(data) → payload
-const _subscribers     = new Map(); // event → Set<{ fn, runScoped }>
-const _lastPayloads    = new Map(); // event → last data payload fired
-const _sources         = [];        // [{ match, start, stop, count, teardown }] — lazy sources
-const _taps            = new Set(); // persistent observer fns (not run-scoped, not clearable)
+const _subscribers = new Map(); // event → Set<{ fn, runScoped }>
+const _lastPayloads = new Map(); // event → last data payload fired
+const _sources = []; // [{ match, start, stop, count, teardown }] — lazy sources
+const _taps = new Set(); // persistent observer fns (not run-scoped, not clearable)
 
 // Extract the namespace prefix of an event ('wm' from 'wm:spawn').
 function _ns(event) {
@@ -35,7 +35,11 @@ function _srcInc(event) {
 function _srcDec(event) {
   for (const s of _sources) {
     if (!s.match(event)) continue;
-    if (--s.count === 0) { s.teardown?.(); s.teardown = null; s.stop?.(); }
+    if (--s.count === 0) {
+      s.teardown?.();
+      s.teardown = null;
+      s.stop?.();
+    }
   }
 }
 
@@ -43,12 +47,21 @@ function _srcDec(event) {
 // NEVER export this function.
 function _fire(event, data) {
   _lastPayloads.set(event, data);
-  for (const t of _taps) { try { t(event, data); } catch (e) { console.error('[bus] tap error:', e); } }
+  for (const t of _taps) {
+    try {
+      t(event, data);
+    } catch (e) {
+      console.error('[bus] tap error:', e);
+    }
+  }
   const set = _subscribers.get(event);
   if (!set) return;
   for (const entry of set) {
-    try { entry.fn(data); }
-    catch (e) { console.error('[bus] listener error:', e); }
+    try {
+      entry.fn(data);
+    } catch (e) {
+      console.error('[bus] listener error:', e);
+    }
   }
 }
 
@@ -68,7 +81,9 @@ export function emit(event, data = {}) {
       const result = handler(data);
       // Async handlers: surface errors as namespace:error events
       if (result instanceof Promise) {
-        result.catch(err => _fire(`${_ns(event)}:error`, { command: event, reason: err?.message ?? String(err) }));
+        result.catch((err) =>
+          _fire(`${_ns(event)}:error`, { command: event, reason: err?.message ?? String(err) }),
+        );
       }
     } catch (err) {
       _fire(`${_ns(event)}:error`, { command: event, reason: err?.message ?? String(err) });
@@ -95,10 +110,16 @@ export function subscribe(event, fn, { persistent = false } = {}) {
   _srcInc(event);
   const runScoped = !persistent && window.__ar_active_editor_id != null;
   let set = _subscribers.get(event);
-  if (!set) { set = new Set(); _subscribers.set(event, set); }
+  if (!set) {
+    set = new Set();
+    _subscribers.set(event, set);
+  }
   const entry = { fn, runScoped };
   set.add(entry);
-  return () => { set.delete(entry); _srcDec(event); };
+  return () => {
+    set.delete(entry);
+    _srcDec(event);
+  };
 }
 
 // Register a command handler for a system event. Internal use by subsystems only —
@@ -144,7 +165,10 @@ export function addBusTap(fn) {
 export function clearRunScoped() {
   for (const [event, set] of _subscribers.entries()) {
     for (const entry of Array.from(set)) {
-      if (entry.runScoped) { set.delete(entry); _srcDec(event); }
+      if (entry.runScoped) {
+        set.delete(entry);
+        _srcDec(event);
+      }
     }
   }
 }
@@ -152,6 +176,6 @@ export function clearRunScoped() {
 // Self-register bus teardown (ADR 008). session:reset fires before clearRunScoped
 // so run-scoped handlers still receive the reset notification.
 onReset(() => {
-  _fire('session:reset', {});  // fire directly — session:reset has a command handler for artist use
+  _fire('session:reset', {}); // fire directly — session:reset has a command handler for artist use
   clearRunScoped();
 });

@@ -242,7 +242,7 @@ describe('transform chain', () => {
   it('filter() swallows values not matching predicate', () => {
     const r = route(() => 0);
     r.filter(v => v > 0.5);
-    const SKIP = r._eval(0.3);
+    r._eval(0.3);
     // SKIP is the internal sentinel — to() would not write this
     // We verify by checking the sink is not called
     const writes = [];
@@ -481,7 +481,7 @@ describe('fan-in (.mix)', () => {
 
   it('nested route passed to mix is removed from _routes registry', () => {
     const inner = route(() => 0.5);
-    const outer = route(() => 0.3).mix(inner);
+    route(() => 0.3).mix(inner);
     // inner should have been deleted from _routes (it's a source-only route)
     expect(getLiveRoutes().has(inner)).toBe(false);
   });
@@ -524,8 +524,8 @@ describe('lifecycle', () => {
   });
 
   it('onReset callback clears all routes', () => {
-    const r1 = route(() => 0).to(v => v);
-    const r2 = route(() => 1).to(v => v);
+    route(() => 0).to(v => v);
+    route(() => 1).to(v => v);
     expect(getLiveRoutes().size).toBeGreaterThanOrEqual(2);
     _onResetCb?.();
     expect(getLiveRoutes().size).toBe(0);
@@ -548,9 +548,9 @@ describe('lifecycle', () => {
 
   it('onReset() with no editorId still clears everything (global reset)', () => {
     window.__ar_active_editor_id = 1;
-    const rA = route(() => 0).to(v => v);
+    route(() => 0).to(v => v);
     window.__ar_active_editor_id = 2;
-    const rB = route(() => 1).to(v => v);
+    route(() => 1).to(v => v);
     window.__ar_active_editor_id = undefined;
 
     _onResetCb?.();                          // no id → full teardown

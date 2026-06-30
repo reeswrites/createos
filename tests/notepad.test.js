@@ -49,7 +49,7 @@ function makeWmMock() {
         delete windows[id];
       }
     },
-    show(id) {},
+    show(_id) {},
     addHistoryControls() {},
     getWindows: () => windows,
   };
@@ -65,7 +65,7 @@ function makeDesktopMock() {
 
 // Import the module under test — needs mocks in place first
 let Notepad, cleanupNotepads;
-let notify, subscribe;
+let subscribe;
 
 beforeEach(async () => {
   // Fresh mocks per test
@@ -84,7 +84,7 @@ beforeEach(async () => {
   // Re-import fresh copies to avoid cross-test state pollution
   vi.resetModules();
   ({ Notepad, cleanupNotepads } = await import('../src/api/notepad.js'));
-  ({ notify, subscribe } = await import('../src/events/bus.js'));
+  ({ subscribe } = await import('../src/events/bus.js'));
 });
 
 afterEach(() => {

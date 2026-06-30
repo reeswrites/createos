@@ -10,10 +10,10 @@ import { notify } from '../events/index.js';
 //
 // Project save/load: serializeDesktop() / restoreDesktop() — called from project.js.
 
-const _icons  = new Map(); // id → icon object
-let _wm       = null;
-let _desktop  = null;
-let _nextId   = 1;
+const _icons = new Map(); // id → icon object
+let _wm = null;
+let _desktop = null;
+let _nextId = 1;
 const _onFileCbs = [];
 const _iconClickHandlers = new Map(); // id → fn[] — run-scoped, cleared on reset
 
@@ -23,15 +23,16 @@ const _restoredPositions = new Map(); // editorId → {x, y}
 const _DESKTOP_KEY = 'vl-desktop-state';
 
 // ── Folder handle IDB persistence ─────────────────────────────────────────────
-const _FOLDER_IDB   = 'vl-folder-icons';
+const _FOLDER_IDB = 'vl-folder-icons';
 const _FOLDER_STORE = 'icons';
 
 function _openFolderDB() {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(_FOLDER_IDB, 1);
-    req.onupgradeneeded = e => e.target.result.createObjectStore(_FOLDER_STORE, { autoIncrement: true });
-    req.onsuccess = e => resolve(e.target.result);
-    req.onerror   = e => reject(e.target.error);
+    req.onupgradeneeded = (e) =>
+      e.target.result.createObjectStore(_FOLDER_STORE, { autoIncrement: true });
+    req.onsuccess = (e) => resolve(e.target.result);
+    req.onerror = (e) => reject(e.target.error);
   });
 }
 
@@ -64,15 +65,15 @@ async function _loadFolderIcons() {
 // ──────────────────────────────────────────────────────────────────────────────
 
 // ── Capture blob IDB persistence ──────────────────────────────────────────────
-const _CAPTURE_IDB   = 'vl-captures';
+const _CAPTURE_IDB = 'vl-captures';
 const _CAPTURE_STORE = 'blobs';
 
 function _openCaptureDB() {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(_CAPTURE_IDB, 1);
-    req.onupgradeneeded = e => e.target.result.createObjectStore(_CAPTURE_STORE);
-    req.onsuccess = e => resolve(e.target.result);
-    req.onerror   = e => reject(e.target.error);
+    req.onupgradeneeded = (e) => e.target.result.createObjectStore(_CAPTURE_STORE);
+    req.onsuccess = (e) => resolve(e.target.result);
+    req.onerror = (e) => reject(e.target.error);
   });
 }
 
@@ -95,7 +96,9 @@ async function _getCaptureBlob(key) {
     });
     db.close();
     return blob;
-  } catch (_) { return undefined; }
+  } catch (_) {
+    return undefined;
+  }
 }
 
 async function _delCaptureBlob(key) {
@@ -109,7 +112,8 @@ async function _delCaptureBlob(key) {
 
 function _download(url, name) {
   const a = document.createElement('a');
-  a.href = url; a.download = name;
+  a.href = url;
+  a.download = name;
   a.style.display = 'none';
   document.body.appendChild(a);
   a.click();
@@ -118,7 +122,9 @@ function _download(url, name) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 function _saveDesktopState() {
-  try { localStorage.setItem(_DESKTOP_KEY, JSON.stringify(serializeDesktop())); } catch (_) {}
+  try {
+    localStorage.setItem(_DESKTOP_KEY, JSON.stringify(serializeDesktop()));
+  } catch (_) {}
   _syncFoldersToDB();
 }
 let _saveDragTimer = null;
@@ -222,16 +228,26 @@ function _injectCSS() {
 // ── Type helpers ──────────────────────────────────────────────────────────────
 
 function _classify(name, mime = '') {
-  if (mime.startsWith('image/') || /\.(png|jpe?g|gif|webp|svg|avif|bmp|ico)$/i.test(name)) return 'image';
-  if (mime.startsWith('video/') || /\.(mp4|webm|mov|avi|mkv|ogv)$/i.test(name))            return 'video';
-  if (mime.startsWith('audio/') || /\.(mp3|wav|ogg|flac|aac|m4a|opus)$/i.test(name))       return 'audio';
-  if (/\.(js|ts|mjs|wgsl|glsl|json|html?|css|md|txt|yaml|toml)$/i.test(name))              return 'code';
+  if (mime.startsWith('image/') || /\.(png|jpe?g|gif|webp|svg|avif|bmp|ico)$/i.test(name))
+    return 'image';
+  if (mime.startsWith('video/') || /\.(mp4|webm|mov|avi|mkv|ogv)$/i.test(name)) return 'video';
+  if (mime.startsWith('audio/') || /\.(mp3|wav|ogg|flac|aac|m4a|opus)$/i.test(name)) return 'audio';
+  if (/\.(js|ts|mjs|wgsl|glsl|json|html?|css|md|txt|yaml|toml)$/i.test(name)) return 'code';
   return 'file';
 }
 
 const _GLYPH = { image: '🖼', video: '🎬', audio: '🎵', code: '📄', file: '📁' };
-const _FA_GLYPH = { editor: 'fa-solid fa-file-code', folder: 'fa-solid fa-folder', beat: 'fa-solid fa-drum', sprite: 'fa-solid fa-border-all', paint: 'fa-solid fa-paintbrush', note: 'fa-solid fa-file-lines', ascii: 'fa-solid fa-font', piano: 'fa-solid fa-music' };
-const _WM    = { image: 'image', video: 'video' };
+const _FA_GLYPH = {
+  editor: 'fa-solid fa-file-code',
+  folder: 'fa-solid fa-folder',
+  beat: 'fa-solid fa-drum',
+  sprite: 'fa-solid fa-border-all',
+  paint: 'fa-solid fa-paintbrush',
+  note: 'fa-solid fa-file-lines',
+  ascii: 'fa-solid fa-font',
+  piano: 'fa-solid fa-music',
+};
+const _WM = { image: 'image', video: 'video' };
 
 // ── Trash zone ────────────────────────────────────────────────────────────────
 
@@ -245,8 +261,12 @@ function _ensureTrash() {
   _desktop.appendChild(_trashEl);
 }
 
-function _trashShow() { _trashEl?.classList.add('dt-trash-show'); }
-function _trashHide() { _trashEl?.classList.remove('dt-trash-show', 'dt-trash-hover'); }
+function _trashShow() {
+  _trashEl?.classList.add('dt-trash-show');
+}
+function _trashHide() {
+  _trashEl?.classList.remove('dt-trash-show', 'dt-trash-hover');
+}
 
 function _overTrash(clientX, clientY) {
   if (!_trashEl) return false;
@@ -273,14 +293,20 @@ function _makeThumb(icon) {
       vid.src = icon.url;
       vid.muted = true;
       vid.preload = 'metadata';
-      vid.addEventListener('loadedmetadata', () => { vid.currentTime = 0.5; }, { once: true });
+      vid.addEventListener(
+        'loadedmetadata',
+        () => {
+          vid.currentTime = 0.5;
+        },
+        { once: true },
+      );
       return vid;
     }
   }
   const g = document.createElement('div');
   g.className = 'dt-glyph';
-  if (io.glyphBg)    g.style.background = io.glyphBg;
-  if (io.glyphColor) g.style.color      = io.glyphColor;
+  if (io.glyphBg) g.style.background = io.glyphBg;
+  if (io.glyphColor) g.style.color = io.glyphColor;
   if (io.glyph) {
     g.textContent = io.glyph;
   } else if (_FA_GLYPH[icon.type]) {
@@ -295,15 +321,33 @@ function _makeThumb(icon) {
 
 function _buildEl(icon) {
   const el = document.createElement('div');
-  el.className = 'dt-icon' + (icon.type === 'editor' ? ' dt-editor-icon' : icon.type === 'folder' ? ' dt-folder-icon' : icon.type === 'beat' ? ' dt-beat-icon' : icon.type === 'sprite' ? ' dt-sprite-icon' : icon.type === 'paint' ? ' dt-paint-icon' : icon.type === 'ascii' ? ' dt-ascii-icon' : icon.type === 'note' ? ' dt-note-icon' : icon.type === 'piano' ? ' dt-piano-icon' : '');
+  el.className =
+    'dt-icon' +
+    (icon.type === 'editor'
+      ? ' dt-editor-icon'
+      : icon.type === 'folder'
+        ? ' dt-folder-icon'
+        : icon.type === 'beat'
+          ? ' dt-beat-icon'
+          : icon.type === 'sprite'
+            ? ' dt-sprite-icon'
+            : icon.type === 'paint'
+              ? ' dt-paint-icon'
+              : icon.type === 'ascii'
+                ? ' dt-ascii-icon'
+                : icon.type === 'note'
+                  ? ' dt-note-icon'
+                  : icon.type === 'piano'
+                    ? ' dt-piano-icon'
+                    : '');
   el.style.left = icon.x + 'px';
-  el.style.top  = icon.y + 'px';
+  el.style.top = icon.y + 'px';
   el.dataset.dtId = icon.id;
 
   const thumb = _makeThumb(icon);
   const lbl = document.createElement('div');
   lbl.className = 'dt-label';
-  lbl.textContent = icon.name.replace(/(\.[^.]+)$/, m => m.toLowerCase());
+  lbl.textContent = icon.name.replace(/(\.[^.]+)$/, (m) => m.toLowerCase());
 
   const io = icon.iconOpts ?? {};
   if (io.labelPosition === 'above') {
@@ -313,15 +357,15 @@ function _buildEl(icon) {
     el.appendChild(thumb);
     el.appendChild(lbl);
   }
-  if (io.labelColor) lbl.style.color      = io.labelColor;
-  if (io.labelSize)  lbl.style.fontSize   = io.labelSize + 'px';
-  if (io.labelFont)  lbl.style.fontFamily = io.labelFont;
-  if (io.tooltip)    el.title = io.tooltip;
+  if (io.labelColor) lbl.style.color = io.labelColor;
+  if (io.labelSize) lbl.style.fontSize = io.labelSize + 'px';
+  if (io.labelFont) lbl.style.fontFamily = io.labelFont;
+  if (io.tooltip) el.title = io.tooltip;
 
   // CSS transforms on the icon container
   const transforms = [];
   if (io.rotation) transforms.push(`rotate(${io.rotation}deg)`);
-  if (io.scale)    transforms.push(`scale(${io.scale})`);
+  if (io.scale) transforms.push(`scale(${io.scale})`);
   if (transforms.length) el.style.transform = transforms.join(' ');
 
   // Tint on thumbnail (only when showing real image/video, not a custom glyph)
@@ -338,7 +382,11 @@ function _buildEl(icon) {
 
   // Animate
   if (io.animate) {
-    const anim = { spin: 'ar-icon-spin 2s linear infinite', bounce: 'ar-icon-bounce 0.8s ease infinite', pulse: 'ar-icon-pulse 1s ease infinite' };
+    const anim = {
+      spin: 'ar-icon-spin 2s linear infinite',
+      bounce: 'ar-icon-bounce 0.8s ease infinite',
+      pulse: 'ar-icon-pulse 1s ease infinite',
+    };
     el.style.animation = anim[io.animate] ?? io.animate;
     if (!document.getElementById('dt-anim-styles')) {
       const st = document.createElement('style');
@@ -349,42 +397,55 @@ function _buildEl(icon) {
   }
 
   let _t = 0;
-  el.addEventListener('click', e => {
+  el.addEventListener('click', (e) => {
     e.stopPropagation();
     const now = Date.now();
-    if (now - _t < 380) { _activate(icon); _t = 0; }
-    else { _sel(icon.id); _t = now; }
+    if (now - _t < 380) {
+      _activate(icon);
+      _t = 0;
+    } else {
+      _sel(icon.id);
+      _t = now;
+    }
   });
-  el.addEventListener('contextmenu', e => {
-    e.preventDefault(); e.stopPropagation();
+  el.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
     _ctx(icon, e.clientX, e.clientY);
   });
-  el.addEventListener('mousedown', e => {
+  el.addEventListener('mousedown', (e) => {
     if (e.button !== 0) return;
     if (e.target.contentEditable === 'true') return;
     e.stopPropagation();
-    const ox = e.clientX - icon.x, oy = e.clientY - icon.y;
+    const ox = e.clientX - icon.x,
+      oy = e.clientY - icon.y;
     let moved = false;
     // If dragging a selected icon, co-move all selected icons
     const isMulti = _selIds.has(icon.id) && _selIds.size > 1;
     const peers = isMulti
-      ? [..._selIds].map(id => _icons.get(id)).filter(ic => ic && ic !== icon)
+      ? [..._selIds].map((id) => _icons.get(id)).filter((ic) => ic && ic !== icon)
       : [];
-    const peerOffsets = peers.map(ic => ({ ic, ox: e.clientX - ic.x, oy: e.clientY - ic.y }));
-    const mv = e => {
-      if (!moved) { moved = true; _trashShow(); }
+    const peerOffsets = peers.map((ic) => ({ ic, ox: e.clientX - ic.x, oy: e.clientY - ic.y }));
+    const mv = (e) => {
+      if (!moved) {
+        moved = true;
+        _trashShow();
+      }
       icon.x = Math.max(0, e.clientX - ox);
       icon.y = Math.max(0, e.clientY - oy);
       el.style.left = icon.x + 'px';
-      el.style.top  = icon.y + 'px';
+      el.style.top = icon.y + 'px';
       for (const { ic, ox: pox, oy: poy } of peerOffsets) {
         ic.x = Math.max(0, e.clientX - pox);
         ic.y = Math.max(0, e.clientY - poy);
-        if (ic.el) { ic.el.style.left = ic.x + 'px'; ic.el.style.top = ic.y + 'px'; }
+        if (ic.el) {
+          ic.el.style.left = ic.x + 'px';
+          ic.el.style.top = ic.y + 'px';
+        }
       }
       if (_trashEl) _trashEl.classList.toggle('dt-trash-hover', _overTrash(e.clientX, e.clientY));
     };
-    const up = e => {
+    const up = (e) => {
       document.removeEventListener('mousemove', mv);
       document.removeEventListener('mouseup', up);
       _trashHide();
@@ -430,28 +491,41 @@ function _rerenderIcon(icon) {
 let _selIds = new Set();
 
 function _clearSel() {
-  _selIds.forEach(id => _icons.get(id)?.el?.classList.remove('dt-sel'));
+  _selIds.forEach((id) => _icons.get(id)?.el?.classList.remove('dt-sel'));
   _selIds.clear();
 }
 
 function _sel(id) {
   _clearSel();
-  if (id) { _selIds.add(id); _icons.get(id)?.el?.classList.add('dt-sel'); }
+  if (id) {
+    _selIds.add(id);
+    _icons.get(id)?.el?.classList.add('dt-sel');
+  }
 }
 
 function _selMulti(ids) {
   _clearSel();
-  for (const id of ids) { _selIds.add(id); _icons.get(id)?.el?.classList.add('dt-sel'); }
+  for (const id of ids) {
+    _selIds.add(id);
+    _icons.get(id)?.el?.classList.add('dt-sel');
+  }
 }
 
 // ── Activate (double-click) ───────────────────────────────────────────────────
 
 function _activate(icon) {
   notify('desktop:icon-clicked', { id: icon.id, name: icon.name, type: icon.type });
-  (_iconClickHandlers.get(icon.id) ?? []).forEach(fn => { try { fn({ id: icon.id, name: icon.name, type: icon.type, url: icon.url }); } catch (_) {} });
+  (_iconClickHandlers.get(icon.id) ?? []).forEach((fn) => {
+    try {
+      fn({ id: icon.id, name: icon.name, type: icon.type, url: icon.url });
+    } catch (_) {}
+  });
   if (icon.type === 'editor') {
     const win = document.getElementById(icon.winId);
-    if (win) { win.style.display = 'flex'; _wm?.focus(icon.winId); }
+    if (win) {
+      win.style.display = 'flex';
+      _wm?.focus(icon.winId);
+    }
     return;
   }
   if (icon.type === 'folder') {
@@ -464,133 +538,216 @@ function _activate(icon) {
   if (!icon.url) return;
   const wmType = _WM[icon.type];
   if (wmType) {
-    const winId = _wm?.spawn(icon.name.replace(/(\.[^.]+)$/, m => m.toLowerCase()), { type: wmType, src: icon.url, w: 560, h: 400 });
+    const winId = _wm?.spawn(
+      icon.name.replace(/(\.[^.]+)$/, (m) => m.toLowerCase()),
+      { type: wmType, src: icon.url, w: 560, h: 400 },
+    );
     if (winId && icon.el) {
       icon._wmWinId = winId;
       icon.el.classList.add('dt-active');
       const poll = setInterval(() => {
         const w = document.getElementById(winId);
-        if (!w || w.style.display === 'none') { icon.el?.classList.remove('dt-active'); clearInterval(poll); }
+        if (!w || w.style.display === 'none') {
+          icon.el?.classList.remove('dt-active');
+          clearInterval(poll);
+        }
       }, 600);
     }
     return;
   }
-  if (icon.type === 'audio') { new Audio(icon.url).play().catch(() => {}); return; }
+  if (icon.type === 'audio') {
+    new Audio(icon.url).play().catch(() => {});
+    return;
+  }
   if (icon.type === 'code') {
-    fetch(icon.url).then(r => r.text()).then(code => {
-      if (window.__ar_newEditorWithCode) window.__ar_newEditorWithCode(code);
-    }).catch(() => {});
+    fetch(icon.url)
+      .then((r) => r.text())
+      .then((code) => {
+        if (window.__ar_newEditorWithCode) window.__ar_newEditorWithCode(code);
+      })
+      .catch(() => {});
     return;
   }
   if (icon.type === 'beat') {
-    fetch(icon.url).then(r => r.json()).then(data => {
-      if (window.Drumpad) {
-        const dp = new window.Drumpad({ ...data, x: (icon.x ?? 100) + 80, y: icon.y ?? 100, _desktopIconId: icon.id });
-      }
-    }).catch(() => {});
+    fetch(icon.url)
+      .then((r) => r.json())
+      .then((data) => {
+        if (window.Drumpad) {
+          new window.Drumpad({
+            ...data,
+            x: (icon.x ?? 100) + 80,
+            y: icon.y ?? 100,
+            _desktopIconId: icon.id,
+          });
+        }
+      })
+      .catch(() => {});
     return;
   }
   if (icon.type === 'note') {
-    fetch(icon.url).then(r => r.json()).then(data => {
-      if (window.Notepad) {
-        new window.Notepad({ ...data, x: (icon.x ?? 100) + 80, y: icon.y ?? 100, _desktopIconId: icon.id });
-      }
-    }).catch(() => {});
+    fetch(icon.url)
+      .then((r) => r.json())
+      .then((data) => {
+        if (window.Notepad) {
+          new window.Notepad({
+            ...data,
+            x: (icon.x ?? 100) + 80,
+            y: icon.y ?? 100,
+            _desktopIconId: icon.id,
+          });
+        }
+      })
+      .catch(() => {});
     return;
   }
   if (icon.type === 'sprite') {
-    fetch(icon.url).then(r => r.json()).then(data => {
-      if (!window.SpriteEditor || !window.Sprite) return;
-      const sp = new window.Sprite({ width: data.width, height: data.height, scale: data.scale, frames: data.frames?.length ?? 1 });
-      const frameUrls = data.frames ?? [];
-      let loaded = 0;
-      const open = () => {
-        new window.SpriteEditor({ sprite: sp, title: data.title, x: (icon.x ?? 100) + 80, y: icon.y ?? 100, _desktopIconId: icon.id });
-      };
-      if (!frameUrls.length) { open(); return; }
-      frameUrls.forEach((url, i) => {
-        const img = new Image();
-        img.onload = () => {
-          sp._frames[i].getContext('2d').drawImage(img, 0, 0);
-          sp._render();
-          if (++loaded === frameUrls.length) open();
+    fetch(icon.url)
+      .then((r) => r.json())
+      .then((data) => {
+        if (!window.SpriteEditor || !window.Sprite) return;
+        const sp = new window.Sprite({
+          width: data.width,
+          height: data.height,
+          scale: data.scale,
+          frames: data.frames?.length ?? 1,
+        });
+        const frameUrls = data.frames ?? [];
+        let loaded = 0;
+        const open = () => {
+          new window.SpriteEditor({
+            sprite: sp,
+            title: data.title,
+            x: (icon.x ?? 100) + 80,
+            y: icon.y ?? 100,
+            _desktopIconId: icon.id,
+          });
         };
-        img.onerror = () => { if (++loaded === frameUrls.length) open(); };
-        img.src = url;
-      });
-    }).catch(() => {});
+        if (!frameUrls.length) {
+          open();
+          return;
+        }
+        frameUrls.forEach((url, i) => {
+          const img = new Image();
+          img.onload = () => {
+            sp._frames[i].getContext('2d').drawImage(img, 0, 0);
+            sp._render();
+            if (++loaded === frameUrls.length) open();
+          };
+          img.onerror = () => {
+            if (++loaded === frameUrls.length) open();
+          };
+          img.src = url;
+        });
+      })
+      .catch(() => {});
     return;
   }
   if (icon.type === 'paint') {
-    fetch(icon.url).then(r => r.json()).then(data => {
-      if (!window.Paint) return;
-      const frameUrls = data.frames ?? [];
-      let loaded = 0;
-      const canvases = frameUrls.map(() => {
-        const c = document.createElement('canvas');
-        c.width  = data.width  ?? 400;
-        c.height = data.height ?? 300;
-        return c;
-      });
-      const open = () => {
-        new window.Paint({
-          width: data.width ?? 400, height: data.height ?? 300,
-          bg: data.bg ?? '#ffffff', fps: data.fps ?? 8,
-          title: data.title ?? 'Paint',
-          x: (icon.x ?? 100) + 80, y: icon.y ?? 100,
-          _desktopIconId: icon.id,
-          _frameCanvases: canvases.length ? canvases : null,
-          backdrop:     data.backdrop     ?? null,
-          backdropMode: data.backdropMode ?? 'image',
+    fetch(icon.url)
+      .then((r) => r.json())
+      .then((data) => {
+        if (!window.Paint) return;
+        const frameUrls = data.frames ?? [];
+        let loaded = 0;
+        const canvases = frameUrls.map(() => {
+          const c = document.createElement('canvas');
+          c.width = data.width ?? 400;
+          c.height = data.height ?? 300;
+          return c;
         });
-      };
-      if (!frameUrls.length) { open(); return; }
-      frameUrls.forEach((url, i) => {
-        const img = new Image();
-        img.onload  = () => { canvases[i].getContext('2d').drawImage(img, 0, 0); if (++loaded === frameUrls.length) open(); };
-        img.onerror = () => {                                                       if (++loaded === frameUrls.length) open(); };
-        img.src = url;
-      });
-    }).catch(() => {});
+        const open = () => {
+          new window.Paint({
+            width: data.width ?? 400,
+            height: data.height ?? 300,
+            bg: data.bg ?? '#ffffff',
+            fps: data.fps ?? 8,
+            title: data.title ?? 'Paint',
+            x: (icon.x ?? 100) + 80,
+            y: icon.y ?? 100,
+            _desktopIconId: icon.id,
+            _frameCanvases: canvases.length ? canvases : null,
+            backdrop: data.backdrop ?? null,
+            backdropMode: data.backdropMode ?? 'image',
+          });
+        };
+        if (!frameUrls.length) {
+          open();
+          return;
+        }
+        frameUrls.forEach((url, i) => {
+          const img = new Image();
+          img.onload = () => {
+            canvases[i].getContext('2d').drawImage(img, 0, 0);
+            if (++loaded === frameUrls.length) open();
+          };
+          img.onerror = () => {
+            if (++loaded === frameUrls.length) open();
+          };
+          img.src = url;
+        });
+      })
+      .catch(() => {});
     return;
   }
   if (icon.type === 'ascii') {
-    fetch(icon.url).then(r => r.json()).then(data => {
-      if (!window.AsciiEditor) return;
-      new window.AsciiEditor({
-        cols: data.cols ?? 64, rows: data.rows ?? 24,
-        cellW: data.cellW ?? 10, cellH: data.cellH ?? 18,
-        fps: data.fps ?? 8, bg: data.bg ?? '#0d0208',
-        title: data.title ?? 'ASCII Editor',
-        x: (icon.x ?? 100) + 80, y: icon.y ?? 100,
-        _desktopIconId: icon.id,
-        _frames: data.frames ?? null,
-      });
-    }).catch(() => {});
+    fetch(icon.url)
+      .then((r) => r.json())
+      .then((data) => {
+        if (!window.AsciiEditor) return;
+        new window.AsciiEditor({
+          cols: data.cols ?? 64,
+          rows: data.rows ?? 24,
+          cellW: data.cellW ?? 10,
+          cellH: data.cellH ?? 18,
+          fps: data.fps ?? 8,
+          bg: data.bg ?? '#0d0208',
+          title: data.title ?? 'ASCII Editor',
+          x: (icon.x ?? 100) + 80,
+          y: icon.y ?? 100,
+          _desktopIconId: icon.id,
+          _frames: data.frames ?? null,
+        });
+      })
+      .catch(() => {});
     return;
   }
   if (icon.type === 'piano') {
-    fetch(icon.url).then(r => r.json()).then(data => {
-      if (!window.Piano) return;
-      const p = new window.Piano({
-        title: data.title ?? 'Piano',
-        bpm: data.bpm ?? 120,
-        preset: data.preset ?? 'electric',
-        duration: data.duration ?? '8n',
-        x: (icon.x ?? 100) + 80, y: icon.y ?? 100,
-        _desktopIconId: icon.id,
-      });
-      if (data.steps) data.steps.forEach((notes, si) => { if (p.note) notes.forEach(n => p.note(si, n, true)); });
-    }).catch(() => {});
+    fetch(icon.url)
+      .then((r) => r.json())
+      .then((data) => {
+        if (!window.Piano) return;
+        const p = new window.Piano({
+          title: data.title ?? 'Piano',
+          bpm: data.bpm ?? 120,
+          preset: data.preset ?? 'electric',
+          duration: data.duration ?? '8n',
+          x: (icon.x ?? 100) + 80,
+          y: icon.y ?? 100,
+          _desktopIconId: icon.id,
+        });
+        if (data.steps)
+          data.steps.forEach((notes, si) => {
+            if (p.note) notes.forEach((n) => p.note(si, n, true));
+          });
+      })
+      .catch(() => {});
     return;
   }
-  _wm?.spawn(icon.name, { type: 'html', html: `<div style="padding:16px;color:#ccc;">${icon.name}</div>`, w: 280, h: 160 });
+  _wm?.spawn(icon.name, {
+    type: 'html',
+    html: `<div style="padding:16px;color:#ccc;">${icon.name}</div>`,
+    w: 280,
+    h: 160,
+  });
 }
 
 // ── Context menu ──────────────────────────────────────────────────────────────
 
 let _ctxEl = null;
-function _dismissCtx() { _ctxEl?.remove(); _ctxEl = null; }
+function _dismissCtx() {
+  _ctxEl?.remove();
+  _ctxEl = null;
+}
 
 function _ctx(icon, cx, cy) {
   _dismissCtx();
@@ -602,11 +759,24 @@ function _ctx(icon, cx, cy) {
     const el = document.createElement('div');
     el.className = 'dt-ctx-item';
     el.textContent = label;
-    el.addEventListener('mousedown', e => { e.stopPropagation(); _dismissCtx(); fn(); });
+    el.addEventListener('mousedown', (e) => {
+      e.stopPropagation();
+      _dismissCtx();
+      fn();
+    });
     menu.appendChild(el);
   };
-  const sep = () => { const el = document.createElement('div'); el.className = 'dt-ctx-sep'; menu.appendChild(el); };
-  const section = t => { const el = document.createElement('div'); el.className = 'dt-ctx-label'; el.textContent = t; menu.appendChild(el); };
+  const sep = () => {
+    const el = document.createElement('div');
+    el.className = 'dt-ctx-sep';
+    menu.appendChild(el);
+  };
+  const section = (t) => {
+    const el = document.createElement('div');
+    el.className = 'dt-ctx-label';
+    el.textContent = t;
+    menu.appendChild(el);
+  };
 
   const startRename = () => {
     const lbl = icon.el?.querySelector('.dt-label');
@@ -615,19 +785,29 @@ function _ctx(icon, cx, cy) {
     lbl.style.pointerEvents = 'auto';
     setTimeout(() => {
       lbl.focus();
-      const range = document.createRange(); range.selectNodeContents(lbl);
-      const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+      const range = document.createRange();
+      range.selectNodeContents(lbl);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
     }, 0);
-    const onKey = e => {
-      if (e.key === 'Enter') { e.preventDefault(); lbl.blur(); }
-      if (e.key === 'Escape') { lbl.textContent = icon.name; lbl.blur(); }
+    const onKey = (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        lbl.blur();
+      }
+      if (e.key === 'Escape') {
+        lbl.textContent = icon.name;
+        lbl.blur();
+      }
     };
     const finish = () => {
       lbl.contentEditable = 'false';
       lbl.style.pointerEvents = '';
       lbl.removeEventListener('keydown', onKey);
       const name = lbl.textContent.trim() || icon.name;
-      icon.name = name; lbl.textContent = name;
+      icon.name = name;
+      lbl.textContent = name;
       if (icon.type === 'editor') {
         document.getElementById(icon.winId)?._wmOnTitleChange?.(name);
       }
@@ -638,11 +818,19 @@ function _ctx(icon, cx, cy) {
   };
 
   const doDuplicate = () => {
-    if (icon.type === 'editor') { duplicateEditor(icon.editorId); return; }
-    const nx = icon.x + 20, ny = icon.y + 20;
+    if (icon.type === 'editor') {
+      duplicateEditor(icon.editorId);
+      return;
+    }
+    const nx = icon.x + 20,
+      ny = icon.y + 20;
     const dup = _addFileIcon(icon.name, '', icon.url, nx + 38, ny + 38, icon.content);
-    dup.x = nx; dup.y = ny;
-    if (dup.el) { dup.el.style.left = nx + 'px'; dup.el.style.top = ny + 'px'; }
+    dup.x = nx;
+    dup.y = ny;
+    if (dup.el) {
+      dup.el.style.left = nx + 'px';
+      dup.el.style.top = ny + 'px';
+    }
   };
 
   if (icon.type === 'editor') {
@@ -656,29 +844,51 @@ function _ctx(icon, cx, cy) {
     item('Duplicate', doDuplicate);
     if (icon.url) item('Copy URL', () => navigator.clipboard?.writeText(icon.url).catch(() => {}));
     if ((icon.type === 'image' || icon.type === 'video') && icon.url) {
-      sep(); section('Shader');
+      sep();
+      section('Shader');
       item('Use as shader texture', () => {
         if (!window.Shader) return;
         if (icon.type === 'image') {
           const img = Object.assign(new Image(), { crossOrigin: 'anonymous', src: icon.url });
-          img.addEventListener('load', () =>
-            new window.Shader(({ uv, col }) => [col.r, col.g, col.b, col.a], { video: img }).start(), { once: true });
+          img.addEventListener(
+            'load',
+            () =>
+              new window.Shader(({ col }) => [col.r, col.g, col.b, col.a], {
+                video: img,
+              }).start(),
+            { once: true },
+          );
         } else {
-          const v = Object.assign(document.createElement('video'), { src: icon.url, loop: true, muted: true });
-          v.addEventListener('canplay', () => {
-            v.play().catch(() => {});
-            new window.Shader(({ uv, col }) => [col.r, col.g, col.b, col.a], { video: v }).start();
-          }, { once: true });
+          const v = Object.assign(document.createElement('video'), {
+            src: icon.url,
+            loop: true,
+            muted: true,
+          });
+          v.addEventListener(
+            'canplay',
+            () => {
+              v.play().catch(() => {});
+              new window.Shader(({ col }) => [col.r, col.g, col.b, col.a], {
+                video: v,
+              }).start();
+            },
+            { once: true },
+          );
         }
       });
     }
     if (icon.type === 'code' && icon.url) {
-      sep(); section('Editor');
+      sep();
+      section('Editor');
       item('Load into new editor', () => {
-        fetch(icon.url).then(r => r.text()).then(code => {
-          window.__ar_newEditorWithCode ? window.__ar_newEditorWithCode(code)
-            : navigator.clipboard?.writeText(code);
-        }).catch(() => {});
+        fetch(icon.url)
+          .then((r) => r.text())
+          .then((code) => {
+            window.__ar_newEditorWithCode
+              ? window.__ar_newEditorWithCode(code)
+              : navigator.clipboard?.writeText(code);
+          })
+          .catch(() => {});
       });
     }
     sep();
@@ -686,7 +896,8 @@ function _ctx(icon, cx, cy) {
 
   item(icon.type === 'editor' ? 'Remove editor…' : 'Release', () => {
     if (icon.type === 'editor') {
-      if (!confirm(`Remove "${icon.name}"? This removes the editor and its code permanently.`)) return;
+      if (!confirm(`Remove "${icon.name}"? This removes the editor and its code permanently.`))
+        return;
       window.__ar_instances?.get(icon.editorId)?.destroy();
     } else {
       icon.el?.remove();
@@ -696,7 +907,7 @@ function _ctx(icon, cx, cy) {
     }
   });
 
-  const allSelected = [..._selIds].filter(id => _icons.has(id));
+  const allSelected = [..._selIds].filter((id) => _icons.has(id));
   if (allSelected.length > 1) {
     sep();
     item(`Release all ${allSelected.length} selected`, () => {
@@ -706,7 +917,8 @@ function _ctx(icon, cx, cy) {
         if (ic.type === 'editor') {
           window.__ar_instances?.get(ic.editorId)?.destroy();
         } else {
-          ic.el?.remove(); _icons.delete(id);
+          ic.el?.remove();
+          _icons.delete(id);
         }
       }
       _clearSel();
@@ -718,9 +930,8 @@ function _ctx(icon, cx, cy) {
   const pm = window.__ar_projectManager;
   if (pm) {
     const activeId = pm.getActiveProjectId();
-    const projects = (window.__ar_projectCache ?? []).filter(p => p.id !== activeId);
+    const projects = (window.__ar_projectCache ?? []).filter((p) => p.id !== activeId);
     const targets = allSelected.length > 1 ? allSelected : [icon.id];
-    const label = allSelected.length > 1 ? `${allSelected.length} selected` : `"${icon.name}"`;
 
     const doMoveOrCopy = (targetId, copy) => {
       for (const id of targets) {
@@ -764,12 +975,15 @@ function _ctx(icon, cx, cy) {
 
   document.body.appendChild(menu);
   const r = menu.getBoundingClientRect();
-  menu.style.left = Math.min(cx, window.innerWidth  - r.width  - 8) + 'px';
-  menu.style.top  = Math.min(cy, window.innerHeight - r.height - 8) + 'px';
+  menu.style.left = Math.min(cx, window.innerWidth - r.width - 8) + 'px';
+  menu.style.top = Math.min(cy, window.innerHeight - r.height - 8) + 'px';
 
   setTimeout(() => {
-    const dismiss = e => {
-      if (!menu.contains(e.target)) { _dismissCtx(); document.removeEventListener('mousedown', dismiss, true); }
+    const dismiss = (e) => {
+      if (!menu.contains(e.target)) {
+        _dismissCtx();
+        document.removeEventListener('mousedown', dismiss, true);
+      }
     };
     document.addEventListener('mousedown', dismiss, true);
   }, 0);
@@ -789,15 +1003,28 @@ function _ctxDesktop(cx, cy) {
     const el = document.createElement('div');
     el.className = 'dt-ctx-item';
     el.textContent = label;
-    el.addEventListener('mousedown', e => { e.stopPropagation(); _dismissCtx(); fn(); });
+    el.addEventListener('mousedown', (e) => {
+      e.stopPropagation();
+      _dismissCtx();
+      fn();
+    });
     menu.appendChild(el);
   };
-  const sep = () => { const el = document.createElement('div'); el.className = 'dt-ctx-sep'; menu.appendChild(el); };
-  const section = t => { const el = document.createElement('div'); el.className = 'dt-ctx-label'; el.textContent = t; menu.appendChild(el); };
+  const sep = () => {
+    const el = document.createElement('div');
+    el.className = 'dt-ctx-sep';
+    menu.appendChild(el);
+  };
+  const section = (t) => {
+    const el = document.createElement('div');
+    el.className = 'dt-ctx-label';
+    el.textContent = t;
+    menu.appendChild(el);
+  };
 
-  const activeId   = pm.getActiveProjectId();
+  const activeId = pm.getActiveProjectId();
   const activeName = pm.getActiveProjectName();
-  const projects   = (window.__ar_projectCache ?? []).filter(p => p.id !== activeId);
+  const projects = (window.__ar_projectCache ?? []).filter((p) => p.id !== activeId);
 
   section('Current: ' + activeName);
   if (projects.length > 0) {
@@ -828,12 +1055,15 @@ function _ctxDesktop(cx, cy) {
 
   document.body.appendChild(menu);
   const r = menu.getBoundingClientRect();
-  menu.style.left = Math.min(cx, window.innerWidth  - r.width  - 8) + 'px';
-  menu.style.top  = Math.min(cy, window.innerHeight - r.height - 8) + 'px';
+  menu.style.left = Math.min(cx, window.innerWidth - r.width - 8) + 'px';
+  menu.style.top = Math.min(cy, window.innerHeight - r.height - 8) + 'px';
 
   setTimeout(() => {
-    const dismiss = e => {
-      if (!menu.contains(e.target)) { _dismissCtx(); document.removeEventListener('mousedown', dismiss, true); }
+    const dismiss = (e) => {
+      if (!menu.contains(e.target)) {
+        _dismissCtx();
+        document.removeEventListener('mousedown', dismiss, true);
+      }
     };
     document.addEventListener('mousedown', dismiss, true);
   }, 0);
@@ -841,31 +1071,56 @@ function _ctxDesktop(cx, cy) {
 
 // ── Internal add ──────────────────────────────────────────────────────────────
 
-function _addFileIcon(name, mime, url, dropX, dropY, content = null, iconOpts = null, forceType = null) {
+function _addFileIcon(
+  name,
+  mime,
+  url,
+  dropX,
+  dropY,
+  content = null,
+  iconOpts = null,
+  forceType = null,
+) {
   const type = forceType ?? _classify(name, mime);
-  let x = Math.max(4, dropX - 38), y = Math.max(4, dropY - 38);
+  let x = Math.max(4, dropX - 38),
+    y = Math.max(4, dropY - 38);
   for (const f of _icons.values()) {
     if (f.type !== 'editor' && Math.abs(f.x - x) < 80 && Math.abs(f.y - y) < 96) x += 88;
   }
-  const id = 'dt-' + (_nextId++);
+  const id = 'dt-' + _nextId++;
   const icon = { id, name, type, url, content, x, y, el: null, iconOpts };
   const el = _buildEl(icon);
   icon.el = el;
   _icons.set(id, icon);
   _desktop?.appendChild(el);
-  for (const cb of _onFileCbs) { try { cb({ id, name, type, url, el }); } catch (_) {} }
+  for (const cb of _onFileCbs) {
+    try {
+      cb({ id, name, type, url, el });
+    } catch (_) {}
+  }
   notify('desktop:file-added', { id, name, type, url });
   _saveDesktopState();
   return icon;
 }
 
 function _addFolderIcon(folderData, x = 20, y = 20) {
-  const id = 'dt-' + (_nextId++);
-  let ix = x, iy = y;
+  const id = 'dt-' + _nextId++;
+  let ix = x,
+    iy = y;
   for (const f of _icons.values()) {
     if (Math.abs(f.x - ix) < 80 && Math.abs(f.y - iy) < 96) ix += 88;
   }
-  const icon = { id, name: folderData.name, type: 'folder', folderData, url: null, content: null, x: ix, y: iy, el: null };
+  const icon = {
+    id,
+    name: folderData.name,
+    type: 'folder',
+    folderData,
+    url: null,
+    content: null,
+    x: ix,
+    y: iy,
+    el: null,
+  };
   const el = _buildEl(icon);
   icon.el = el;
   _icons.set(id, icon);
@@ -887,16 +1142,25 @@ function _initDrop() {
 
   _ensureTrash();
 
-  d.addEventListener('dragenter', e => {
-    if ([...e.dataTransfer.types].includes('Files')) { e.preventDefault(); d.classList.add('dt-hover'); }
+  d.addEventListener('dragenter', (e) => {
+    if ([...e.dataTransfer.types].includes('Files')) {
+      e.preventDefault();
+      d.classList.add('dt-hover');
+    }
   });
-  d.addEventListener('dragleave', e => { if (!d.contains(e.relatedTarget)) d.classList.remove('dt-hover'); });
-  d.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
-  d.addEventListener('drop', e => {
+  d.addEventListener('dragleave', (e) => {
+    if (!d.contains(e.relatedTarget)) d.classList.remove('dt-hover');
+  });
+  d.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  });
+  d.addEventListener('drop', (e) => {
     e.preventDefault();
     d.classList.remove('dt-hover');
     const rect = d.getBoundingClientRect();
-    const dx = e.clientX - rect.left, dy = e.clientY - rect.top;
+    const dx = e.clientX - rect.left,
+      dy = e.clientY - rect.top;
     let offset = 0;
     for (const file of e.dataTransfer.files) {
       if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)) continue;
@@ -907,11 +1171,17 @@ function _initDrop() {
       const icon = _addFileIcon(fref.name, fref.type, url, dx + offset, dy + offset);
       if (type === 'image' && fref.size < 2 * 1024 * 1024) {
         const reader = new FileReader();
-        reader.onload = ev => { icon.content = ev.target.result; _saveDesktopState(); };
+        reader.onload = (ev) => {
+          icon.content = ev.target.result;
+          _saveDesktopState();
+        };
         reader.readAsDataURL(fref);
       } else if (type === 'code') {
         const reader = new FileReader();
-        reader.onload = ev => { icon.content = ev.target.result; _saveDesktopState(); };
+        reader.onload = (ev) => {
+          icon.content = ev.target.result;
+          _saveDesktopState();
+        };
         reader.readAsText(fref);
       }
       offset += 18;
@@ -920,42 +1190,66 @@ function _initDrop() {
 
   let _suppressClick = false;
 
-  d.addEventListener('click', e => {
-    if (_suppressClick) { _suppressClick = false; return; }
-    if (e.target === d) { _clearSel(); _dismissCtx(); }
+  d.addEventListener('click', (e) => {
+    if (_suppressClick) {
+      _suppressClick = false;
+      return;
+    }
+    if (e.target === d) {
+      _clearSel();
+      _dismissCtx();
+    }
   });
 
-  d.addEventListener('contextmenu', e => {
+  d.addEventListener('contextmenu', (e) => {
     if (e.target !== d) return;
     e.preventDefault();
     _ctxDesktop(e.clientX, e.clientY);
   });
 
   // Marquee selection
-  d.addEventListener('mousedown', e => {
+  d.addEventListener('mousedown', (e) => {
     if (e.button !== 0 || e.target !== d) return;
     const dRect = d.getBoundingClientRect();
-    const x0 = e.clientX - dRect.left, y0 = e.clientY - dRect.top;
-    let marquee = null, moved = false;
+    const x0 = e.clientX - dRect.left,
+      y0 = e.clientY - dRect.top;
+    let marquee = null,
+      moved = false;
 
-    const mv = e => {
-      const x1 = e.clientX - dRect.left, y1 = e.clientY - dRect.top;
+    const mv = (e) => {
+      const x1 = e.clientX - dRect.left,
+        y1 = e.clientY - dRect.top;
       if (!moved && Math.abs(x1 - x0) + Math.abs(y1 - y0) < 4) return;
       moved = true;
-      if (!marquee) { marquee = document.createElement('div'); marquee.className = 'dt-marquee'; d.appendChild(marquee); }
-      const left = Math.min(x0, x1), top = Math.min(y0, y1);
-      const w = Math.abs(x1 - x0), h = Math.abs(y1 - y0);
-      Object.assign(marquee.style, { left: left+'px', top: top+'px', width: w+'px', height: h+'px' });
+      if (!marquee) {
+        marquee = document.createElement('div');
+        marquee.className = 'dt-marquee';
+        d.appendChild(marquee);
+      }
+      const left = Math.min(x0, x1),
+        top = Math.min(y0, y1);
+      const w = Math.abs(x1 - x0),
+        h = Math.abs(y1 - y0);
+      Object.assign(marquee.style, {
+        left: left + 'px',
+        top: top + 'px',
+        width: w + 'px',
+        height: h + 'px',
+      });
       const hits = [];
       for (const icon of _icons.values()) {
-        const ir = icon.el?.getBoundingClientRect(); if (!ir) continue;
-        const ix = ir.left - dRect.left, iy = ir.top - dRect.top;
-        if (ix < left + w && ix + ir.width > left && iy < top + h && iy + ir.height > top) hits.push(icon.id);
+        const ir = icon.el?.getBoundingClientRect();
+        if (!ir) continue;
+        const ix = ir.left - dRect.left,
+          iy = ir.top - dRect.top;
+        if (ix < left + w && ix + ir.width > left && iy < top + h && iy + ir.height > top)
+          hits.push(icon.id);
       }
       _selMulti(hits);
     };
     const up = () => {
-      marquee?.remove(); marquee = null;
+      marquee?.remove();
+      marquee = null;
       if (moved) _suppressClick = true;
       document.removeEventListener('mousemove', mv);
       document.removeEventListener('mouseup', up);
@@ -978,10 +1272,21 @@ export function addEditorIcon(editorId, winId, label) {
   _restoredPositions.delete(editorId);
   const { x, y } = saved ?? _defaultEditorPos(editorId);
 
-  const id   = 'dt-editor-' + editorId;
-  const icon = { id, name: label, type: 'editor', editorId, winId, url: null, content: null, x, y, el: null };
-  const el   = _buildEl(icon);
-  icon.el    = el;
+  const id = 'dt-editor-' + editorId;
+  const icon = {
+    id,
+    name: label,
+    type: 'editor',
+    editorId,
+    winId,
+    url: null,
+    content: null,
+    x,
+    y,
+    el: null,
+  };
+  const el = _buildEl(icon);
+  icon.el = el;
   _icons.set(id, icon);
   _desktop?.appendChild(el);
   _saveDesktopState();
@@ -1017,13 +1322,34 @@ export function serializeDesktop({ forProject = false } = {}) {
       out.push({ type: 'editor', editorId: icon.editorId, name: icon.name, x: icon.x, y: icon.y });
     } else if (icon.blobKey && !forProject) {
       // IDB-backed capture (photo/video) — persist key only; excluded from project files
-      out.push({ type: icon.type, name: icon.name, blobKey: icon.blobKey, x: icon.x, y: icon.y, iconOpts: icon.iconOpts ?? undefined });
+      out.push({
+        type: icon.type,
+        name: icon.name,
+        blobKey: icon.blobKey,
+        x: icon.x,
+        y: icon.y,
+        iconOpts: icon.iconOpts ?? undefined,
+      });
     } else if (icon.content) {
       // content = data URL (images) or plain text (code)
-      out.push({ type: icon.type, name: icon.name, content: icon.content, x: icon.x, y: icon.y, iconOpts: icon.iconOpts ?? undefined });
+      out.push({
+        type: icon.type,
+        name: icon.name,
+        content: icon.content,
+        x: icon.x,
+        y: icon.y,
+        iconOpts: icon.iconOpts ?? undefined,
+      });
     } else if (icon.url && !icon.url.startsWith('blob:')) {
       // HTTP URL — save directly
-      out.push({ type: icon.type, name: icon.name, url: icon.url, x: icon.x, y: icon.y, iconOpts: icon.iconOpts ?? undefined });
+      out.push({
+        type: icon.type,
+        name: icon.name,
+        url: icon.url,
+        x: icon.x,
+        y: icon.y,
+        iconOpts: icon.iconOpts ?? undefined,
+      });
     }
     // blob URL without content = dropped file too large or not read yet — skip
   }
@@ -1033,7 +1359,10 @@ export function serializeDesktop({ forProject = false } = {}) {
 export function restoreDesktop(icons = []) {
   // Remove all non-editor icons (editor icons are removed when editors are destroyed)
   for (const [id, icon] of _icons) {
-    if (icon.type !== 'editor') { icon.el?.remove(); _icons.delete(id); }
+    if (icon.type !== 'editor') {
+      icon.el?.remove();
+      _icons.delete(id);
+    }
   }
   _restoredPositions.clear();
 
@@ -1043,11 +1372,24 @@ export function restoreDesktop(icons = []) {
       _restoredPositions.set(saved.editorId, { x: saved.x, y: saved.y });
     } else if (saved.blobKey) {
       // IDB-backed capture — create placeholder icon, fill blob async
-      const icon = _addFileIcon(saved.name, '', '', saved.x + 38, saved.y + 38, null, saved.iconOpts ?? null, saved.type ?? null);
+      const icon = _addFileIcon(
+        saved.name,
+        '',
+        '',
+        saved.x + 38,
+        saved.y + 38,
+        null,
+        saved.iconOpts ?? null,
+        saved.type ?? null,
+      );
       icon.blobKey = saved.blobKey;
-      icon.x = saved.x; icon.y = saved.y;
-      if (icon.el) { icon.el.style.left = icon.x + 'px'; icon.el.style.top = icon.y + 'px'; }
-      _getCaptureBlob(saved.blobKey).then(blob => {
+      icon.x = saved.x;
+      icon.y = saved.y;
+      if (icon.el) {
+        icon.el.style.left = icon.x + 'px';
+        icon.el.style.top = icon.y + 'px';
+      }
+      _getCaptureBlob(saved.blobKey).then((blob) => {
         if (!blob || !_icons.has(icon.id)) return;
         if (icon.url?.startsWith('blob:')) URL.revokeObjectURL(icon.url);
         icon.url = URL.createObjectURL(blob);
@@ -1055,60 +1397,163 @@ export function restoreDesktop(icons = []) {
         if (oldThumb) oldThumb.replaceWith(_makeThumb(icon));
       });
     } else if (saved.content) {
-      let url, mime = '';
+      let url,
+        mime = '';
       if (saved.type === 'image') {
-        url  = saved.content; // data URL is already the src
+        url = saved.content; // data URL is already the src
         mime = 'image/jpeg';
       } else if (saved.type === 'code') {
         const blob = new Blob([saved.content], { type: 'text/javascript' });
-        url  = URL.createObjectURL(blob);
+        url = URL.createObjectURL(blob);
         mime = 'text/javascript';
       }
       if (url) {
-        const icon = _addFileIcon(saved.name, mime, url, saved.x + 38, saved.y + 38, saved.content, saved.iconOpts ?? null);
-        icon.x = saved.x; icon.y = saved.y;
-        if (icon.el) { icon.el.style.left = icon.x + 'px'; icon.el.style.top = icon.y + 'px'; }
+        const icon = _addFileIcon(
+          saved.name,
+          mime,
+          url,
+          saved.x + 38,
+          saved.y + 38,
+          saved.content,
+          saved.iconOpts ?? null,
+        );
+        icon.x = saved.x;
+        icon.y = saved.y;
+        if (icon.el) {
+          icon.el.style.left = icon.x + 'px';
+          icon.el.style.top = icon.y + 'px';
+        }
       } else if (saved.type === 'beat') {
         const blob = new Blob([saved.content], { type: 'application/json' });
         const burl = URL.createObjectURL(blob);
-        const icon = _addFileIcon(saved.name, '', burl, saved.x + 38, saved.y + 38, saved.content, saved.iconOpts ?? null, 'beat');
-        icon.x = saved.x; icon.y = saved.y;
-        if (icon.el) { icon.el.style.left = icon.x + 'px'; icon.el.style.top = icon.y + 'px'; }
+        const icon = _addFileIcon(
+          saved.name,
+          '',
+          burl,
+          saved.x + 38,
+          saved.y + 38,
+          saved.content,
+          saved.iconOpts ?? null,
+          'beat',
+        );
+        icon.x = saved.x;
+        icon.y = saved.y;
+        if (icon.el) {
+          icon.el.style.left = icon.x + 'px';
+          icon.el.style.top = icon.y + 'px';
+        }
       } else if (saved.type === 'sprite') {
         const blob = new Blob([saved.content], { type: 'application/json' });
         const burl = URL.createObjectURL(blob);
-        const icon = _addFileIcon(saved.name, '', burl, saved.x + 38, saved.y + 38, saved.content, saved.iconOpts ?? null, 'sprite');
-        icon.x = saved.x; icon.y = saved.y;
-        if (icon.el) { icon.el.style.left = icon.x + 'px'; icon.el.style.top = icon.y + 'px'; }
+        const icon = _addFileIcon(
+          saved.name,
+          '',
+          burl,
+          saved.x + 38,
+          saved.y + 38,
+          saved.content,
+          saved.iconOpts ?? null,
+          'sprite',
+        );
+        icon.x = saved.x;
+        icon.y = saved.y;
+        if (icon.el) {
+          icon.el.style.left = icon.x + 'px';
+          icon.el.style.top = icon.y + 'px';
+        }
       } else if (saved.type === 'paint') {
         const blob = new Blob([saved.content], { type: 'application/json' });
         const burl = URL.createObjectURL(blob);
-        const icon = _addFileIcon(saved.name, '', burl, saved.x + 38, saved.y + 38, saved.content, saved.iconOpts ?? null, 'paint');
-        icon.x = saved.x; icon.y = saved.y;
-        if (icon.el) { icon.el.style.left = icon.x + 'px'; icon.el.style.top = icon.y + 'px'; }
+        const icon = _addFileIcon(
+          saved.name,
+          '',
+          burl,
+          saved.x + 38,
+          saved.y + 38,
+          saved.content,
+          saved.iconOpts ?? null,
+          'paint',
+        );
+        icon.x = saved.x;
+        icon.y = saved.y;
+        if (icon.el) {
+          icon.el.style.left = icon.x + 'px';
+          icon.el.style.top = icon.y + 'px';
+        }
       } else if (saved.type === 'ascii') {
         const blob = new Blob([saved.content], { type: 'application/json' });
         const burl = URL.createObjectURL(blob);
-        const icon = _addFileIcon(saved.name, '', burl, saved.x + 38, saved.y + 38, saved.content, saved.iconOpts ?? null, 'ascii');
-        icon.x = saved.x; icon.y = saved.y;
-        if (icon.el) { icon.el.style.left = icon.x + 'px'; icon.el.style.top = icon.y + 'px'; }
+        const icon = _addFileIcon(
+          saved.name,
+          '',
+          burl,
+          saved.x + 38,
+          saved.y + 38,
+          saved.content,
+          saved.iconOpts ?? null,
+          'ascii',
+        );
+        icon.x = saved.x;
+        icon.y = saved.y;
+        if (icon.el) {
+          icon.el.style.left = icon.x + 'px';
+          icon.el.style.top = icon.y + 'px';
+        }
       } else if (saved.type === 'note') {
         const blob = new Blob([saved.content], { type: 'application/json' });
         const burl = URL.createObjectURL(blob);
-        const icon = _addFileIcon(saved.name, '', burl, saved.x + 38, saved.y + 38, saved.content, saved.iconOpts ?? null, 'note');
-        icon.x = saved.x; icon.y = saved.y;
-        if (icon.el) { icon.el.style.left = icon.x + 'px'; icon.el.style.top = icon.y + 'px'; }
+        const icon = _addFileIcon(
+          saved.name,
+          '',
+          burl,
+          saved.x + 38,
+          saved.y + 38,
+          saved.content,
+          saved.iconOpts ?? null,
+          'note',
+        );
+        icon.x = saved.x;
+        icon.y = saved.y;
+        if (icon.el) {
+          icon.el.style.left = icon.x + 'px';
+          icon.el.style.top = icon.y + 'px';
+        }
       } else if (saved.type === 'piano') {
         const blob = new Blob([saved.content], { type: 'application/json' });
         const burl = URL.createObjectURL(blob);
-        const icon = _addFileIcon(saved.name, '', burl, saved.x + 38, saved.y + 38, saved.content, saved.iconOpts ?? null, 'piano');
-        icon.x = saved.x; icon.y = saved.y;
-        if (icon.el) { icon.el.style.left = icon.x + 'px'; icon.el.style.top = icon.y + 'px'; }
+        const icon = _addFileIcon(
+          saved.name,
+          '',
+          burl,
+          saved.x + 38,
+          saved.y + 38,
+          saved.content,
+          saved.iconOpts ?? null,
+          'piano',
+        );
+        icon.x = saved.x;
+        icon.y = saved.y;
+        if (icon.el) {
+          icon.el.style.left = icon.x + 'px';
+          icon.el.style.top = icon.y + 'px';
+        }
       }
     } else if (saved.url) {
-      const icon = _addFileIcon(saved.name, '', saved.url, saved.x + 38, saved.y + 38, null, saved.iconOpts ?? null);
-      icon.x = saved.x; icon.y = saved.y;
-      if (icon.el) { icon.el.style.left = icon.x + 'px'; icon.el.style.top = icon.y + 'px'; }
+      const icon = _addFileIcon(
+        saved.name,
+        '',
+        saved.url,
+        saved.x + 38,
+        saved.y + 38,
+        null,
+        saved.iconOpts ?? null,
+      );
+      icon.x = saved.x;
+      icon.y = saved.y;
+      if (icon.el) {
+        icon.el.style.left = icon.x + 'px';
+        icon.el.style.top = icon.y + 'px';
+      }
     }
   }
 }
@@ -1116,19 +1561,141 @@ export function restoreDesktop(icons = []) {
 // ── Public API ────────────────────────────────────────────────────────────────
 
 export const DesktopAPI = {
-  add(url, { name = 'file', type, content, x, y, rotation, tint, scale, animate, labelPosition, labelColor, glyph, glyphBg, glyphColor, labelSize, labelFont, badge, badgeColor, tooltip } = {}) {
-    const iconOpts = (rotation != null || tint != null || scale != null || animate != null || labelPosition != null || labelColor != null || glyph != null || glyphBg != null || glyphColor != null || labelSize != null || labelFont != null || badge != null || badgeColor != null || tooltip != null)
-      ? { rotation, tint, scale, animate, labelPosition, labelColor, glyph, glyphBg, glyphColor, labelSize, labelFont, badge, badgeColor, tooltip }
-      : null;
-    const icon = _addFileIcon(name, type ? '' : name, url, (x ?? 80) + 38, (y ?? 80) + 38, content ?? null, iconOpts, type ?? null);
+  add(
+    url,
+    {
+      name = 'file',
+      type,
+      content,
+      x,
+      y,
+      rotation,
+      tint,
+      scale,
+      animate,
+      labelPosition,
+      labelColor,
+      glyph,
+      glyphBg,
+      glyphColor,
+      labelSize,
+      labelFont,
+      badge,
+      badgeColor,
+      tooltip,
+    } = {},
+  ) {
+    const iconOpts =
+      rotation != null ||
+      tint != null ||
+      scale != null ||
+      animate != null ||
+      labelPosition != null ||
+      labelColor != null ||
+      glyph != null ||
+      glyphBg != null ||
+      glyphColor != null ||
+      labelSize != null ||
+      labelFont != null ||
+      badge != null ||
+      badgeColor != null ||
+      tooltip != null
+        ? {
+            rotation,
+            tint,
+            scale,
+            animate,
+            labelPosition,
+            labelColor,
+            glyph,
+            glyphBg,
+            glyphColor,
+            labelSize,
+            labelFont,
+            badge,
+            badgeColor,
+            tooltip,
+          }
+        : null;
+    const icon = _addFileIcon(
+      name,
+      type ? '' : name,
+      url,
+      (x ?? 80) + 38,
+      (y ?? 80) + 38,
+      content ?? null,
+      iconOpts,
+      type ?? null,
+    );
     return { id: icon.id, name: icon.name, type: icon.type, url: icon.url };
   },
-  addBlob(blob, { name = 'capture', type, download = false, x, y, rotation, tint, scale, animate, labelPosition, labelColor, glyph, glyphBg, glyphColor, labelSize, labelFont, badge, badgeColor, tooltip } = {}) {
+  addBlob(
+    blob,
+    {
+      name = 'capture',
+      type,
+      download = false,
+      x,
+      y,
+      rotation,
+      tint,
+      scale,
+      animate,
+      labelPosition,
+      labelColor,
+      glyph,
+      glyphBg,
+      glyphColor,
+      labelSize,
+      labelFont,
+      badge,
+      badgeColor,
+      tooltip,
+    } = {},
+  ) {
     const url = URL.createObjectURL(blob);
-    const iconOpts = (rotation != null || tint != null || scale != null || animate != null || labelPosition != null || labelColor != null || glyph != null || glyphBg != null || glyphColor != null || labelSize != null || labelFont != null || badge != null || badgeColor != null || tooltip != null)
-      ? { rotation, tint, scale, animate, labelPosition, labelColor, glyph, glyphBg, glyphColor, labelSize, labelFont, badge, badgeColor, tooltip }
-      : null;
-    const icon = _addFileIcon(name, '', url, (x ?? 80) + 38, (y ?? 80) + 38, null, iconOpts, type ?? null);
+    const iconOpts =
+      rotation != null ||
+      tint != null ||
+      scale != null ||
+      animate != null ||
+      labelPosition != null ||
+      labelColor != null ||
+      glyph != null ||
+      glyphBg != null ||
+      glyphColor != null ||
+      labelSize != null ||
+      labelFont != null ||
+      badge != null ||
+      badgeColor != null ||
+      tooltip != null
+        ? {
+            rotation,
+            tint,
+            scale,
+            animate,
+            labelPosition,
+            labelColor,
+            glyph,
+            glyphBg,
+            glyphColor,
+            labelSize,
+            labelFont,
+            badge,
+            badgeColor,
+            tooltip,
+          }
+        : null;
+    const icon = _addFileIcon(
+      name,
+      '',
+      url,
+      (x ?? 80) + 38,
+      (y ?? 80) + 38,
+      null,
+      iconOpts,
+      type ?? null,
+    );
     icon.blobKey = icon.id;
     _putCaptureBlob(icon.id, blob);
     _saveDesktopState();
@@ -1139,33 +1706,65 @@ export const DesktopAPI = {
     const icon = _icons.get(id);
     if (!icon) return;
     if (opts.name !== undefined) icon.name = opts.name;
-    if (opts.x    !== undefined) icon.x    = opts.x;
-    if (opts.y    !== undefined) icon.y    = opts.y;
-    const VISUAL_KEYS = ['rotation','tint','scale','animate','labelPosition','labelColor','glyph','glyphBg','glyphColor','labelSize','labelFont','badge','badgeColor','tooltip'];
-    const hasVisual = VISUAL_KEYS.some(k => k in opts);
+    if (opts.x !== undefined) icon.x = opts.x;
+    if (opts.y !== undefined) icon.y = opts.y;
+    const VISUAL_KEYS = [
+      'rotation',
+      'tint',
+      'scale',
+      'animate',
+      'labelPosition',
+      'labelColor',
+      'glyph',
+      'glyphBg',
+      'glyphColor',
+      'labelSize',
+      'labelFont',
+      'badge',
+      'badgeColor',
+      'tooltip',
+    ];
+    const hasVisual = VISUAL_KEYS.some((k) => k in opts);
     if (hasVisual || opts.name !== undefined) {
       if (hasVisual) {
-        const merged = { ...(icon.iconOpts ?? {}) };
-        for (const k of VISUAL_KEYS) { if (k in opts) merged[k] = opts[k]; }
+        const merged = { ...icon.iconOpts };
+        for (const k of VISUAL_KEYS) {
+          if (k in opts) merged[k] = opts[k];
+        }
         icon.iconOpts = Object.keys(merged).length ? merged : null;
       }
       _rerenderIcon(icon);
     } else if (opts.x !== undefined || opts.y !== undefined) {
-      if (icon.el) { icon.el.style.left = icon.x + 'px'; icon.el.style.top = icon.y + 'px'; }
+      if (icon.el) {
+        icon.el.style.left = icon.x + 'px';
+        icon.el.style.top = icon.y + 'px';
+      }
     }
     _saveDesktopStateDebounced();
   },
   move(id, x, y) {
     const icon = _icons.get(id);
     if (!icon) return;
-    icon.x = x; icon.y = y;
-    if (icon.el) { icon.el.style.left = x + 'px'; icon.el.style.top = y + 'px'; }
+    icon.x = x;
+    icon.y = y;
+    if (icon.el) {
+      icon.el.style.left = x + 'px';
+      icon.el.style.top = y + 'px';
+    }
     _saveDesktopStateDebounced();
   },
   get(id) {
     const icon = _icons.get(id);
     if (!icon) return null;
-    return { id: icon.id, name: icon.name, type: icon.type, url: icon.url, x: icon.x, y: icon.y, iconOpts: icon.iconOpts ? { ...icon.iconOpts } : null };
+    return {
+      id: icon.id,
+      name: icon.name,
+      type: icon.type,
+      url: icon.url,
+      x: icon.x,
+      y: icon.y,
+      iconOpts: icon.iconOpts ? { ...icon.iconOpts } : null,
+    };
   },
   onClick(id, fn) {
     if (!_iconClickHandlers.has(id)) _iconClickHandlers.set(id, []);
@@ -1182,15 +1781,35 @@ export const DesktopAPI = {
     _saveDesktopState();
   },
   clear() {
-    for (const icon of _icons.values()) { if (icon.type !== 'editor') { icon.el?.remove(); _icons.delete(icon.id); } }
+    for (const icon of _icons.values()) {
+      if (icon.type !== 'editor') {
+        icon.el?.remove();
+        _icons.delete(icon.id);
+      }
+    }
     _clearSel();
     _saveDesktopState();
   },
   files() {
-    return [..._icons.values()].map(({ id, name, type, url, x, y }) => ({ id, name, type, url, x, y }));
+    return [..._icons.values()].map(({ id, name, type, url, x, y }) => ({
+      id,
+      name,
+      type,
+      url,
+      x,
+      y,
+    }));
   },
-  onFile(fn) { _onFileCbs.push(fn); },
-  open(id)   { const icon = _icons.get(id); if (icon) { notify('desktop:file-opened', { id, name: icon.name, type: icon.type }); _activate(icon); } },
+  onFile(fn) {
+    _onFileCbs.push(fn);
+  },
+  open(id) {
+    const icon = _icons.get(id);
+    if (icon) {
+      notify('desktop:file-opened', { id, name: icon.name, type: icon.type });
+      _activate(icon);
+    }
+  },
   updateUrl(id, newUrl, newContent) {
     const icon = _icons.get(id);
     if (!icon) return;
@@ -1210,18 +1829,25 @@ export function duplicateEditor(editorId) {
   const newTitle = base + ' (copy)';
   const newInst = window.__ar_newEditorWithCode?.(code);
   if (!newInst) return;
-  try { localStorage.setItem('vl-ide-title-' + newInst.id, newTitle); } catch (_) {}
+  try {
+    localStorage.setItem('vl-ide-title-' + newInst.id, newTitle);
+  } catch (_) {}
   newInst.title = newTitle;
   const win = document.getElementById(newInst.editorWinId);
   if (win) {
-    const t = win.querySelector('.wm-title'); if (t) t.textContent = newTitle;
+    const t = win.querySelector('.wm-title');
+    if (t) t.textContent = newTitle;
     win.style.display = 'none';
   }
   updateEditorIconLabel(newInst.id, newTitle);
   const newIcon = _icons.get('dt-editor-' + newInst.id);
   if (newIcon && icon) {
-    newIcon.x = icon.x + 20; newIcon.y = icon.y + 20;
-    if (newIcon.el) { newIcon.el.style.left = newIcon.x + 'px'; newIcon.el.style.top = newIcon.y + 'px'; }
+    newIcon.x = icon.x + 20;
+    newIcon.y = icon.y + 20;
+    if (newIcon.el) {
+      newIcon.el.style.left = newIcon.x + 'px';
+      newIcon.el.style.top = newIcon.y + 'px';
+    }
   }
 }
 
@@ -1235,7 +1861,7 @@ export function cleanupDesktop() {
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 export function initDesktop(wmApi) {
-  _wm      = wmApi;
+  _wm = wmApi;
   _desktop = document.getElementById('desktop');
   _injectCSS();
   try {
@@ -1245,11 +1871,18 @@ export function initDesktop(wmApi) {
   _loadFolderIcons();
   _initDrop();
 
-  document.addEventListener('keydown', e => {
+  document.addEventListener('keydown', (e) => {
     if (e.key !== 'Delete' && e.key !== 'Backspace') return;
     if (_selIds.size === 0) return;
     const active = document.activeElement;
-    if (active && active !== document.body && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable === true)) return;
+    if (
+      active &&
+      active !== document.body &&
+      (active.tagName === 'INPUT' ||
+        active.tagName === 'TEXTAREA' ||
+        active.isContentEditable === true)
+    )
+      return;
     e.preventDefault();
     for (const id of [..._selIds]) {
       const icon = _icons.get(id);
@@ -1273,13 +1906,34 @@ export function getIconSerializedData(id) {
   const icon = _icons.get(id);
   if (!icon) return null;
   if (icon.blobKey) {
-    return { type: icon.type, name: icon.name, blobKey: icon.blobKey, x: icon.x, y: icon.y, iconOpts: icon.iconOpts ?? undefined };
+    return {
+      type: icon.type,
+      name: icon.name,
+      blobKey: icon.blobKey,
+      x: icon.x,
+      y: icon.y,
+      iconOpts: icon.iconOpts ?? undefined,
+    };
   }
   if (icon.content) {
-    return { type: icon.type, name: icon.name, content: icon.content, x: icon.x, y: icon.y, iconOpts: icon.iconOpts ?? undefined };
+    return {
+      type: icon.type,
+      name: icon.name,
+      content: icon.content,
+      x: icon.x,
+      y: icon.y,
+      iconOpts: icon.iconOpts ?? undefined,
+    };
   }
   if (icon.url && !icon.url.startsWith('blob:')) {
-    return { type: icon.type, name: icon.name, url: icon.url, x: icon.x, y: icon.y, iconOpts: icon.iconOpts ?? undefined };
+    return {
+      type: icon.type,
+      name: icon.name,
+      url: icon.url,
+      x: icon.x,
+      y: icon.y,
+      iconOpts: icon.iconOpts ?? undefined,
+    };
   }
   return null;
 }

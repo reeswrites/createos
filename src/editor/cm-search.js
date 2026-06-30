@@ -12,18 +12,18 @@ export const searchMarksField = StateField.define({
     for (const e of tr.effects) if (e.is(setSearchMarks)) deco = e.value;
     return deco;
   },
-  provide: f => EditorView.decorations.from(f),
+  provide: (f) => EditorView.decorations.from(f),
 });
 
 // ── Search panel ──────────────────────────────────────────────────────────────
 
 export function initSearch(view, container) {
-  let matches   = [];
+  let matches = [];
   let matchIndex = -1;
-  let query      = '';
-  let panel      = null;
-  let input      = null;
-  let countEl    = null;
+  let query = '';
+  let panel = null;
+  let input = null;
+  let countEl = null;
 
   function dispatchMarks(decos) {
     view.dispatch({ effects: setSearchMarks.of(decos) });
@@ -33,16 +33,24 @@ export function initSearch(view, container) {
     const builder = new RangeSetBuilder();
     for (let i = 0; i < matches.length; i++) {
       const { from, to } = matches[i];
-      builder.add(from, to, Decoration.mark({
-        class: i === activeIdx ? 'cm-search-active' : 'cm-search-match',
-      }));
+      builder.add(
+        from,
+        to,
+        Decoration.mark({
+          class: i === activeIdx ? 'cm-search-active' : 'cm-search-match',
+        }),
+      );
     }
     dispatchMarks(builder.finish());
   }
 
   function findMatches(q) {
     matches = [];
-    if (!q) { dispatchMarks(Decoration.none); updateCount(); return; }
+    if (!q) {
+      dispatchMarks(Decoration.none);
+      updateCount();
+      return;
+    }
     const text = view.state.doc.toString();
     const qLow = q.toLowerCase();
     const tLow = text.toLowerCase();
@@ -70,18 +78,27 @@ export function initSearch(view, container) {
     query = q;
     findMatches(q);
     if (matches.length) goTo(matchIndex >= 0 ? Math.min(matchIndex, matches.length - 1) : 0);
-    else { dispatchMarks(Decoration.none); updateCount(); }
+    else {
+      dispatchMarks(Decoration.none);
+      updateCount();
+    }
   }
 
   function updateCount() {
     if (!countEl) return;
     countEl.textContent = matches.length
       ? `${matchIndex + 1}/${matches.length}`
-      : (query ? 'no results' : '');
+      : query
+        ? 'no results'
+        : '';
   }
 
   function openPanel() {
-    if (panel) { input.focus(); input.select(); return; }
+    if (panel) {
+      input.focus();
+      input.select();
+      return;
+    }
 
     panel = document.createElement('div');
     panel.className = 'cm-search-panel';
@@ -94,12 +111,12 @@ export function initSearch(view, container) {
     countEl = document.createElement('span');
     countEl.className = 'cm-search-count';
 
-    const prev  = document.createElement('button');
+    const prev = document.createElement('button');
     prev.className = 'cm-search-btn';
     prev.title = 'Previous (Shift+Enter)';
     prev.textContent = '↑';
 
-    const next  = document.createElement('button');
+    const next = document.createElement('button');
     next.className = 'cm-search-btn';
     next.title = 'Next (Enter)';
     next.textContent = '↓';
@@ -126,19 +143,23 @@ export function initSearch(view, container) {
     close.addEventListener('click', closePanel);
 
     input.focus();
-    const sel = view.state.sliceDoc(
-      view.state.selection.main.from,
-      view.state.selection.main.to,
-    );
-    if (sel && !sel.includes('\n')) { input.value = sel; runSearch(sel); }
+    const sel = view.state.sliceDoc(view.state.selection.main.from, view.state.selection.main.to);
+    if (sel && !sel.includes('\n')) {
+      input.value = sel;
+      runSearch(sel);
+    }
   }
 
   function closePanel() {
     if (!panel) return;
     panel.remove();
-    panel = null; input = null; countEl = null;
+    panel = null;
+    input = null;
+    countEl = null;
     dispatchMarks(Decoration.none);
-    matches = []; matchIndex = -1; query = '';
+    matches = [];
+    matchIndex = -1;
+    query = '';
     view.focus();
   }
 

@@ -13,8 +13,8 @@ const _openCameras = [];
 // no id is known). Two consumers on Source.camera get the SAME getUserMedia stream
 // + <video> element via refcount — one decode, no device contention. The stream is
 // stopped only when the last handle releases.
-const _sharedSources = new Map();   // key → CameraSource
-const _pendingSources = new Map();  // key → Promise<CameraSource> (open in flight)
+const _sharedSources = new Map(); // key → CameraSource
+const _pendingSources = new Map(); // key → Promise<CameraSource> (open in flight)
 
 class CameraSource {
   constructor(key, stream) {
@@ -32,11 +32,13 @@ class CameraSource {
     // blank frame. Kick playback explicitly. Muted + playsInline → no gesture needed.
     this.element.play().catch(() => {});
   }
-  acquire() { this.refs++; }
+  acquire() {
+    this.refs++;
+  }
   release() {
     this.refs = Math.max(0, this.refs - 1);
     if (this.refs > 0) return;
-    this.stream?.getTracks().forEach(t => t.stop());
+    this.stream?.getTracks().forEach((t) => t.stop());
     this.element.srcObject = null;
     _sharedSources.delete(this.key);
     if (this.deviceId) notify('camera:close', { deviceId: this.deviceId });
@@ -51,8 +53,9 @@ async function _getSharedSource(key, constraints, id) {
   if (_pendingSources.has(key)) return _pendingSources.get(key);
   const p = (async () => {
     let stream;
-    try { stream = await navigator.mediaDevices.getUserMedia(constraints); }
-    catch (err) {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia(constraints);
+    } catch (err) {
       notify('camera:error', { deviceId: id, error: err?.message ?? String(err) });
       throw err;
     }
@@ -61,8 +64,11 @@ async function _getSharedSource(key, constraints, id) {
     return src;
   })();
   _pendingSources.set(key, p);
-  try { return await p; }
-  finally { _pendingSources.delete(key); }
+  try {
+    return await p;
+  } finally {
+    _pendingSources.delete(key);
+  }
 }
 
 export function cleanupCameras(editorId) {
@@ -90,9 +96,15 @@ class CameraStream {
     this._scoped = runScoped({ owner: ownerEditorId, onStop: () => this._release() });
   }
 
-  get element()  { return this._source.element; }
-  get _stream()  { return this._source.stream; }
-  get _deviceId() { return this._source.deviceId; }
+  get element() {
+    return this._source.element;
+  }
+  get _stream() {
+    return this._source.stream;
+  }
+  get _deviceId() {
+    return this._source.deviceId;
+  }
 
   /** Mirror the video feed horizontally */
   flip(state = true) {
@@ -102,28 +114,39 @@ class CameraStream {
     return this;
   }
 
-  stop() { this._release(); }
+  stop() {
+    this._release();
+  }
 
   async photo({ name = 'photo', download = false } = {}) {
     const v = this.element;
-    const w = v.videoWidth || 640, h = v.videoHeight || 480;
+    const w = v.videoWidth || 640,
+      h = v.videoHeight || 480;
     const c = document.createElement('canvas');
-    c.width = w; c.height = h;
+    c.width = w;
+    c.height = h;
     const ctx = c.getContext('2d');
-    if (this._flipped) { ctx.translate(w, 0); ctx.scale(-1, 1); }
+    if (this._flipped) {
+      ctx.translate(w, 0);
+      ctx.scale(-1, 1);
+    }
     ctx.drawImage(v, 0, 0, w, h);
-    return new Promise(resolve => {
-      c.toBlob(blob => {
-        if (blob) window.desktop?.addBlob(blob, { name: name + '.jpg', type: 'image', download });
-        resolve(blob);
-      }, 'image/jpeg', 0.92);
+    return new Promise((resolve) => {
+      c.toBlob(
+        (blob) => {
+          if (blob) window.desktop?.addBlob(blob, { name: name + '.jpg', type: 'image', download });
+          resolve(blob);
+        },
+        'image/jpeg',
+        0.92,
+      );
     });
   }
 
-  record({ name = 'clip', fps = 30 } = {}) {
+  record({ name = 'clip' } = {}) {
     if (!this._stream) throw new Error('Camera stopped');
     return recordStream(this._stream, {
-      onStop: blob => window.desktop?.addBlob(blob, { name: name + '.webm', type: 'video' }),
+      onStop: (blob) => window.desktop?.addBlob(blob, { name: name + '.webm', type: 'video' }),
     });
   }
 
@@ -132,8 +155,8 @@ class CameraStream {
     this._released = true;
     const i = _openCameras.indexOf(this);
     if (i >= 0) _openCameras.splice(i, 1);
-    this._source.release();   // stops tracks only when last handle releases
-    this._scoped?.dispose();  // removes from run-scoped set (onStop re-enters, guarded)
+    this._source.release(); // stops tracks only when last handle releases
+    this._scoped?.dispose(); // removes from run-scoped set (onStop re-enters, guarded)
   }
 }
 
@@ -145,7 +168,7 @@ export const Camera = {
     let id = deviceId;
     if (!id) {
       const all = await navigator.mediaDevices.enumerateDevices();
-      const cams = all.filter(d => d.kind === 'videoinput');
+      const cams = all.filter((d) => d.kind === 'videoinput');
       id = cams[index]?.deviceId ?? null;
     }
     const constraints = {
@@ -157,8 +180,11 @@ export const Camera = {
     const source = await _getSharedSource(key, constraints, id);
     const cam = new CameraStream(source, ownerEditorId);
     // Wait for video metadata so width/height are available
-    await new Promise(resolve => {
-      if (cam.element.readyState >= 1) { resolve(); return; }
+    await new Promise((resolve) => {
+      if (cam.element.readyState >= 1) {
+        resolve();
+        return;
+      }
       cam.element.addEventListener('loadedmetadata', resolve, { once: true });
     });
     notify('camera:open', {
@@ -173,7 +199,7 @@ export const Camera = {
   async list() {
     const all = await navigator.mediaDevices.enumerateDevices();
     return all
-      .filter(d => d.kind === 'videoinput')
+      .filter((d) => d.kind === 'videoinput')
       .map((d, i) => ({ index: i, deviceId: d.deviceId, label: d.label || `Camera ${i + 1}` }));
   },
 };
@@ -184,38 +210,39 @@ export const Camera = {
 // No getUserMedia at page load. acquireCamera() in media-lease.js calls _startToolbarCamera.
 
 export function initCamera() {
-  const video = document.createElement("video");
+  const video = document.createElement('video');
   video.autoplay = true;
   video.playsInline = true;
   window.__ar_video = video;
   window.camera = video; // ergonomic alias for user code
 
-  const cameraCanvas = document.getElementById("camera");
-  const cameraCtx = cameraCanvas.getContext("2d");
+  const cameraCanvas = document.getElementById('camera');
+  const cameraCtx = cameraCanvas.getContext('2d');
   let rafId = null;
   let currentStream = null;
 
   const drawFrame = () => {
     rafId = requestAnimationFrame(drawFrame);
     if (video.readyState >= video.HAVE_CURRENT_DATA) {
-      const w = cameraCanvas.width, h = cameraCanvas.height;
+      const w = cameraCanvas.width,
+        h = cameraCanvas.height;
       cameraCtx.drawImage(video, 0, 0, w, h);
     }
   };
 
   const populateCameras = (devices) => {
-    const videoDevices = devices.filter((d) => d.kind === "videoinput");
-    const select = document.getElementById("cameraSelect");
+    const videoDevices = devices.filter((d) => d.kind === 'videoinput');
+    const select = document.getElementById('cameraSelect');
     const current = select.value;
-    select.innerHTML = "";
+    select.innerHTML = '';
     videoDevices.forEach((device, i) => {
-      const opt = document.createElement("option");
+      const opt = document.createElement('option');
       opt.value = device.deviceId;
       opt.text = device.label || `Camera ${i + 1}`;
       if (opt.value === current) opt.selected = true;
       select.appendChild(opt);
     });
-    document.getElementById("cameraWrapper").style.display = videoDevices.length > 1 ? "" : "none";
+    document.getElementById('cameraWrapper').style.display = videoDevices.length > 1 ? '' : 'none';
   };
 
   // _startToolbarCamera: called by media-lease on 0→1 (first consumer).
@@ -239,49 +266,63 @@ export function initCamera() {
         window.__ar_camera_on = true;
         if (!rafId) drawFrame();
         notify('camera:open', { deviceId: 'toolbar', toolbar: true });
-        return new Promise(resolve => {
-          if (video.readyState >= 1) { resolve(); return; }
+        return new Promise((resolve) => {
+          if (video.readyState >= 1) {
+            resolve();
+            return;
+          }
           video.addEventListener('loadedmetadata', resolve, { once: true });
         });
       })
       .then(() => {
-        notify('camera:ready', { deviceId: 'toolbar', toolbar: true, width: video.videoWidth, height: video.videoHeight });
+        notify('camera:ready', {
+          deviceId: 'toolbar',
+          toolbar: true,
+          width: video.videoWidth,
+          height: video.videoHeight,
+        });
         return navigator.mediaDevices.enumerateDevices();
       })
       .then(populateCameras)
       .catch((err) => {
         notify('camera:error', { deviceId: 'toolbar', error: err?.message ?? String(err) });
-        console.warn("Camera unavailable:", err.message);
+        console.warn('Camera unavailable:', err.message);
       });
   };
 
   // _stopToolbarCamera: called by media-lease on 1→0 (last consumer released).
   const _stopToolbarCamera = () => {
-    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+    if (rafId) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
     cameraCtx.clearRect(0, 0, cameraCanvas.width, cameraCanvas.height);
     currentStream?.getTracks().forEach((t) => t.stop());
     currentStream = null;
     video.srcObject = null;
     window.__ar_camera_on = false;
-    document.getElementById("cameraWrapper").style.display = "none";
+    document.getElementById('cameraWrapper').style.display = 'none';
     notify('camera:close', { deviceId: 'toolbar', toolbar: true });
   };
 
   // Device select change handler — switch camera while live.
-  document.getElementById("cameraSelect").addEventListener("change", function () {
+  document.getElementById('cameraSelect').addEventListener('change', function () {
     if (window.__ar_camera_on) _startToolbarCamera(this.value);
   });
 
   // Permission change watcher — re-acquire if permission is granted externally.
-  navigator.permissions?.query({ name: "camera" }).then((status) => {
-    status.addEventListener("change", () => {
-      // Only re-acquire if a consumer is waiting (refcount > 0 but no stream yet).
-      if (status.state === "granted" && window.__ar_camera_on === false) {
-        // If there are active leases but stream failed, try again.
-        // media-lease will call _startToolbarCamera when count goes 0→1.
-      }
-    });
-  }).catch(() => {});
+  navigator.permissions
+    ?.query({ name: 'camera' })
+    .then((status) => {
+      status.addEventListener('change', () => {
+        // Only re-acquire if a consumer is waiting (refcount > 0 but no stream yet).
+        if (status.state === 'granted' && window.__ar_camera_on === false) {
+          // If there are active leases but stream failed, try again.
+          // media-lease will call _startToolbarCamera when count goes 0→1.
+        }
+      });
+    })
+    .catch(() => {});
 
   // Register with media-lease (ADR 023).
   initCameraLease(_startToolbarCamera, _stopToolbarCamera);
@@ -294,6 +335,6 @@ export function initCamera() {
 // ── Event bus command handler ─────────────────────────────────────────────────
 registerCommand('camera:close', ({ deviceId }) => {
   if (deviceId === 'toolbar') return; // toolbar handled by media-lease
-  const cam = _openCameras.find(c => c._deviceId === deviceId);
+  const cam = _openCameras.find((c) => c._deviceId === deviceId);
   if (cam) cam.stop(); // stop() → _release() → notify('camera:close', ...)
 });

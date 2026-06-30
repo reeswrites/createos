@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { onReset, runResetHandlers, _resetHandlerCount } from '../src/runtime/reset-registry.js';
 
 // The registry is module-singleton state; these tests register their own

@@ -28,12 +28,14 @@ import { isVideoSignal, isAudioSignal } from './signal-shape.js';
 // RAF is native — route keeps its own loop independent of the patched scheduler.
 // Timeline (wait/loop) intentionally uses patched window.setTimeout so it pauses
 // with __ar_paused and is cleaned up by the harness — same exception as tick().
-const _nativeRAF       = window.requestAnimationFrame.bind(window);
+const _nativeRAF = window.requestAnimationFrame.bind(window);
 const _nativeCancelRAF = window.cancelAnimationFrame.bind(window);
 
 // ── Live route registry (signalGraph + cleanup) ───────────────────────────────
 const _routes = new Set();
-export function getLiveRoutes() { return _routes; }
+export function getLiveRoutes() {
+  return _routes;
+}
 
 // ── SKIP sentinel — filter/debounce swallow values without writing ─────────────
 const SKIP = Symbol('route:skip');
@@ -54,12 +56,15 @@ function _t(name, args, stateful, step) {
 
 function _makeSmooth(f = 0.8) {
   let p = 0;
-  return _t('smooth', [f], true, v => { p = p * f + v * (1 - f); return p; });
+  return _t('smooth', [f], true, (v) => {
+    p = p * f + v * (1 - f);
+    return p;
+  });
 }
 
 function _makeDebounce(ms) {
   let last = 0;
-  return _t('debounce', [ms], true, v => {
+  return _t('debounce', [ms], true, (v) => {
     const n = performance.now();
     if (n - last < ms) return SKIP;
     last = n;
@@ -74,14 +79,14 @@ function _parseColor(color) {
   if (typeof color === 'string' && color.startsWith('#')) {
     const h = color.slice(1);
     if (h.length === 3) {
-      return [
-        parseInt(h[0] + h[0], 16),
-        parseInt(h[1] + h[1], 16),
-        parseInt(h[2] + h[2], 16),
-      ];
+      return [parseInt(h[0] + h[0], 16), parseInt(h[1] + h[1], 16), parseInt(h[2] + h[2], 16)];
     }
     if (h.length === 6) {
-      return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+      return [
+        parseInt(h.slice(0, 2), 16),
+        parseInt(h.slice(2, 4), 16),
+        parseInt(h.slice(4, 6), 16),
+      ];
     }
   }
   return [0, 0, 0];
@@ -92,7 +97,7 @@ function _parseColor(color) {
 function resolveSource(src) {
   // String → discrete bus event
   if (typeof src === 'string') {
-    return { kind: 'discrete', sub: fn => subscribe(src, fn), label: src };
+    return { kind: 'discrete', sub: (fn) => subscribe(src, fn), label: src };
   }
 
   // Source.mic token
@@ -110,15 +115,22 @@ function resolveSource(src) {
   if (sourceKind(src) === 'gaze') {
     const field = sourceField(src);
     const isScreen = field === 'vx' || field === 'vy';
-    let last = 0, warned = false;
+    let last = 0,
+      warned = false;
     return {
-      kind: 'continuous', label: 'gaze.' + field,
+      kind: 'continuous',
+      label: 'gaze.' + field,
       read: () => {
         const g = window.vision?.gaze?.();
         if (!g) return last;
         const v = g[field];
         if (isScreen && v == null) {
-          if (!warned) { console.warn(`route(Source.gaze.${field}): gaze not calibrated — holding ${last}. Call vision.calibrate().`); warned = true; }
+          if (!warned) {
+            console.warn(
+              `route(Source.gaze.${field}): gaze not calibrated — holding ${last}. Call vision.calibrate().`,
+            );
+            warned = true;
+          }
           return last;
         }
         if (typeof v === 'number') last = v;
@@ -149,11 +161,11 @@ function resolveSource(src) {
 
   // HTML canvas / video element → frame
   if (_isCanvas(src)) return { kind: 'frame', raw: src, label: 'canvas' };
-  if (_isVideo(src))  return { kind: 'frame', raw: src, label: 'video' };
+  if (_isVideo(src)) return { kind: 'frame', raw: src, label: 'video' };
 
   throw new Error(
     'route(): unsupported source — pass a bus event string, Source.mic, Source.camera, Source.gaze.x/.y/.vx/.vy, ' +
-    'a signal object (video.signal/audio.signal), a fn, or a canvas/video element.'
+      'a signal object (video.signal/audio.signal), a fn, or a canvas/video element.',
   );
 }
 
@@ -164,13 +176,13 @@ function resolveSource(src) {
 function resolveSink(sink, uniformPath, opts = {}) {
   // fn escape hatch
   if (typeof sink === 'function') {
-    return { write: v => sink(v), immediate: true, label: 'fn' };
+    return { write: (v) => sink(v), immediate: true, label: 'fn' };
   }
 
   // String = emit bus event
   if (typeof sink === 'string') {
     return {
-      write: v => notify(sink, typeof v === 'object' && v !== null ? v : { value: v }),
+      write: (v) => notify(sink, typeof v === 'object' && v !== null ? v : { value: v }),
       immediate: true,
       label: sink,
     };
@@ -182,10 +194,10 @@ function resolveSink(sink, uniformPath, opts = {}) {
       const dot = uniformPath.indexOf('.');
       if (dot !== -1) {
         // Read-modify-write swizzle: 'uCustom.x' → set only the .x component
-        const uname     = uniformPath.slice(0, dot);
+        const uname = uniformPath.slice(0, dot);
         const component = uniformPath.slice(dot + 1);
         return {
-          write: v => {
+          write: (v) => {
             const cur = sink.getUniform(uname) ?? { x: 0, y: 0, z: 0, w: 0 };
             sink.setUniform(uname, { ...cur, [component]: v });
           },
@@ -194,7 +206,7 @@ function resolveSink(sink, uniformPath, opts = {}) {
         };
       }
       return {
-        write: v => sink.setUniform(uniformPath, v),
+        write: (v) => sink.setUniform(uniformPath, v),
         immediate: false,
         label: `shader:${uniformPath}`,
       };
@@ -204,15 +216,25 @@ function resolveSink(sink, uniformPath, opts = {}) {
     if ('value' in sink && typeof sink.value === 'number') {
       const rampMs = opts.ramp;
       if (rampMs && typeof sink.rampTo === 'function') {
-        return { write: v => sink.rampTo(v, rampMs / 1000), immediate: true, label: 'audioparam' };
+        return {
+          write: (v) => sink.rampTo(v, rampMs / 1000),
+          immediate: true,
+          label: 'audioparam',
+        };
       }
-      return { write: v => { sink.value = v; }, immediate: true, label: 'audioparam' };
+      return {
+        write: (v) => {
+          sink.value = v;
+        },
+        immediate: true,
+        label: 'audioparam',
+      };
     }
   }
 
   throw new Error(
     'route().to(): unsupported sink — pass an event string, fn, Tone.Signal/AudioParam, ' +
-    'or (shaderInst, "uniformPath").'
+      'or (shaderInst, "uniformPath").',
   );
 }
 
@@ -220,29 +242,29 @@ function resolveSink(sink, uniformPath, opts = {}) {
 
 class Route {
   constructor(src) {
-    this._src        = resolveSource(src);
-    this._chain      = [];      // [{name,args,stateful,step}]
-    this._stateful   = false;   // any stateful transform in chain?
-    this._sinks      = [];      // [{write, immediate, label}]
-    this._raf        = null;
-    this._scoped     = null;    // runScopedOutput handle (owner-scoped + keep-alive)
-    this._started    = false;
-    this._destroyed  = false;
-    this._subs       = [];      // unsubscribe fns (bus subscriptions)
-    this._onSubs     = [];      // route-scoped .on() unsubscribe fns
-    this._mixSources = [];      // [{read, combineFn}] for fan-in
-    this._held       = undefined;    // sample-and-hold cell (discrete source)
-    this._heldResult = undefined;    // evaluated result held for RAF sinks
+    this._src = resolveSource(src);
+    this._chain = []; // [{name,args,stateful,step}]
+    this._stateful = false; // any stateful transform in chain?
+    this._sinks = []; // [{write, immediate, label}]
+    this._raf = null;
+    this._scoped = null; // runScopedOutput handle (owner-scoped + keep-alive)
+    this._started = false;
+    this._destroyed = false;
+    this._subs = []; // unsubscribe fns (bus subscriptions)
+    this._onSubs = []; // route-scoped .on() unsubscribe fns
+    this._mixSources = []; // [{read, combineFn}] for fan-in
+    this._held = undefined; // sample-and-hold cell (discrete source)
+    this._heldResult = undefined; // evaluated result held for RAF sinks
 
     // Frame-route state
-    this._pipeline    = null;   // the Pipeline instance (frame routes only)
-    this._taps        = [];     // [{event, fn}] registered via .tap()
-    this._stageQueue  = [];     // [{op:'add'|'clear', type?, args?}] pending stages
-    this._timelineParts = [];   // [{atMs, ops:[]}] committed by wait()
-    this._cursor      = 0;      // accumulated ms timeline cursor
-    this._inTimeline  = false;  // true after first wait()
-    this._looping     = false;
-    this._timeoutId   = null;
+    this._pipeline = null; // the Pipeline instance (frame routes only)
+    this._taps = []; // [{event, fn}] registered via .tap()
+    this._stageQueue = []; // [{op:'add'|'clear', type?, args?}] pending stages
+    this._timelineParts = []; // [{atMs, ops:[]}] committed by wait()
+    this._cursor = 0; // accumulated ms timeline cursor
+    this._inTimeline = false; // true after first wait()
+    this._looping = false;
+    this._timeoutId = null;
 
     // Owner editor — set when constructed during a run (app.js tags it before
     // user code executes). Lets the reset handler tear down only this editor's
@@ -258,7 +280,7 @@ class Route {
     if (this._src.kind === 'frame') {
       throw new Error(
         `route().${op}(): scalar transform on a frame source. ` +
-        `Add a bridge first: .brightness() .motion() or similar.`
+          `Add a bridge first: .brightness() .motion() or similar.`,
       );
     }
   }
@@ -267,7 +289,7 @@ class Route {
     if (this._src.kind !== 'frame') {
       throw new Error(
         `route().${op}(): visual/frame method requires a frame source ` +
-        `(Source.camera, canvas element, video element).`
+          `(Source.camera, canvas element, video element).`,
       );
     }
   }
@@ -276,7 +298,7 @@ class Route {
     if (this._src.kind === 'discrete') {
       throw new Error(
         `route().${op}: bridge on a discrete (event) source. ` +
-        `Bridges only work on continuous or frame sources.`
+          `Bridges only work on continuous or frame sources.`,
       );
     }
   }
@@ -289,18 +311,52 @@ class Route {
     return this;
   }
 
-  scale(a, b, c, d)  { this._assertScalar('scale');     return this._addTransform(_t('scale',    [a,b,c,d], false, v => b===a ? c : c+(v-a)*(d-c)/(b-a))); }
-  clamp(lo, hi)      { this._assertScalar('clamp');     return this._addTransform(_t('clamp',    [lo,hi],   false, v => Math.min(hi, Math.max(lo, v)))); }
-  norm(lo, hi)       { this._assertScalar('norm');      return this._addTransform(_t('norm',     [lo,hi],   false, v => hi===lo ? 0 : (v-lo)/(hi-lo))); }
-  invert()           { this._assertScalar('invert');    return this._addTransform(_t('invert',   [],        false, v => 1-v)); }
-  get(k)             { this._assertScalar('get');       return this._addTransform(_t('get',      [k],       false, v => v?.[k])); }
-  filter(pred)       { this._assertScalar('filter');    return this._addTransform(_t('filter',   [pred],    false, v => pred(v) ? v : SKIP)); }
-  threshold(t)       { this._assertScalar('threshold'); return this._addTransform(_t('threshold',[t],       false, v => v >= t ? 1 : 0)); }
-  gate(lo, hi)       { this._assertScalar('gate');      return this._addTransform(_t('gate',     [lo,hi],   false, v => (v>=lo && v<=hi) ? v : SKIP)); }
+  scale(a, b, c, d) {
+    this._assertScalar('scale');
+    return this._addTransform(
+      _t('scale', [a, b, c, d], false, (v) => (b === a ? c : c + ((v - a) * (d - c)) / (b - a))),
+    );
+  }
+  clamp(lo, hi) {
+    this._assertScalar('clamp');
+    return this._addTransform(_t('clamp', [lo, hi], false, (v) => Math.min(hi, Math.max(lo, v))));
+  }
+  norm(lo, hi) {
+    this._assertScalar('norm');
+    return this._addTransform(
+      _t('norm', [lo, hi], false, (v) => (hi === lo ? 0 : (v - lo) / (hi - lo))),
+    );
+  }
+  invert() {
+    this._assertScalar('invert');
+    return this._addTransform(_t('invert', [], false, (v) => 1 - v));
+  }
+  get(k) {
+    this._assertScalar('get');
+    return this._addTransform(_t('get', [k], false, (v) => v?.[k]));
+  }
+  filter(pred) {
+    this._assertScalar('filter');
+    return this._addTransform(_t('filter', [pred], false, (v) => (pred(v) ? v : SKIP)));
+  }
+  threshold(t) {
+    this._assertScalar('threshold');
+    return this._addTransform(_t('threshold', [t], false, (v) => (v >= t ? 1 : 0)));
+  }
+  gate(lo, hi) {
+    this._assertScalar('gate');
+    return this._addTransform(_t('gate', [lo, hi], false, (v) => (v >= lo && v <= hi ? v : SKIP)));
+  }
 
   // Scalar transforms (stateful) — force whole-route RAF driver
-  smooth(f = 0.8)    { this._assertScalar('smooth');    return this._addTransform(_makeSmooth(f)); }
-  debounce(ms)       { this._assertScalar('debounce');  return this._addTransform(_makeDebounce(ms)); }
+  smooth(f = 0.8) {
+    this._assertScalar('smooth');
+    return this._addTransform(_makeSmooth(f));
+  }
+  debounce(ms) {
+    this._assertScalar('debounce');
+    return this._addTransform(_makeDebounce(ms));
+  }
 
   // ── Bridges — retype source to scalar (wrap existing samplers) ────────────
   // Position-constrained: must come directly after a frame/audio/continuous source.
@@ -308,8 +364,13 @@ class Route {
   get amplitude() {
     this._assertBridgeable('amplitude');
     // Wrap audio.level — reuses the harness mic analyser (no new sampling)
-    import('./media-lease.js').then(m => m.acquireMicRunScoped?.()).catch(() => {});
-    this._src = { kind: 'continuous', read: () => audio.level, label: this._src.label + '.amplitude', isMic: true };
+    import('./media-lease.js').then((m) => m.acquireMicRunScoped?.()).catch(() => {});
+    this._src = {
+      kind: 'continuous',
+      read: () => audio.level,
+      label: this._src.label + '.amplitude',
+      isMic: true,
+    };
     return this;
   }
 
@@ -319,7 +380,11 @@ class Route {
     const sig = isVideoSignal(this._src._signalObj)
       ? this._src._signalObj
       : VideoSignalAPI.signal(rawSrc ?? 'camera', opts);
-    this._src = { kind: 'continuous', read: () => sig.brightness, label: this._src.label + '.brightness' };
+    this._src = {
+      kind: 'continuous',
+      read: () => sig.brightness,
+      label: this._src.label + '.brightness',
+    };
     return this;
   }
 
@@ -336,7 +401,11 @@ class Route {
   fft() {
     this._assertBridgeable('fft');
     const sig = this._src._signalObj ?? audio.fft;
-    this._src = { kind: 'continuous', read: () => sig.fft ?? sig.getValue?.(), label: this._src.label + '.fft' };
+    this._src = {
+      kind: 'continuous',
+      read: () => sig.fft ?? sig.getValue?.(),
+      label: this._src.label + '.fft',
+    };
     return this;
   }
 
@@ -350,7 +419,7 @@ class Route {
       _routes.delete(otherSrc); // not a full route — no sinks, no keep-alive
     } else {
       const resolved = resolveSource(otherSrc);
-      read = resolved.kind === 'continuous' ? resolved.read : (() => undefined);
+      read = resolved.kind === 'continuous' ? resolved.read : () => undefined;
     }
     this._mixSources.push({ read, combineFn });
     this._stateful = true; // fan-in forces RAF
@@ -372,7 +441,7 @@ class Route {
    */
   to(sink, uniformPathOrOpts, opts) {
     let uniformPath = null;
-    let sinkOpts    = opts ?? {};
+    let sinkOpts = opts ?? {};
     if (typeof uniformPathOrOpts === 'string') {
       uniformPath = uniformPathOrOpts;
     } else if (uniformPathOrOpts && typeof uniformPathOrOpts === 'object') {
@@ -398,7 +467,7 @@ class Route {
 
     // Non-frame STT routes have no .show() — subscribe now (winId null) to trigger start.
     if (isStt && this._src.kind !== 'frame') {
-      const unsub = subscribe(event, payload => fn(payload, null));
+      const unsub = subscribe(event, (payload) => fn(payload, null));
       this._subs.push(unsub);
     }
     return this;
@@ -410,7 +479,7 @@ class Route {
     this.winId = this._pipeline?.winId ?? null;
     const winId = this.winId;
     for (const { event, fn } of this._taps) {
-      const unsub = subscribe(event, payload => fn(payload, winId));
+      const unsub = subscribe(event, (payload) => fn(payload, winId));
       this._subs.push(unsub);
     }
     return this;
@@ -427,19 +496,45 @@ class Route {
 
   // ── Frame-route visual effect stages ────────────────────────────────────
 
-  tint(color)        { return this._addStageOp('tint',      [color]); }
-  negative()         { return this._addStageOp('negative',  []); }
-  solarize(t = 0.5)  { return this._addStageOp('solarize',  [t]); }
-  posterize(n = 4)   { return this._addStageOp('posterize', [n]); }
-  duotone(c1, c2)    { return this._addStageOp('duotone',   [c1, c2]); }
-  grain(amt = 0.15)  { return this._addStageOp('grain',     [amt]); }
-  strobe(fps = 4)    { return this._addStageOp('strobe',    [fps]); }
-  blur(r = 4)        { return this._addStageOp('blur',      [r]); }
-  hue(deg = 0)       { return this._addStageOp('hue',       [deg]); }
-  ascii(opts)        { return this._addStageOp('ascii',     [opts ?? {}]); }
-  pixelate(opts)     { return this._addStageOp('pixelate',  [opts ?? {}]); }
-  fx(filter)         { return this._addStageOp('fx',        [filter]); }
-  glshader(body, o)  { return this._addStageOp('glshader',  [body, o ?? {}]); }
+  tint(color) {
+    return this._addStageOp('tint', [color]);
+  }
+  negative() {
+    return this._addStageOp('negative', []);
+  }
+  solarize(t = 0.5) {
+    return this._addStageOp('solarize', [t]);
+  }
+  posterize(n = 4) {
+    return this._addStageOp('posterize', [n]);
+  }
+  duotone(c1, c2) {
+    return this._addStageOp('duotone', [c1, c2]);
+  }
+  grain(amt = 0.15) {
+    return this._addStageOp('grain', [amt]);
+  }
+  strobe(fps = 4) {
+    return this._addStageOp('strobe', [fps]);
+  }
+  blur(r = 4) {
+    return this._addStageOp('blur', [r]);
+  }
+  hue(deg = 0) {
+    return this._addStageOp('hue', [deg]);
+  }
+  ascii(opts) {
+    return this._addStageOp('ascii', [opts ?? {}]);
+  }
+  pixelate(opts) {
+    return this._addStageOp('pixelate', [opts ?? {}]);
+  }
+  fx(filter) {
+    return this._addStageOp('fx', [filter]);
+  }
+  glshader(body, o) {
+    return this._addStageOp('glshader', [body, o ?? {}]);
+  }
 
   _addStageOp(type, args) {
     if (this._pipeline && this._pipeline._rafId) {
@@ -476,7 +571,9 @@ class Route {
     return this;
   }
 
-  clear() { return this.clearEffects(); }
+  clear() {
+    return this.clearEffects();
+  }
 
   // ── Temporal control (frame routes, optical-printing model) ───────────────
   // Effects accumulate between wait() calls. clearEffects() = scene boundary.
@@ -502,7 +599,7 @@ class Route {
   // Chainable; cb(route, payload). Auto-cleaned when route is destroyed.
 
   on(event, cb) {
-    const unsub = subscribe(event, payload => cb(this, payload));
+    const unsub = subscribe(event, (payload) => cb(this, payload));
     this._onSubs.push(unsub);
     return this;
   }
@@ -524,10 +621,10 @@ class Route {
     if (this._src.kind === 'frame') return; // frame routes have no scalar driver
     this._started = true;
 
-    const discrete    = this._src.kind === 'discrete';
-    const hasMix      = this._mixSources.length > 0;
-    const stateless   = !this._stateful && !hasMix;
-    const allImmediate = this._sinks.every(s => s.immediate);
+    const discrete = this._src.kind === 'discrete';
+    const hasMix = this._mixSources.length > 0;
+    const stateless = !this._stateful && !hasMix;
+    const allImmediate = this._sinks.every((s) => s.immediate);
 
     // Register as a run-scoped output: owner-scoped teardown + keep-alive.
     this._register();
@@ -536,7 +633,7 @@ class Route {
     // Conditions: discrete + stateless chain + no fan-in + all sinks immediate
     // → fire transform chain synchronously on event arrival (sub-ms)
     if (discrete && stateless && allImmediate && !hasMix) {
-      const unsub = this._src.sub(payload => {
+      const unsub = this._src.sub((payload) => {
         const v = this._eval(payload);
         this._held = payload;
         this._heldResult = v;
@@ -554,7 +651,9 @@ class Route {
     if (needsPull) {
       // Discrete primary source: also set up hold-cell subscription
       if (discrete && this._subs.length === 0) {
-        const unsub = this._src.sub(payload => { this._held = payload; });
+        const unsub = this._src.sub((payload) => {
+          this._held = payload;
+        });
         if (unsub) this._subs.push(unsub);
       }
 
@@ -611,7 +710,8 @@ class Route {
     this._buildPipeline();
 
     // Simple case: single segment at t=0, no loop — add stages directly before start
-    const isSingleSegment = this._timelineParts.length <= 1 &&
+    const isSingleSegment =
+      this._timelineParts.length <= 1 &&
       (!this._timelineParts[0] || this._timelineParts[0].atMs === 0) &&
       !this._looping;
 
@@ -711,18 +811,18 @@ class Route {
   _descriptor() {
     return {
       source: this._src.label,
-      chain:  this._chain.map(t => ({
-        op:   t.name,
-        args: t.args.filter(a => typeof a !== 'function'),
+      chain: this._chain.map((t) => ({
+        op: t.name,
+        args: t.args.filter((a) => typeof a !== 'function'),
       })),
-      sinks: this._sinks.map(s => s.label),
+      sinks: this._sinks.map((s) => s.label),
     };
   }
 
   _registerGraph() {
     if (!window.__ar_signalRoutes) window.__ar_signalRoutes = [];
     const d = this._descriptor();
-    const chainLabel = d.chain.map(t => t.op).join('→') || undefined;
+    const chainLabel = d.chain.map((t) => t.op).join('→') || undefined;
     for (const sink of d.sinks) {
       window.__ar_signalRoutes.push({ source: d.source, sink, label: chainLabel });
     }
@@ -734,15 +834,29 @@ class Route {
     if (this._destroyed) return;
     this._destroyed = true;
 
-    if (this._raf)       { _nativeCancelRAF(this._raf); this._raf = null; }
-    if (this._timeoutId) { window.clearTimeout(this._timeoutId); this._timeoutId = null; }
+    if (this._raf) {
+      _nativeCancelRAF(this._raf);
+      this._raf = null;
+    }
+    if (this._timeoutId) {
+      window.clearTimeout(this._timeoutId);
+      this._timeoutId = null;
+    }
 
-    for (const unsub of this._subs)   { try { unsub?.(); } catch (_) {} }
-    for (const unsub of this._onSubs) { try { unsub?.(); } catch (_) {} }
-    this._subs   = [];
+    for (const unsub of this._subs) {
+      try {
+        unsub?.();
+      } catch (_) {}
+    }
+    for (const unsub of this._onSubs) {
+      try {
+        unsub?.();
+      } catch (_) {}
+    }
+    this._subs = [];
     this._onSubs = [];
 
-    this._scoped?.dispose();   // releases keep-alive; onStop re-enters _destroy (guarded)
+    this._scoped?.dispose(); // releases keep-alive; onStop re-enters _destroy (guarded)
     this._scoped = null;
 
     // Frame-route pipeline: cleanupPipelines() handles it on reset,

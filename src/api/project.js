@@ -1,26 +1,26 @@
-import { saveWorkspaceJSON, loadWorkspaceJSON } from '../blocks/blocks.js';
+import { saveWorkspaceJSON } from '../blocks/blocks.js';
 import { serializeDesktop, restoreDesktop } from './desktop-files.js';
 import { serializeMixer, restoreMixer } from './mixer.js';
 
 // ── Serialize ─────────────────────────────────────────────────────────────────
 
 function _readAudio(win) {
-  const muteBtn   = win.querySelector('.wm-mute');
+  const muteBtn = win.querySelector('.wm-mute');
   const volSlider = win.querySelector('.wm-vol');
   return {
-    muted:  muteBtn?.classList.contains('muted') ?? false,
+    muted: muteBtn?.classList.contains('muted') ?? false,
     volume: volSlider ? parseFloat(volSlider.value) / 100 : 1,
   };
 }
 
 function _geo(win) {
   return {
-    x: parseInt(win.style.left)   || 0,
-    y: parseInt(win.style.top)    || 0,
-    w: parseInt(win.style.width)  || 320,
+    x: parseInt(win.style.left) || 0,
+    y: parseInt(win.style.top) || 0,
+    w: parseInt(win.style.width) || 320,
     h: parseInt(win.style.height) || 240,
-    visible:     win.style.display !== 'none',
-    nochrome:    win.classList.contains('wm-no-chrome'),
+    visible: win.style.display !== 'none',
+    nochrome: win.classList.contains('wm-no-chrome'),
     transparent: win.classList.contains('wm-transparent'),
   };
 }
@@ -28,7 +28,7 @@ function _geo(win) {
 export function serializeProject(wm, instances) {
   const windows = [];
 
-  document.querySelectorAll('.wm-win').forEach(win => {
+  document.querySelectorAll('.wm-win').forEach((win) => {
     const opts = win._wmSpawnOpts;
 
     if (win._wmIsEditor) {
@@ -40,12 +40,13 @@ export function serializeProject(wm, instances) {
         editorId,
         title: win.querySelector('.wm-title')?.textContent?.trim() ?? 'Editor',
         ..._geo(win),
-        audio:          _readAudio(win),
-        code:           inst.cm.state.doc.toString(),
-        mode:           inst.blocksMode ? 'blocks' : 'text',
-        blocksJson:     inst.blocksMode && inst.blocklyWorkspace
-                          ? saveWorkspaceJSON(inst.blocklyWorkspace)
-                          : null,
+        audio: _readAudio(win),
+        code: inst.cm.state.doc.toString(),
+        mode: inst.blocksMode ? 'blocks' : 'text',
+        blocksJson:
+          inst.blocksMode && inst.blocklyWorkspace
+            ? saveWorkspaceJSON(inst.blocklyWorkspace)
+            : null,
         executionState: inst.btnState,
       });
       return;
@@ -62,18 +63,18 @@ export function serializeProject(wm, instances) {
 
     if (opts.type === 'viz') {
       windows.push({
-        type:   'visualizer',
-        title:  win.querySelector('.wm-title')?.textContent?.trim() ?? 'Visualizer',
+        type: 'visualizer',
+        title: win.querySelector('.wm-title')?.textContent?.trim() ?? 'Visualizer',
         ..._geo(win),
         source: win._vizSourceEl?.value ?? opts.source ?? 'master',
-        style:  win._vizStyleEl?.value  ?? opts.style  ?? 'wave',
+        style: win._vizStyleEl?.value ?? opts.style ?? 'wave',
       });
       return;
     }
 
     if (win.id.startsWith('win-toolkit')) {
       windows.push({
-        type:  'toolkit',
+        type: 'toolkit',
         title: win.querySelector('.wm-title')?.textContent?.trim() ?? 'API Toolbox',
         ..._geo(win),
       });
@@ -83,7 +84,7 @@ export function serializeProject(wm, instances) {
     if (opts.type === 'image' || opts.type === 'video') {
       const isBlobSrc = opts.src?.startsWith('blob:');
       const entry = {
-        type:  opts.type,
+        type: opts.type,
         title: win.querySelector('.wm-title')?.textContent?.trim() ?? opts.title,
         ..._geo(win),
         loop: opts.loop,
@@ -101,10 +102,10 @@ export function serializeProject(wm, instances) {
 
     if (opts.type === 'html' && opts.html !== undefined) {
       windows.push({
-        type:  'html',
+        type: 'html',
         title: win.querySelector('.wm-title')?.textContent?.trim() ?? opts.title ?? '',
         ..._geo(win),
-        html:  opts.html ?? '',
+        html: opts.html ?? '',
       });
     }
   });
@@ -121,12 +122,12 @@ export function serializeProject(wm, instances) {
 
 function _applyGeo(win, w) {
   if (!win) return;
-  win.style.left    = `${w.x}px`;
-  win.style.top     = `${w.y}px`;
-  win.style.width   = `${w.w}px`;
-  win.style.height  = `${w.h}px`;
+  win.style.left = `${w.x}px`;
+  win.style.top = `${w.y}px`;
+  win.style.width = `${w.w}px`;
+  win.style.height = `${w.h}px`;
   win.style.display = w.visible ? 'flex' : 'none';
-  if (w.nochrome)    win.classList.add('wm-no-chrome');
+  if (w.nochrome) win.classList.add('wm-no-chrome');
   if (w.transparent) win.classList.add('wm-transparent');
 }
 
@@ -138,7 +139,7 @@ export async function applyProject(data, wm, instances, appAPI) {
   restoreDesktop(data.desktop ?? []);
   restoreMixer(data.mixer);
 
-  const editorEntries = data.windows.filter(w => w.type === 'editor');
+  const editorEntries = data.windows.filter((w) => w.type === 'editor');
   const editorIds = [];
 
   for (const w of editorEntries) {
@@ -169,8 +170,13 @@ export async function applyProject(data, wm, instances, appAPI) {
 
     if (w.type === 'visualizer') {
       const id = wm.spawn(w.title ?? 'Visualizer', {
-        type: 'viz', source: w.source, style: w.style,
-        x: w.x, y: w.y, w: w.w, h: w.h,
+        type: 'viz',
+        source: w.source,
+        style: w.style,
+        x: w.x,
+        y: w.y,
+        w: w.w,
+        h: w.h,
       });
       const win = document.getElementById(id);
       if (win && !w.visible) win.style.display = 'none';
@@ -179,9 +185,27 @@ export async function applyProject(data, wm, instances, appAPI) {
 
     if (w.type === 'image' || w.type === 'video') {
       if (w.fileKey) {
-        wm.restoreFileWindow({ id: w.fileKey, title: w.title, type: w.type, x: w.x, y: w.y, w: w.w, h: w.h, nochrome: w.nochrome, transparent: w.transparent });
+        wm.restoreFileWindow({
+          id: w.fileKey,
+          title: w.title,
+          type: w.type,
+          x: w.x,
+          y: w.y,
+          w: w.w,
+          h: w.h,
+          nochrome: w.nochrome,
+          transparent: w.transparent,
+        });
       } else if (w.src) {
-        const id = wm.spawn(w.title, { type: w.type, src: w.src, loop: w.loop, x: w.x, y: w.y, w: w.w, h: w.h });
+        const id = wm.spawn(w.title, {
+          type: w.type,
+          src: w.src,
+          loop: w.loop,
+          x: w.x,
+          y: w.y,
+          w: w.w,
+          h: w.h,
+        });
         const win = document.getElementById(id);
         if (win && !w.visible) win.style.display = 'none';
       }
@@ -189,7 +213,14 @@ export async function applyProject(data, wm, instances, appAPI) {
     }
 
     if (w.type === 'html') {
-      const id = wm.spawn(w.title ?? '', { type: 'html', html: w.html ?? '', x: w.x, y: w.y, w: w.w, h: w.h });
+      const id = wm.spawn(w.title ?? '', {
+        type: 'html',
+        html: w.html ?? '',
+        x: w.x,
+        y: w.y,
+        w: w.w,
+        h: w.h,
+      });
       const win = document.getElementById(id);
       if (win && !w.visible) win.style.display = 'none';
     }
@@ -220,7 +251,9 @@ export async function saveProject(wm, instances) {
     try {
       const handle = await window.showSaveFilePicker({
         suggestedName: 'project.vljson',
-        types: [{ description: 'VL Project', accept: { 'application/json': ['.vljson', '.json'] } }],
+        types: [
+          { description: 'VL Project', accept: { 'application/json': ['.vljson', '.json'] } },
+        ],
       });
       const writable = await handle.createWritable();
       await writable.write(json);
@@ -234,9 +267,11 @@ export async function saveProject(wm, instances) {
 
   // Fallback: download
   const blob = new Blob([json], { type: 'application/json' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href = url; a.download = 'project.vljson'; a.click();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'project.vljson';
+  a.click();
   URL.revokeObjectURL(url);
 }
 
@@ -246,7 +281,9 @@ export async function loadProject(wm, instances, appAPI) {
   if (window.showOpenFilePicker) {
     try {
       const [handle] = await window.showOpenFilePicker({
-        types: [{ description: 'VL Project', accept: { 'application/json': ['.vljson', '.json'] } }],
+        types: [
+          { description: 'VL Project', accept: { 'application/json': ['.vljson', '.json'] } },
+        ],
       });
       json = await (await handle.getFile()).text();
     } catch (e) {
@@ -256,9 +293,10 @@ export async function loadProject(wm, instances, appAPI) {
   }
 
   if (!json) {
-    json = await new Promise(resolve => {
+    json = await new Promise((resolve) => {
       const input = document.createElement('input');
-      input.type = 'file'; input.accept = '.vljson,.json';
+      input.type = 'file';
+      input.accept = '.vljson,.json';
       input.onchange = async () => {
         const file = input.files?.[0];
         resolve(file ? await file.text() : null);
@@ -270,6 +308,11 @@ export async function loadProject(wm, instances, appAPI) {
   if (!json) return;
 
   let data;
-  try { data = JSON.parse(json); } catch (e) { console.error('Invalid project file:', e); return; }
+  try {
+    data = JSON.parse(json);
+  } catch (e) {
+    console.error('Invalid project file:', e);
+    return;
+  }
   await applyProject(data, wm, instances, appAPI);
 }

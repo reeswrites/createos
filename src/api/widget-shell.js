@@ -12,7 +12,7 @@ import { WidgetHistory } from './widget-history.js';
 import { insertSnippet } from '../editor/active-editor.js';
 import { buildReplayCode } from './performance-recorder.js';
 
-const ACTIVE_COLOR    = '#cba6f7';
+const ACTIVE_COLOR = '#cba6f7';
 const INACTIVE_BORDER = '#45475a';
 
 // ── Capture button (Performance recording, ADR 031) ───────────────────────────
@@ -27,8 +27,8 @@ export function wireCaptureButton(btn, { take, widget, idleLabel = '● Rec' }) 
     recording = !recording;
     if (recording) {
       take.arm();
-      btn.textContent  = '■ Stop';
-      btn.style.color  = '#f38ba8';
+      btn.textContent = '■ Stop';
+      btn.style.color = '#f38ba8';
       btn.dataset.recording = '1';
     } else {
       const actions = take.disarm();
@@ -46,35 +46,51 @@ export function wireCaptureButton(btn, { take, widget, idleLabel = '● Rec' }) 
 // only the thumbnail row; the widget wires ctrl events to render/history/save.
 export function buildFrameStrip(ctrl, { thumbH = 36, minThumbW = 0 } = {}) {
   const strip = document.createElement('div');
-  strip.style.cssText = 'display:flex;flex-direction:column;flex-shrink:0;background:#181825;border-top:1px solid #313244;';
+  strip.style.cssText =
+    'display:flex;flex-direction:column;flex-shrink:0;background:#181825;border-top:1px solid #313244;';
 
   const thumbRow = document.createElement('div');
-  thumbRow.style.cssText = 'display:flex;gap:4px;padding:4px 8px;overflow-x:auto;align-items:center;min-height:50px;max-height:58px;';
+  thumbRow.style.cssText =
+    'display:flex;gap:4px;padding:4px 8px;overflow-x:auto;align-items:center;min-height:50px;max-height:58px;';
   strip.appendChild(thumbRow);
 
   const btnRow = document.createElement('div');
-  btnRow.style.cssText = 'display:flex;gap:4px;padding:2px 8px 5px;align-items:center;flex-wrap:wrap;';
+  btnRow.style.cssText =
+    'display:flex;gap:4px;padding:2px 8px 5px;align-items:center;flex-wrap:wrap;';
 
   const mk = (html, title, fn) => {
     const b = document.createElement('button');
-    b.innerHTML = html; b.title = title;
+    b.innerHTML = html;
+    b.title = title;
     b.style.cssText = `background:#313244;color:#cdd6f4;border:1px solid ${INACTIVE_BORDER};
       border-radius:4px;padding:2px 7px;font-size:11px;cursor:pointer;`;
     b.addEventListener('click', fn);
     return b;
   };
 
-  btnRow.appendChild(mk('<i class="fa-solid fa-plus"></i>',          'Add frame',              () => ctrl.add()));
-  btnRow.appendChild(mk('<i class="fa-solid fa-clone"></i>',         'Duplicate current frame', () => ctrl.duplicate()));
-  btnRow.appendChild(mk('<i class="fa-solid fa-broom"></i>',         'Clear frame',            () => ctrl.clearCurrent()));
-  btnRow.appendChild(mk('<i class="fa-solid fa-trash"></i>',         'Delete current frame',   () => ctrl.remove()));
-  btnRow.appendChild(mk('<i class="fa-solid fa-chevron-left"></i>',  'Move frame left',        () => ctrl.move(-1)));
-  btnRow.appendChild(mk('<i class="fa-solid fa-chevron-right"></i>', 'Move frame right',       () => ctrl.move(+1)));
+  btnRow.appendChild(mk('<i class="fa-solid fa-plus"></i>', 'Add frame', () => ctrl.add()));
+  btnRow.appendChild(
+    mk('<i class="fa-solid fa-clone"></i>', 'Duplicate current frame', () => ctrl.duplicate()),
+  );
+  btnRow.appendChild(
+    mk('<i class="fa-solid fa-broom"></i>', 'Clear frame', () => ctrl.clearCurrent()),
+  );
+  btnRow.appendChild(
+    mk('<i class="fa-solid fa-trash"></i>', 'Delete current frame', () => ctrl.remove()),
+  );
+  btnRow.appendChild(
+    mk('<i class="fa-solid fa-chevron-left"></i>', 'Move frame left', () => ctrl.move(-1)),
+  );
+  btnRow.appendChild(
+    mk('<i class="fa-solid fa-chevron-right"></i>', 'Move frame right', () => ctrl.move(+1)),
+  );
 
   const onionBtn = mk('<i class="fa-solid fa-layer-group"></i>', 'Toggle onion skin', () => {
     ctrl.onion = !ctrl.onion;
   });
-  const syncOnion = () => { onionBtn.style.borderColor = ctrl.onion ? ACTIVE_COLOR : INACTIVE_BORDER; };
+  const syncOnion = () => {
+    onionBtn.style.borderColor = ctrl.onion ? ACTIVE_COLOR : INACTIVE_BORDER;
+  };
   ctrl.on('onion', syncOnion);
   btnRow.appendChild(onionBtn);
   strip.appendChild(btnRow);
@@ -83,13 +99,14 @@ export function buildFrameStrip(ctrl, { thumbH = 36, minThumbW = 0 } = {}) {
     thumbRow.innerHTML = '';
     for (let i = 0; i < ctrl.count; i++) {
       const wrap = document.createElement('div');
-      wrap.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;flex-shrink:0;';
+      wrap.style.cssText =
+        'display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;flex-shrink:0;';
 
       const tc = document.createElement('canvas');
-      ctrl.drawThumb(tc, i);                       // widget sizes + paints tc
+      ctrl.drawThumb(tc, i); // widget sizes + paints tc
       // Display aspect: controller may override (e.g. non-square ASCII cells);
       // otherwise derive from the thumbnail canvas's own pixel ratio.
-      const ar = ctrl.thumbAspect ?? ((tc.width / tc.height) || 1);
+      const ar = ctrl.thumbAspect ?? (tc.width / tc.height || 1);
       const tw = Math.max(minThumbW, Math.round(thumbH * ar));
       const px = ctrl.thumbPixelated ? 'image-rendering:pixelated;' : '';
       tc.style.cssText = `width:${tw}px;height:${thumbH}px;border:2px solid ${i === ctrl.index ? ACTIVE_COLOR : INACTIVE_BORDER};border-radius:3px;${px}`;
@@ -118,7 +135,8 @@ export function buildFrameStrip(ctrl, { thumbH = 36, minThumbW = 0 } = {}) {
 // export buttons (Code/PNG/Sheet) appended after the spacer — see Fork C, ADR.
 export function buildTransport(ctrl, { onFpsChange, extraButtons = [] } = {}) {
   const row = document.createElement('div');
-  row.style.cssText = 'display:flex;align-items:center;gap:5px;padding:5px 8px;background:#13131f;border-top:1px solid #2a2a3e;flex-shrink:0;flex-wrap:wrap;';
+  row.style.cssText =
+    'display:flex;align-items:center;gap:5px;padding:5px 8px;background:#13131f;border-top:1px solid #2a2a3e;flex-shrink:0;flex-wrap:wrap;';
 
   const mkBtn = (html, color, title, fn) => {
     const b = document.createElement('button');
@@ -145,8 +163,12 @@ export function buildTransport(ctrl, { onFpsChange, extraButtons = [] } = {}) {
   fpsLbl.style.cssText = 'color:#6c7086;font-size:10px;font-family:monospace;';
 
   const fpsIn = document.createElement('input');
-  fpsIn.type = 'number'; fpsIn.value = String(ctrl.fps ?? 8); fpsIn.min = '1'; fpsIn.max = '60';
-  fpsIn.style.cssText = 'width:38px;background:#1e1e2e;color:#cdd6f4;border:1px solid #313244;border-radius:3px;padding:2px 4px;font-size:11px;font-family:monospace;text-align:center;';
+  fpsIn.type = 'number';
+  fpsIn.value = String(ctrl.fps ?? 8);
+  fpsIn.min = '1';
+  fpsIn.max = '60';
+  fpsIn.style.cssText =
+    'width:38px;background:#1e1e2e;color:#cdd6f4;border:1px solid #313244;border-radius:3px;padding:2px 4px;font-size:11px;font-family:monospace;text-align:center;';
   fpsIn.addEventListener('change', () => {
     const fps = parseInt(fpsIn.value, 10) || 8;
     ctrl.fps = fps;
@@ -181,20 +203,35 @@ export function buildTransport(ctrl, { onFpsChange, extraButtons = [] } = {}) {
 // returns { winId, win, body, save, history } — `save` is the debounced autosave.
 export function mountWidgetShell(opts) {
   const {
-    title, x, y, w, h, widgetType, rows = [], bg = '#1e1e2e',
-    getState, save: saveCfg, history: historyHooks,
-    onMount, onDestroy, keepIconOnClose = false,
+    title,
+    x,
+    y,
+    w,
+    h,
+    widgetType,
+    rows = [],
+    bg = '#1e1e2e',
+    getState,
+    save: saveCfg,
+    history: historyHooks,
+    onMount,
+    onDestroy,
+    keepIconOnClose = false,
   } = opts;
 
   if (!window.wm) return null;
 
   const winId = window.wm.spawn(title, {
-    type: 'html', html: '', w, h, audio: false,
+    type: 'html',
+    html: '',
+    w,
+    h,
+    audio: false,
     ...(x != null ? { x } : {}),
     ...(y != null ? { y } : {}),
   });
 
-  const win  = document.getElementById(winId);
+  const win = document.getElementById(winId);
   if (!win) return null;
   const body = win.querySelector('.wm-body');
   if (!body) return null;
@@ -202,7 +239,7 @@ export function mountWidgetShell(opts) {
   body.style.cssText += `background:${bg};overflow:hidden;padding:0;flex-direction:column;gap:0;`;
   for (const row of rows) if (row) body.appendChild(row);
 
-  win._widgetType  = widgetType;
+  win._widgetType = widgetType;
   win._widgetState = () => getState();
 
   let history = null;
@@ -221,11 +258,15 @@ export function mountWidgetShell(opts) {
     clearTimeout(_saveTimer);
     _saveTimer = setTimeout(() => {
       const content = JSON.stringify(getState());
-      const blob    = new Blob([content], { type: 'application/json' });
-      const url     = URL.createObjectURL(blob);
-      const id      = saveCfg.getIconId();
+      const blob = new Blob([content], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const id = saveCfg.getIconId();
       if (!id) {
-        const newId = window.desktop?.add(url, { name: saveCfg.name, type: saveCfg.type, content })?.id;
+        const newId = window.desktop?.add(url, {
+          name: saveCfg.name,
+          type: saveCfg.type,
+          content,
+        })?.id;
         saveCfg.setIconId(newId);
       } else {
         window.desktop?.updateUrl(id, url, content);

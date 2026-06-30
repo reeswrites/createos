@@ -38,11 +38,9 @@ describe('readAnalyser', () => {
   });
 
   it('Web Audio AnalyserNode path: normalises byte values', () => {
-    let capturedData;
     const node = {
       frequencyBinCount: 4,
       getByteFrequencyData: vi.fn(arr => {
-        capturedData = arr;
         arr[0] = 0;
         arr[1] = 128;
         arr[2] = 255;

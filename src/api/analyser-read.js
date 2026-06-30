@@ -46,8 +46,8 @@ export function bands(fft) {
   };
   return {
     value: avg(0, n),
-    bass:  avg(0, e),
-    mid:   avg(e, m),
-    high:  avg(m, n),
+    bass: avg(0, e),
+    mid: avg(e, m),
+    high: avg(m, n),
   };
 }

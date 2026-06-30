@@ -49,14 +49,14 @@ export function initStrudel() {
   try {
     const Native = window.AudioContext || window.webkitAudioContext;
     const ctx = new Native({ latencyHint: 'interactive' });
-    Tone.setContext(ctx);    // Tone master, on the shared native ctx
-    setAudioContext(ctx);    // superdough shares the exact same native ctx
+    Tone.setContext(ctx); // Tone master, on the shared native ctx
+    setAudioContext(ctx); // superdough shares the exact same native ctx
   } catch (_) {}
 
-  initAudioOnFirstClick();   // superdough resumes the (shared) ctx on first user gesture
-  miniAllStrings();          // setStringParser(mini) only — no String.prototype patch in this version
+  initAudioOnFirstClick(); // superdough resumes the (shared) ctx on first user gesture
+  miniAllStrings(); // setStringParser(mini) only — no String.prototype patch in this version
 
-  _repl = webaudioRepl({});  // NB: no transpiler (ADR 035 #2)
+  _repl = webaudioRepl({}); // NB: no transpiler (ADR 035 #2)
 
   _initDone = (async () => {
     await evalScope(
@@ -65,7 +65,9 @@ export function initStrudel() {
       import('@strudel/tonal'),
       import('@strudel/webaudio'),
     );
-    try { await registerSynthSounds(); } catch (_) {}
+    try {
+      await registerSynthSounds();
+    } catch (_) {}
     return _repl;
   })();
 
@@ -75,12 +77,19 @@ export function initStrudel() {
   // Strudel; stack(...) to layer). .stop()/hush() halt the scheduler.
   Pattern.prototype.play = function () {
     _initDone.then(() => {
-      try { _wireStrip(); } catch (_) {}
+      try {
+        _wireStrip();
+      } catch (_) {}
       _repl.setPattern(this, true);
     });
     return this;
   };
-  Pattern.prototype.stop = function () { try { _repl?.stop(); } catch (_) {} return this; };
+  Pattern.prototype.stop = function () {
+    try {
+      _repl?.stop();
+    } catch (_) {}
+    return this;
+  };
 
   return _initDone;
 }
@@ -88,12 +97,22 @@ export function initStrudel() {
 // ── Tempo bridge (ADR 035 #3) ───────────────────────────────────────────────
 
 export function setcps(n) {
-  try { _repl?.scheduler?.setCps?.(n); } catch (_) {}
-  try { Tone.getTransport().bpm.value = n * 60; } catch (_) {}
+  try {
+    _repl?.scheduler?.setCps?.(n);
+  } catch (_) {}
+  try {
+    Tone.getTransport().bpm.value = n * 60;
+  } catch (_) {}
   return n;
 }
-export function setcpm(n) { return setcps(n / 60); }
-export function hush() { try { _repl?.stop(); } catch (_) {} }
+export function setcpm(n) {
+  return setcps(n / 60);
+}
+export function hush() {
+  try {
+    _repl?.stop();
+  } catch (_) {}
+}
 
 // ── Mixer strip (ADR 035 #4) ────────────────────────────────────────────────
 // Reroute superdough's single master node into a dedicated "Strudel" strip.
@@ -102,15 +121,17 @@ export function hush() { try { _repl?.stop(); } catch (_) {} }
 function _wireStrip() {
   if (_stripWired) return;
   let dg;
-  try { dg = getSuperdoughAudioController()?.output?.destinationGain; } catch (_) {}
-  if (!dg) return;                       // superdough not initialised yet — retry next play
+  try {
+    dg = getSuperdoughAudioController()?.output?.destinationGain;
+  } catch (_) {}
+  if (!dg) return; // superdough not initialised yet — retry next play
   try {
     const strip = acquireStrip('Strudel', { type: 'node', lifecycle: 'persistent' });
-    dg.disconnect();                     // detach from ctx.destination
-    strip.connectFrom(dg);               // → strip._in → channel → masterIn → destination
+    dg.disconnect(); // detach from ctx.destination
+    strip.connectFrom(dg); // → strip._in → channel → masterIn → destination
     _stripWired = true;
   } catch (_) {
-    _stripWired = false;                 // leave default routing intact on failure
+    _stripWired = false; // leave default routing intact on failure
   }
 }
 
@@ -122,14 +143,45 @@ function _wireStrip() {
 
 const GLOBAL_NAMES = [
   // sources
-  'note', 's', 'n', 'sound', 'silence',
+  'note',
+  's',
+  'n',
+  'sound',
+  'silence',
   // combinators
-  'stack', 'cat', 'slowcat', 'fastcat', 'seq', 'sequence', 'timeCat', 'arrange', 'polymeter', 'polyrhythm', 'run',
+  'stack',
+  'cat',
+  'slowcat',
+  'fastcat',
+  'seq',
+  'sequence',
+  'timeCat',
+  'arrange',
+  'polymeter',
+  'polyrhythm',
+  'run',
   // random / signals
-  'rand', 'rand2', 'perlin', 'irand', 'choose', 'wchoose', 'chooseCycles', 'randcat',
-  'sine', 'cosine', 'saw', 'isaw', 'square', 'tri', 'signal', 'steady',
+  'rand',
+  'rand2',
+  'perlin',
+  'irand',
+  'choose',
+  'wchoose',
+  'chooseCycles',
+  'randcat',
+  'sine',
+  'cosine',
+  'saw',
+  'isaw',
+  'square',
+  'tri',
+  'signal',
+  'steady',
   // misc helpers
-  'pure', 'reify', 'mini', 'samples',
+  'pure',
+  'reify',
+  'mini',
+  'samples',
 ];
 
 export function strudelGlobals() {
@@ -146,4 +198,6 @@ export function strudelGlobals() {
 }
 
 // ── Reset (ADR 035 #5) ──────────────────────────────────────────────────────
-onReset(() => { hush(); });
+onReset(() => {
+  hush();
+});

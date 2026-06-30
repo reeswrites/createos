@@ -16,7 +16,7 @@ vi.mock('tone', () => {
 });
 
 const m = await import('../src/api/mixer.js');
-const { mixer, acquireStrip, getStrip, releaseStrip, cleanupMixer, serializeMixer, restoreMixer } = m;
+const { mixer, acquireStrip, getStrip, cleanupMixer, serializeMixer, restoreMixer } = m;
 
 // localStorage is non-functional in this jsdom env (mixer guards it with try/catch);
 // assert persisted settings via serializeMixer() instead.
@@ -66,7 +66,7 @@ describe('Mixer strips', () => {
   });
 
   test('cleanupMixer tears down run strips for the editor but keeps settings', () => {
-    const s = acquireStrip('lead', { type: 'instrument', owner: 7, lifecycle: 'run' });
+    acquireStrip('lead', { type: 'instrument', owner: 7, lifecycle: 'run' });
     mixer.strip('lead').volume(-9);
     cleanupMixer(7);
     expect(getStrip('lead')).toBeNull();

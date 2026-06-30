@@ -41,7 +41,7 @@ afterEach(() => {
 
 describe('statusBar.set()', () => {
   it('calls wm.spawn on first use', () => {
-    const { textEl } = mockWm();
+    mockWm();
     statusBar.set('hello');
     expect(window.wm.spawn).toHaveBeenCalledOnce();
   });

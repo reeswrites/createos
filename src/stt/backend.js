@@ -13,17 +13,23 @@
 export class STTBackend {
   // True if this backend can emit meaningful partial/interim transcripts mid-utterance.
   // CTC → true; Whisper → false (it decodes the whole window at once).
-  get interim() { return true; }
+  get interim() {
+    return true;
+  }
 
   // Called once before the first audio chunk. Load the model, warm up.
   async init() {}
 
   // Feed a Float32Array of mono PCM at 16 kHz. Return the current best-guess
   // transcript string for the rolling window (may be '').
-  async transcribe(_float32Chunk) { return ''; }
+  async transcribe(_float32Chunk) {
+    return '';
+  }
 
   // Called when VAD detects silence — flush held state, return the final transcript.
-  async flush() { return ''; }
+  async flush() {
+    return '';
+  }
 
   // Tear down: drop the model session, free workers. Idempotent.
   destroy() {}

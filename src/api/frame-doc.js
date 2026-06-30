@@ -17,47 +17,71 @@
 import { WidgetEvents } from './widget-events.js';
 
 export class FrameDoc {
-  constructor({ frames = null, createBlank, copyFrame, clearFrame, drawThumb,
-                fps = 8, thumbAspect = null, thumbPixelated = false } = {}) {
+  constructor({
+    frames = null,
+    createBlank,
+    copyFrame,
+    clearFrame,
+    drawThumb,
+    fps = 8,
+    thumbAspect = null,
+    thumbPixelated = false,
+  } = {}) {
     this._createBlank = createBlank;
-    this._copyFrame   = copyFrame;
-    this._clearFrame  = clearFrame;
-    this._drawThumb   = drawThumb;
+    this._copyFrame = copyFrame;
+    this._clearFrame = clearFrame;
+    this._drawThumb = drawThumb;
     // Optional thumbnail display hints consumed by widget-shell.buildFrameStrip.
-    this.thumbAspect    = thumbAspect;     // CSS width/height ratio override
-    this.thumbPixelated = thumbPixelated;  // image-rendering:pixelated
-    this.fps    = fps;
-    this._fi     = 0;
-    this._onion  = false;
-    this._iid    = null;
+    this.thumbAspect = thumbAspect; // CSS width/height ratio override
+    this.thumbPixelated = thumbPixelated; // image-rendering:pixelated
+    this.fps = fps;
+    this._fi = 0;
+    this._onion = false;
+    this._iid = null;
     this._events = new WidgetEvents();
-    this._frames = (frames && frames.length) ? frames : [createBlank()];
+    this._frames = frames && frames.length ? frames : [createBlank()];
   }
 
   // ── Queries ──────────────────────────────────────────────────────────────
-  get frames() { return this._frames; }
+  get frames() {
+    return this._frames;
+  }
   // Replace the whole frame list in place (e.g. AsciiEditor grid resize remaps
   // every frame). Caller is responsible for keeping index in range.
-  set frames(v) { this._frames = v; }
-  get count()  { return this._frames.length; }
-  get index()  { return this._fi; }
+  set frames(v) {
+    this._frames = v;
+  }
+  get count() {
+    return this._frames.length;
+  }
+  get index() {
+    return this._fi;
+  }
   set index(n) {
     const len = this._frames.length;
     this._fi = ((n % len) + len) % len;
   }
-  get isPlaying() { return this._iid != null; }
-  get onion() { return this._onion; }
+  get isPlaying() {
+    return this._iid != null;
+  }
+  get onion() {
+    return this._onion;
+  }
   set onion(v) {
     this._onion = !!v;
     this._events.emit('onion', { on: this._onion });
   }
 
-  current() { return this._frames[this._fi]; }
+  current() {
+    return this._frames[this._fi];
+  }
   prev() {
     const len = this._frames.length;
     return this._frames[(this._fi - 1 + len) % len];
   }
-  drawThumb(tc, i) { this._drawThumb?.(tc, this._frames[i], i); }
+  drawThumb(tc, i) {
+    this._drawThumb?.(tc, this._frames[i], i);
+  }
 
   // ── Navigation ─────────────────────────────────────────────────────────────
   // go() is a user-driven selection (thumbnail click): render, no history/save.
@@ -83,9 +107,7 @@ export class FrameDoc {
     return this._fi;
   }
   duplicate() {
-    const copy = this._copyFrame
-      ? this._copyFrame(this.current())
-      : this._createBlank();
+    const copy = this._copyFrame ? this._copyFrame(this.current()) : this._createBlank();
     this._frames.push(copy);
     this._fi = this._frames.length - 1;
     this._emitMutate('duplicate');
@@ -132,7 +154,13 @@ export class FrameDoc {
   // ── Events ───────────────────────────────────────────────────────────────
   // Events: 'mutate' {action,index,count}, 'select' {index,count},
   //         'tick' {index}, 'onion' {on}.
-  on(evt, fn)  { this._events.on(evt, fn);  return this; }
+  on(evt, fn) {
+    this._events.on(evt, fn);
+    return this;
+  }
 
-  destroy() { this.stop(); this._events.clear(); }
+  destroy() {
+    this.stop();
+    this._events.clear();
+  }
 }

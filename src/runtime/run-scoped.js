@@ -37,13 +37,18 @@ export function runScoped({ owner = window.__ar_active_editor_id, onStop } = {})
   const h = {
     owner: owner ?? null,
     _disposed: false,
-    get disposed() { return h._disposed; },
+    get disposed() {
+      return h._disposed;
+    },
     dispose() {
       if (h._disposed) return;
       h._disposed = true;
       _handles.delete(h);
-      try { onStop?.(); }
-      catch (e) { console.error('[run-scoped] onStop failed:', e); }
+      try {
+        onStop?.();
+      } catch (e) {
+        console.error('[run-scoped] onStop failed:', e);
+      }
     },
   };
   _handles.add(h);
@@ -66,8 +71,11 @@ export function runScopedOutput({ owner = window.__ar_active_editor_id, onStop, 
   return runScoped({
     owner,
     onStop() {
-      try { onStop?.(); }
-      finally { live.release(); }
+      try {
+        onStop?.();
+      } finally {
+        live.release();
+      }
     },
   });
 }
@@ -81,4 +89,6 @@ onReset((editorId) => {
 });
 
 // ── Diagnostics / test helper ───────────────────────────────────────────────────
-export function _scopedCount() { return _handles.size; }
+export function _scopedCount() {
+  return _handles.size;
+}

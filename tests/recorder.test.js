@@ -46,7 +46,7 @@ afterEach(() => {
 describe('Recording', () => {
   it('creates a MediaRecorder and calls start(100)', () => {
     const stream = { getTracks: () => [] };
-    const rec = new Recording(stream, {});
+    new Recording(stream, {});
     const mr = MockMediaRecorder.instances[0];
     expect(mr).toBeDefined();
     expect(mr.state).toBe('recording');
@@ -110,7 +110,7 @@ describe('cleanupRecorders', () => {
   it('stops all in-flight recordings and still fires onStop', () => {
     const onStop = vi.fn();
     const stream = { getTracks: () => [] };
-    const rec = recordStream(stream, { onStop });
+    recordStream(stream, { onStop });
     const mr = MockMediaRecorder.instances[0];
     mr.fireData(new Blob(['x']));
     cleanupRecorders();
@@ -121,8 +121,8 @@ describe('cleanupRecorders', () => {
   it('handles multiple in-flight recordings', () => {
     const stream = { getTracks: () => [] };
     const s1 = vi.fn(), s2 = vi.fn();
-    const r1 = recordStream(stream, { onStop: s1 });
-    const r2 = recordStream(stream, { onStop: s2 });
+    recordStream(stream, { onStop: s1 });
+    recordStream(stream, { onStop: s2 });
     MockMediaRecorder.instances[0].fireData(new Blob(['a']));
     MockMediaRecorder.instances[1].fireData(new Blob(['b']));
     cleanupRecorders();

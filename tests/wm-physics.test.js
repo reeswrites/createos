@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 // Physics logic is inside the wm API object returned by initWM.
 // We test the internal _physTick and push/physics/gravity methods directly.

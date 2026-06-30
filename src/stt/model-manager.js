@@ -11,14 +11,14 @@
 
 export const MODELS = {
   'ctc-en': {
-    id:    'Xenova/wav2vec2-base-960h',
-    task:  'automatic-speech-recognition',
+    id: 'Xenova/wav2vec2-base-960h',
+    task: 'automatic-speech-recognition',
     label: 'Speech-to-text (fast, interim)',
     sizeMb: 94,
   },
   'whisper-en': {
-    id:    'onnx-community/whisper-tiny.en',
-    task:  'automatic-speech-recognition',
+    id: 'onnx-community/whisper-tiny.en',
+    task: 'automatic-speech-recognition',
     label: 'Speech-to-text (accurate, final-only)',
     sizeMb: 41,
   },
@@ -29,8 +29,8 @@ const CACHE_NAME = 'transformers-cache';
 class ModelManager extends EventTarget {
   constructor() {
     super();
-    this._pipelines = {};   // modelKey → loaded pipeline instance
-    this._progress  = {};   // modelKey → 0-100 (present only while downloading)
+    this._pipelines = {}; // modelKey → loaded pipeline instance
+    this._progress = {}; // modelKey → 0-100 (present only while downloading)
   }
 
   // 'uncached' | 'downloading' | 'ready'
@@ -45,7 +45,9 @@ class ModelManager extends EventTarget {
     try {
       const est = await navigator.storage.estimate();
       return { used: est.usage ?? 0, quota: est.quota ?? 0 };
-    } catch { return { used: 0, quota: 0 }; }
+    } catch {
+      return { used: 0, quota: 0 };
+    }
   }
 
   // Load from cache or download. Returns the pipeline. Fires 'progress' events.
@@ -72,7 +74,12 @@ class ModelManager extends EventTarget {
       });
     } catch (e) {
       delete this._progress[modelKey];
-      this._emit('progress', { modelKey, percent: 0, status: 'error', error: e?.message ?? String(e) });
+      this._emit('progress', {
+        modelKey,
+        percent: 0,
+        status: 'error',
+        error: e?.message ?? String(e),
+      });
       throw e;
     }
 
@@ -90,10 +97,10 @@ class ModelManager extends EventTarget {
     delete this._progress[modelKey];
     try {
       const cache = await caches.open(CACHE_NAME);
-      const keys  = await cache.keys();
-      const slug  = model.id.replace('/', '--');
-      const mine  = keys.filter(req => req.url.includes(slug) || req.url.includes(model.id));
-      await Promise.all(mine.map(req => cache.delete(req)));
+      const keys = await cache.keys();
+      const slug = model.id.replace('/', '--');
+      const mine = keys.filter((req) => req.url.includes(slug) || req.url.includes(model.id));
+      await Promise.all(mine.map((req) => cache.delete(req)));
     } catch (e) {
       console.warn('[ModelManager] delete failed:', e?.message ?? e);
     }
@@ -104,17 +111,21 @@ class ModelManager extends EventTarget {
     try {
       const model = MODELS[modelKey];
       const cache = await caches.open(CACHE_NAME);
-      const keys  = await cache.keys();
-      const slug  = model.id.replace('/', '--');
-      return keys.some(req => req.url.includes(slug) || req.url.includes(model.id));
-    } catch { return false; }
+      const keys = await cache.keys();
+      const slug = model.id.replace('/', '--');
+      return keys.some((req) => req.url.includes(slug) || req.url.includes(model.id));
+    } catch {
+      return false;
+    }
   }
 
   async _bestDevice() {
     try {
       const adapter = await navigator.gpu?.requestAdapter();
       return adapter ? 'webgpu' : 'wasm';
-    } catch { return 'wasm'; }
+    } catch {
+      return 'wasm';
+    }
   }
 
   _emit(type, detail) {

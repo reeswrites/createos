@@ -2,10 +2,15 @@
 // Entry: new Paint(opts), paint(opts) factory, toolbar 🖌️ button
 // Sibling to SpriteEditor; reuses WidgetHistory, wm.addHistoryControls, desktop autosave.
 
-import { WidgetEvents }  from './widget-events.js';
+import { WidgetEvents } from './widget-events.js';
 import { insertSnippet } from '../editor/active-editor.js';
 import { FrameDoc } from './frame-doc.js';
-import { mountWidgetShell, buildFrameStrip, buildTransport, wireCaptureButton } from './widget-shell.js';
+import {
+  mountWidgetShell,
+  buildFrameStrip,
+  buildTransport,
+  wireCaptureButton,
+} from './widget-shell.js';
 import { onReset } from '../runtime/reset-registry.js';
 import { TextLayer } from './text-layer.js';
 import { Take } from './performance-recorder.js';
@@ -20,80 +25,82 @@ export function cleanupPaints() {
 
 // ── Default palette (same 12 swatches as sprite editor) ───────────────────────
 const PALETTE = [
-  '#000000', '#ffffff', '#ff0000', '#00ff00', '#0000ff',
-  '#ffff00', '#ff00ff', '#00ffff', '#ff8800', '#8800ff',
-  '#00ff88', '#ff0088',
+  '#000000',
+  '#ffffff',
+  '#ff0000',
+  '#00ff00',
+  '#0000ff',
+  '#ffff00',
+  '#ff00ff',
+  '#00ffff',
+  '#ff8800',
+  '#8800ff',
+  '#00ff88',
+  '#ff0088',
 ];
 
 // ── Tool definitions ────────────────────────────────────────────────────────────
 const TOOLS = [
-  { id: 'pen',     icon: '<i class="fa-solid fa-pen"></i>',           title: 'Pen (freehand)' },
-  { id: 'eraser',  icon: '<i class="fa-solid fa-eraser"></i>',        title: 'Eraser' },
-  { id: 'line',    icon: '<i class="fa-solid fa-minus"></i>',         title: 'Line' },
-  { id: 'rect',    icon: '<i class="fa-regular fa-square"></i>',      title: 'Rectangle (outline)' },
-  { id: 'ellipse', icon: '<i class="fa-regular fa-circle"></i>',      title: 'Ellipse (outline)' },
-  { id: 'fill',    icon: '<i class="fa-solid fa-fill-drip"></i>',     title: 'Fill bucket (flood fill)' },
-  { id: 'eye',     icon: '<i class="fa-solid fa-eye-dropper"></i>',   title: 'Eyedropper (pick color)' },
-  { id: 'text',    icon: '<i class="fa-solid fa-font"></i>',          title: 'Text (T)' },
+  { id: 'pen', icon: '<i class="fa-solid fa-pen"></i>', title: 'Pen (freehand)' },
+  { id: 'eraser', icon: '<i class="fa-solid fa-eraser"></i>', title: 'Eraser' },
+  { id: 'line', icon: '<i class="fa-solid fa-minus"></i>', title: 'Line' },
+  { id: 'rect', icon: '<i class="fa-regular fa-square"></i>', title: 'Rectangle (outline)' },
+  { id: 'ellipse', icon: '<i class="fa-regular fa-circle"></i>', title: 'Ellipse (outline)' },
+  { id: 'fill', icon: '<i class="fa-solid fa-fill-drip"></i>', title: 'Fill bucket (flood fill)' },
+  { id: 'eye', icon: '<i class="fa-solid fa-eye-dropper"></i>', title: 'Eyedropper (pick color)' },
+  { id: 'text', icon: '<i class="fa-solid fa-font"></i>', title: 'Text (T)' },
 ];
 
-// ── Canvas-size presets ─────────────────────────────────────────────────────────
-const SIZE_PRESETS = [
-  { label: '400×300', w: 400, h: 300 },
-  { label: '800×600', w: 800, h: 600 },
-  { label: '320×240', w: 320, h: 240 },
-  { label: '512×512', w: 512, h: 512 },
-  { label: '1280×720', w: 1280, h: 720 },
-];
-
-const ACTIVE_COLOR    = '#cba6f7';
+const ACTIVE_COLOR = '#cba6f7';
 const INACTIVE_BORDER = '#45475a';
 
 export class Paint {
   constructor({
-    width  = 400,
+    width = 400,
     height = 300,
     frames = 1,
-    bg     = '#ffffff',
-    fps    = 8,
-    title  = 'Paint',
+    bg = '#ffffff',
+    fps = 8,
+    title = 'Paint',
     _desktopIconId = null,
-    x, y,
+    x,
+    y,
     // Backdrop: image/video shown beneath strokes as a reference layer.
     // backdrop:     URL string | HTMLImageElement | HTMLVideoElement | dataURL | null
     // backdropMode: 'image' (static / frozen frame) | 'live' (video keeps playing)
-    backdrop     = null,
+    backdrop = null,
     backdropMode = 'image',
     // Internal: pre-loaded frame canvases (from restore)
     _frameCanvases = null,
   } = {}) {
-    this._w     = width;
-    this._h     = height;
-    this._bg    = bg;
+    this._w = width;
+    this._h = height;
+    this._bg = bg;
     this._title = title;
     this._desktopIconId = _desktopIconId;
 
-    this._tool    = 'pen';
-    this._color   = '#000000';
-    this._brush   = 6;
+    this._tool = 'pen';
+    this._color = '#000000';
+    this._brush = 6;
     this._drawing = false;
-    this._startXY = null;   // { x, y } screen coords for shape tools
-    this._lastXY  = null;   // previous pointer pos for smooth curves
-    this._prevXY  = null;   // two-back pointer pos for smooth curves
+    this._startXY = null; // { x, y } screen coords for shape tools
+    this._lastXY = null; // previous pointer pos for smooth curves
+    this._prevXY = null; // two-back pointer pos for smooth curves
     this._strokeBbox = null; // { minX, minY, maxX, maxY } accumulated during stroke
-    this._textLayer = null;  // TextLayer — created in _buildCanvasArea
-    this._hitCanvas = null;  // transparent event-catching canvas in wrap
+    this._textLayer = null; // TextLayer — created in _buildCanvasArea
+    this._hitCanvas = null; // transparent event-catching canvas in wrap
 
     this._events = new WidgetEvents();
-    this._take    = new Take(this);  // Performance capture (ADR 031)
-    this._recStroke = null;          // in-flight captured stroke action
-    this._recLast   = 0;             // last point timestamp (for per-point dt)
+    this._take = new Take(this); // Performance capture (ADR 031)
+    this._recStroke = null; // in-flight captured stroke action
+    this._recLast = 0; // last point timestamp (for per-point dt)
 
     // Frame model (canvas frames) — see frame-doc.js. Hooks supply the
     // raster-specific operations; the model owns frames/index/transport/onion.
     const mkCanvas = () => {
       const fc = document.createElement('canvas');
-      fc.width = this._w; fc.height = this._h;
+      fc.width = this._w;
+      fc.height = this._h;
       if (this._bg !== 'transparent') {
         const c = fc.getContext('2d');
         c.fillStyle = this._bg;
@@ -106,7 +113,8 @@ export class Paint {
     for (let i = 0; i < count; i++) {
       if (_frameCanvases) {
         const fc = document.createElement('canvas');
-        fc.width = width; fc.height = height;
+        fc.width = width;
+        fc.height = height;
         fc.getContext('2d').drawImage(_frameCanvases[i], 0, 0);
         seed.push(fc);
       } else {
@@ -117,35 +125,46 @@ export class Paint {
       frames: seed,
       fps,
       createBlank: mkCanvas,
-      copyFrame: (src) => { const fc = mkCanvas(); fc.getContext('2d').drawImage(src, 0, 0); return fc; },
+      copyFrame: (src) => {
+        const fc = mkCanvas();
+        fc.getContext('2d').drawImage(src, 0, 0);
+        return fc;
+      },
       clearFrame: (fc) => {
         const ctx = fc.getContext('2d');
         ctx.clearRect(0, 0, this._w, this._h);
-        if (this._bg !== 'transparent') { ctx.fillStyle = this._bg; ctx.fillRect(0, 0, this._w, this._h); }
+        if (this._bg !== 'transparent') {
+          ctx.fillStyle = this._bg;
+          ctx.fillRect(0, 0, this._w, this._h);
+        }
       },
       drawThumb: (tc, fc) => {
-        tc.width = this._w; tc.height = this._h;
+        tc.width = this._w;
+        tc.height = this._h;
         const tctx = tc.getContext('2d');
-        if (this._bg !== 'transparent') { tctx.fillStyle = this._bg; tctx.fillRect(0, 0, this._w, this._h); }
+        if (this._bg !== 'transparent') {
+          tctx.fillStyle = this._bg;
+          tctx.fillRect(0, 0, this._w, this._h);
+        }
         tctx.drawImage(fc, 0, 0);
       },
     });
 
-    this._winId      = null;
-    this._canvas     = null;   // display canvas (native size)
-    this._overlay    = null;   // shape-preview + onion composite overlay
+    this._winId = null;
+    this._canvas = null; // display canvas (native size)
+    this._overlay = null; // shape-preview + onion composite overlay
     this._colorInput = null;
 
     // Replaced per-instance by the shell in _init(); no-ops until then (and when
     // there is no window manager, e.g. headless tests).
-    this._autoSave      = () => {};
+    this._autoSave = () => {};
     this._refreshThumbs = () => {};
 
     // Backdrop state
-    this._backdropInfo     = null;  // { mode:'image'|'live', src:string|null }
-    this._backdropEl       = null;  // <canvas> (image mode) or <video> (live mode)
-    this._checkerEl        = null;  // reference to checker canvas to show/hide
-    this._backdropDropdown = null;  // floating dropdown menu
+    this._backdropInfo = null; // { mode:'image'|'live', src:string|null }
+    this._backdropEl = null; // <canvas> (image mode) or <video> (live mode)
+    this._checkerEl = null; // reference to checker canvas to show/hide
+    this._backdropDropdown = null; // floating dropdown menu
 
     _paints.push(this);
     this._init(title, x, y);
@@ -155,21 +174,39 @@ export class Paint {
 
   // ── Public getters ────────────────────────────────────────────────────────────
 
-  get frameCount() { return this._fd.count; }
+  get frameCount() {
+    return this._fd.count;
+  }
 
   // Frame model lives in FrameDoc; these proxies keep the widget's existing
   // `this._frames` / `this._fi` / `this._fps` / `this._onion` references working.
-  get _frames() { return this._fd.frames; }
-  get _fi()     { return this._fd.index; }
-  set _fi(v)    { this._fd.index = v; }
-  get _fps()    { return this._fd.fps; }
-  set _fps(v)   { this._fd.fps = v; }
-  get _onion()  { return this._fd.onion; }
-  set _onion(v) { this._fd.onion = v; }
+  get _frames() {
+    return this._fd.frames;
+  }
+  get _fi() {
+    return this._fd.index;
+  }
+  set _fi(v) {
+    this._fd.index = v;
+  }
+  get _fps() {
+    return this._fd.fps;
+  }
+  set _fps(v) {
+    this._fd.fps = v;
+  }
+  get _onion() {
+    return this._fd.onion;
+  }
+  set _onion(v) {
+    this._fd.onion = v;
+  }
 
   // ── Frame API (mirrors Sprite) ───────────────────────────────────────────────
 
-  addFrame() { return this._fd.push(); }          // public: append, no index move
+  addFrame() {
+    return this._fd.push();
+  } // public: append, no index move
 
   frame(n) {
     if (n === undefined) return this._fd.index;
@@ -188,36 +225,62 @@ export class Paint {
     if (!fc) return this;
     const ctx = fc.getContext('2d');
     const style = () => {
-      ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.lineWidth = size;
-      if (tool === 'eraser') { ctx.globalCompositeOperation = 'destination-out'; ctx.strokeStyle = ctx.fillStyle = 'rgba(0,0,0,1)'; }
-      else                   { ctx.globalCompositeOperation = 'source-over';     ctx.strokeStyle = ctx.fillStyle = color; }
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = size;
+      if (tool === 'eraser') {
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.strokeStyle = ctx.fillStyle = 'rgba(0,0,0,1)';
+      } else {
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = ctx.fillStyle = color;
+      }
     };
-    const dot = (cur) => { ctx.save(); style(); ctx.beginPath(); ctx.arc(cur.x, cur.y, size / 2, 0, Math.PI * 2); ctx.fill(); ctx.restore(); this._render(); };
+    const dot = (cur) => {
+      ctx.save();
+      style();
+      ctx.beginPath();
+      ctx.arc(cur.x, cur.y, size / 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      this._render();
+    };
     const seg = (prev2, prev, cur) => {
-      ctx.save(); style(); ctx.beginPath();
+      ctx.save();
+      style();
+      ctx.beginPath();
       if (prev2) {
         ctx.moveTo((prev2.x + prev.x) / 2, (prev2.y + prev.y) / 2);
         ctx.quadraticCurveTo(prev.x, prev.y, (prev.x + cur.x) / 2, (prev.y + cur.y) / 2);
-      } else { ctx.moveTo(prev.x, prev.y); ctx.lineTo(cur.x, cur.y); }
-      ctx.stroke(); ctx.restore(); this._render();
+      } else {
+        ctx.moveTo(prev.x, prev.y);
+        ctx.lineTo(cur.x, cur.y);
+      }
+      ctx.stroke();
+      ctx.restore();
+      this._render();
     };
     let acc = 0;
     pts.forEach((pt, i) => {
-      acc += (pt.dt || 0);
-      const run = () => { if (i === 0) dot(pt); else seg(pts[i - 2] || null, pts[i - 1], pt); };
-      if (acc <= 0) run(); else window.setTimeout(run, acc);
+      acc += pt.dt || 0;
+      const run = () => {
+        if (i === 0) dot(pt);
+        else seg(pts[i - 2] || null, pts[i - 1], pt);
+      };
+      if (acc <= 0) run();
+      else window.setTimeout(run, acc);
     });
     return this;
   }
 
   _applyAction(a) {
     if (!a) return;
-    if (a.op === 'frame')       this.frame(a.i);
+    if (a.op === 'frame') this.frame(a.i);
     else if (a.op === 'stroke') this.stroke(a.pts, { tool: a.tool, color: a.color, size: a.size });
   }
 
   replay(actions, opts) {
-    return replayActions(act => this._applyAction(act), actions, opts);
+    return replayActions((act) => this._applyAction(act), actions, opts);
   }
 
   _perfCtor() {
@@ -227,8 +290,14 @@ export class Paint {
     };
   }
 
-  play(fps = 8) { this._fd.play(fps); return this; }
-  stop()        { this._fd.stop(); return this; }
+  play(fps = 8) {
+    this._fd.play(fps);
+    return this;
+  }
+  stop() {
+    this._fd.stop();
+    return this;
+  }
 
   // ── Window init ───────────────────────────────────────────────────────────────
 
@@ -237,7 +306,7 @@ export class Paint {
 
     // Display canvas
     const dc = document.createElement('canvas');
-    dc.width  = this._w;
+    dc.width = this._w;
     dc.height = this._h;
     dc.style.imageRendering = 'auto';
     this._canvas = dc;
@@ -245,11 +314,11 @@ export class Paint {
     // Window sizing: cap display at 800 wide, let scrolling handle larger
     const dispW = Math.min(this._w, 800);
     const dispH = Math.min(this._h, 600);
-    const winW  = dispW + 4;
+    const winW = dispW + 4;
     // tool row ~32, palette row ~36, canvas area + margins, frame strip ~80, transport ~38
-    const winH  = 32 + 36 + dispH + 14 + 80 + 38;
+    const winH = 32 + 36 + dispH + 14 + 80 + 38;
 
-    const fd    = this._fd;
+    const fd = this._fd;
     const strip = buildFrameStrip(fd);
 
     const mkExport = (html, color, fn) => {
@@ -263,16 +332,24 @@ export class Paint {
     const transport = buildTransport(fd, {
       onFpsChange: () => this._autoSave(),
       extraButtons: [
-        mkExport('<i class="fa-solid fa-code"></i> Code',    '#89b4fa', () => this._exportCode()),
-        mkExport('<i class="fa-solid fa-download"></i> PNG', '#a6e3a1', () => this._exportPng(false)),
-        mkExport('<i class="fa-solid fa-film"></i> Sheet',   '#f9e2af', () => this._exportPng(true)),
-        wireCaptureButton(mkExport('<i class="fa-solid fa-circle"></i> Rec', '#f38ba8', () => {}),
-                          { take: this._take, widget: this, idleLabel: '⏺ Rec' }),
+        mkExport('<i class="fa-solid fa-code"></i> Code', '#89b4fa', () => this._exportCode()),
+        mkExport('<i class="fa-solid fa-download"></i> PNG', '#a6e3a1', () =>
+          this._exportPng(false),
+        ),
+        mkExport('<i class="fa-solid fa-film"></i> Sheet', '#f9e2af', () => this._exportPng(true)),
+        wireCaptureButton(
+          mkExport('<i class="fa-solid fa-circle"></i> Rec', '#f38ba8', () => {}),
+          { take: this._take, widget: this, idleLabel: '⏺ Rec' },
+        ),
       ],
     });
 
     const shell = mountWidgetShell({
-      title, x, y, w: winW, h: winH,
+      title,
+      x,
+      y,
+      w: winW,
+      h: winH,
       widgetType: 'paint',
       rows: [
         this._buildToolRow(),
@@ -286,27 +363,37 @@ export class Paint {
         name: (this._title || 'Paint') + '.paint',
         type: 'paint',
         getIconId: () => this._desktopIconId,
-        setIconId: (id) => { this._desktopIconId = id; },
+        setIconId: (id) => {
+          this._desktopIconId = id;
+        },
       },
       history: {
         capture: () => this._snapFrames(),
         restore: (snap) => this._applyFrames(snap),
       },
-      onMount:   () => this._render(),
+      onMount: () => this._render(),
       onDestroy: () => this._destroy(),
     });
     if (!shell) return;
-    this._winId         = shell.winId;
-    this._autoSave      = shell.save;
+    this._winId = shell.winId;
+    this._autoSave = shell.save;
     this._refreshThumbs = strip.refreshThumbs;
-    this._history       = shell.history;
+    this._history = shell.history;
 
     // Wire the frame model to render + persistence. Structural mutations commit
     // history + autosave; selection only re-renders (matches the original).
-    fd.on('mutate', (e) => { this._render(); this._history?.commit(); this._autoSave(); this._events.emit('frame', e); });
-    fd.on('select', (e) => { this._render(); this._events.emit('frame', { action: 'select', index: e.index, count: e.count }); });
-    fd.on('tick',   () => this._render());
-    fd.on('onion',  () => this._render());
+    fd.on('mutate', (e) => {
+      this._render();
+      this._history?.commit();
+      this._autoSave();
+      this._events.emit('frame', e);
+    });
+    fd.on('select', (e) => {
+      this._render();
+      this._events.emit('frame', { action: 'select', index: e.index, count: e.count });
+    });
+    fd.on('tick', () => this._render());
+    fd.on('onion', () => this._render());
   }
 
   // ── Backdrop ──────────────────────────────────────────────────────────────────
@@ -327,9 +414,9 @@ export class Paint {
     if (mode === 'live') {
       // Live video underlay
       const vid = document.createElement('video');
-      vid.autoplay    = true;
-      vid.muted       = true;
-      vid.loop        = true;
+      vid.autoplay = true;
+      vid.muted = true;
+      vid.loop = true;
       vid.playsInline = true;
       vid.style.cssText = `position:absolute;top:0;left:0;width:${this._w}px;height:${this._h}px;object-fit:contain;`;
       if (typeof source === 'string') vid.src = source;
@@ -338,12 +425,16 @@ export class Paint {
         if (!vid.src) {
           // Mirror the element by drawing to canvas — fall back to image mode
           const bc = document.createElement('canvas');
-          bc.width  = this._w;
+          bc.width = this._w;
           bc.height = this._h;
           bc.style.cssText = `position:absolute;top:0;left:0;`;
           const bctx = bc.getContext('2d');
           let _rafId = null;
-          const tick = () => { bctx.clearRect(0,0,this._w,this._h); if (source.videoWidth) bctx.drawImage(source,0,0,this._w,this._h); _rafId = requestAnimationFrame(tick); };
+          const tick = () => {
+            bctx.clearRect(0, 0, this._w, this._h);
+            if (source.videoWidth) bctx.drawImage(source, 0, 0, this._w, this._h);
+            _rafId = requestAnimationFrame(tick);
+          };
           _rafId = requestAnimationFrame(tick);
           this._backdropEl = bc;
           this._backdropEl._stopRaf = () => cancelAnimationFrame(_rafId);
@@ -363,18 +454,24 @@ export class Paint {
     } else {
       // Static image mode — draw source into an off-screen canvas
       const bc = document.createElement('canvas');
-      bc.width  = this._w;
+      bc.width = this._w;
       bc.height = this._h;
       bc.style.cssText = `position:absolute;top:0;left:0;`;
       const bctx = bc.getContext('2d');
 
       const drawSrc = (img) => {
         bctx.clearRect(0, 0, this._w, this._h);
-        const sw = img.videoWidth  ?? img.naturalWidth  ?? img.width  ?? this._w;
+        const sw = img.videoWidth ?? img.naturalWidth ?? img.width ?? this._w;
         const sh = img.videoHeight ?? img.naturalHeight ?? img.height ?? this._h;
         if (!sw || !sh) return;
         const scale = Math.min(this._w / sw, this._h / sh);
-        bctx.drawImage(img, (this._w - sw * scale) / 2, (this._h - sh * scale) / 2, sw * scale, sh * scale);
+        bctx.drawImage(
+          img,
+          (this._w - sw * scale) / 2,
+          (this._h - sh * scale) / 2,
+          sw * scale,
+          sh * scale,
+        );
       };
 
       if (typeof source === 'string') {
@@ -390,7 +487,9 @@ export class Paint {
         drawSrc(source);
       } else {
         // Treat as drawable
-        try { bctx.drawImage(source, 0, 0, this._w, this._h); } catch (_) {}
+        try {
+          bctx.drawImage(source, 0, 0, this._w, this._h);
+        } catch (_) {}
       }
 
       this._backdropEl = bc;
@@ -423,7 +522,10 @@ export class Paint {
 
   _destroyBackdrop() {
     const slot = this._backdropSlot;
-    if (slot) { slot.style.display = 'none'; slot.innerHTML = ''; }
+    if (slot) {
+      slot.style.display = 'none';
+      slot.innerHTML = '';
+    }
     if (this._backdropEl?._stopRaf) this._backdropEl._stopRaf();
     if (this._backdropEl instanceof HTMLVideoElement) {
       this._backdropEl.pause();
@@ -437,16 +539,20 @@ export class Paint {
   _backdropSnapshot() {
     if (!this._backdropEl) return null;
     const bc = document.createElement('canvas');
-    bc.width  = this._w;
+    bc.width = this._w;
     bc.height = this._h;
-    try { bc.getContext('2d').drawImage(this._backdropEl, 0, 0, this._w, this._h); } catch (_) { return null; }
+    try {
+      bc.getContext('2d').drawImage(this._backdropEl, 0, 0, this._w, this._h);
+    } catch (_) {
+      return null;
+    }
     return bc.toDataURL('image/png');
   }
 
   // ── Render — composite onion + current frame into display canvas ──────────────
 
   _render() {
-    const dc  = this._canvas;
+    const dc = this._canvas;
     if (!dc) return;
     const ctx = dc.getContext('2d');
     ctx.clearRect(0, 0, this._w, this._h);
@@ -474,7 +580,7 @@ export class Paint {
   _snapFrames() {
     return {
       fi: this._fi,
-      frames: this._frames.map(fc => {
+      frames: this._frames.map((fc) => {
         const id = fc.getContext('2d').getImageData(0, 0, this._w, this._h);
         return new Uint8ClampedArray(id.data);
       }),
@@ -486,7 +592,7 @@ export class Paint {
     this._frames.length = snap.frames.length;
     snap.frames.forEach((data, i) => {
       const ctx = this._frames[i].getContext('2d');
-      const id  = ctx.createImageData(this._w, this._h);
+      const id = ctx.createImageData(this._w, this._h);
       id.data.set(new Uint8ClampedArray(data));
       ctx.putImageData(id, 0, 0);
     });
@@ -499,12 +605,12 @@ export class Paint {
 
   _getState() {
     const state = {
-      title:          this._title,
-      width:          this._w,
-      height:         this._h,
-      bg:             this._bg,
-      fps:            this._fps,
-      frames:         this._frames.map(fc => fc.toDataURL('image/png')),
+      title: this._title,
+      width: this._w,
+      height: this._h,
+      bg: this._bg,
+      fps: this._fps,
+      frames: this._frames.map((fc) => fc.toDataURL('image/png')),
       _desktopIconId: this._desktopIconId,
     };
     // Persist backdrop: for live mode store the frozen snapshot as image mode
@@ -512,10 +618,10 @@ export class Paint {
     if (this._backdropInfo) {
       const snap = this._backdropSnapshot();
       if (snap) {
-        state.backdrop     = snap;
+        state.backdrop = snap;
         state.backdropMode = 'image';
       } else if (this._backdropInfo.src) {
-        state.backdrop     = this._backdropInfo.src;
+        state.backdrop = this._backdropInfo.src;
         state.backdropMode = this._backdropInfo.mode;
       }
     }
@@ -528,7 +634,7 @@ export class Paint {
     const row = document.createElement('div');
     row.style.cssText = 'display:flex;gap:3px;padding:5px 8px 3px;flex-shrink:0;flex-wrap:wrap;';
 
-    TOOLS.forEach(t => {
+    TOOLS.forEach((t) => {
       const btn = document.createElement('button');
       btn.title = t.title;
       btn.dataset.tool = t.id;
@@ -542,12 +648,15 @@ export class Paint {
       btn.addEventListener('click', () => {
         const prev = this._tool;
         this._tool = t.id;
-        row.querySelectorAll('button[data-tool]').forEach(b => {
+        row.querySelectorAll('button[data-tool]').forEach((b) => {
           b.style.borderColor = b.dataset.tool === this._tool ? ACTIVE_COLOR : INACTIVE_BORDER;
         });
         if (t.id === 'text') {
           if (this._textLayer) {
-            this._textLayer.setDefaults({ color: this._color, fontSize: Math.max(12, this._brush * 2) });
+            this._textLayer.setDefaults({
+              color: this._color,
+              fontSize: Math.max(12, this._brush * 2),
+            });
             this._textLayer.setActive(true);
           }
           if (this._hitCanvas) this._hitCanvas.style.pointerEvents = 'none';
@@ -562,7 +671,8 @@ export class Paint {
 
     // Separator before backdrop button
     const bdSep = document.createElement('div');
-    bdSep.style.cssText = 'width:1px;height:20px;background:#45475a;margin:2px 2px;flex-shrink:0;align-self:center;';
+    bdSep.style.cssText =
+      'width:1px;height:20px;background:#45475a;margin:2px 2px;flex-shrink:0;align-self:center;';
     row.appendChild(bdSep);
 
     // Backdrop toggle button
@@ -616,43 +726,58 @@ export class Paint {
         'background:none;border:none;color:#cdd6f4;text-align:left;padding:5px 10px;',
         'font-size:12px;border-radius:4px;cursor:pointer;white-space:nowrap;',
       ].join('');
-      item.addEventListener('mouseenter', () => { item.style.background = '#313244'; });
-      item.addEventListener('mouseleave', () => { item.style.background = 'none'; });
+      item.addEventListener('mouseenter', () => {
+        item.style.background = '#313244';
+      });
+      item.addEventListener('mouseleave', () => {
+        item.style.background = 'none';
+      });
       item.addEventListener('click', () => {
-        dd.remove(); this._backdropDropdown = null;
+        dd.remove();
+        this._backdropDropdown = null;
         fn();
       });
       return item;
     };
 
-    dd.appendChild(mkItem('📷 Load image…', () => {
-      const inp = document.createElement('input');
-      inp.type = 'file'; inp.accept = 'image/*';
-      inp.addEventListener('change', () => {
-        const f = inp.files?.[0]; if (!f) return;
-        const url = URL.createObjectURL(f);
-        this.setBackdrop(url, { mode: 'image' });
-      });
-      inp.click();
-    }));
+    dd.appendChild(
+      mkItem('📷 Load image…', () => {
+        const inp = document.createElement('input');
+        inp.type = 'file';
+        inp.accept = 'image/*';
+        inp.addEventListener('change', () => {
+          const f = inp.files?.[0];
+          if (!f) return;
+          const url = URL.createObjectURL(f);
+          this.setBackdrop(url, { mode: 'image' });
+        });
+        inp.click();
+      }),
+    );
 
-    dd.appendChild(mkItem('🎬 Load video (live)…', () => {
-      const inp = document.createElement('input');
-      inp.type = 'file'; inp.accept = 'video/*';
-      inp.addEventListener('change', () => {
-        const f = inp.files?.[0]; if (!f) return;
-        const url = URL.createObjectURL(f);
-        this.setBackdrop(url, { mode: 'live' });
-      });
-      inp.click();
-    }));
+    dd.appendChild(
+      mkItem('🎬 Load video (live)…', () => {
+        const inp = document.createElement('input');
+        inp.type = 'file';
+        inp.accept = 'video/*';
+        inp.addEventListener('change', () => {
+          const f = inp.files?.[0];
+          if (!f) return;
+          const url = URL.createObjectURL(f);
+          this.setBackdrop(url, { mode: 'live' });
+        });
+        inp.click();
+      }),
+    );
 
     if (this._backdropInfo?.mode === 'live') {
-      dd.appendChild(mkItem('📷 Freeze frame', () => {
-        if (!this._backdropEl) return;
-        const snap = this._backdropSnapshot();
-        if (snap) this.setBackdrop(snap, { mode: 'image' });
-      }));
+      dd.appendChild(
+        mkItem('📷 Freeze frame', () => {
+          if (!this._backdropEl) return;
+          const snap = this._backdropSnapshot();
+          if (snap) this.setBackdrop(snap, { mode: 'image' });
+        }),
+      );
     }
 
     if (this._backdropInfo) {
@@ -662,7 +787,7 @@ export class Paint {
     // Position near the anchor button
     const rect = anchor.getBoundingClientRect();
     dd.style.left = `${rect.left}px`;
-    dd.style.top  = `${rect.bottom + 4}px`;
+    dd.style.top = `${rect.bottom + 4}px`;
 
     document.body.appendChild(dd);
     this._backdropDropdown = dd;
@@ -670,7 +795,8 @@ export class Paint {
     // Close on outside click
     const onOut = (e) => {
       if (!dd.contains(e.target) && e.target !== anchor) {
-        dd.remove(); this._backdropDropdown = null;
+        dd.remove();
+        this._backdropDropdown = null;
         document.removeEventListener('mousedown', onOut, true);
       }
     };
@@ -681,7 +807,8 @@ export class Paint {
 
   _buildPaletteRow() {
     const row = document.createElement('div');
-    row.style.cssText = 'display:flex;gap:3px;padding:3px 8px 4px;flex-shrink:0;align-items:center;flex-wrap:wrap;';
+    row.style.cssText =
+      'display:flex;gap:3px;padding:3px 8px 4px;flex-shrink:0;align-items:center;flex-wrap:wrap;';
 
     const mkSwatch = (bg, title) => {
       const sw = document.createElement('button');
@@ -691,7 +818,7 @@ export class Paint {
       return sw;
     };
 
-    PALETTE.forEach(c => {
+    PALETTE.forEach((c) => {
       const sw = mkSwatch(c, c);
       sw.addEventListener('click', () => {
         this._setColor(c);
@@ -702,10 +829,11 @@ export class Paint {
 
     // Custom color picker
     const colorIn = document.createElement('input');
-    colorIn.type  = 'color';
+    colorIn.type = 'color';
     colorIn.value = this._color;
     colorIn.title = 'Custom color';
-    colorIn.style.cssText = 'width:24px;height:24px;border:none;border-radius:3px;cursor:pointer;padding:0;background:none;flex-shrink:0;';
+    colorIn.style.cssText =
+      'width:24px;height:24px;border:none;border-radius:3px;cursor:pointer;padding:0;background:none;flex-shrink:0;';
     colorIn.addEventListener('input', () => {
       this._setColor(colorIn.value);
       this._highlightSwatch(row, null);
@@ -726,15 +854,16 @@ export class Paint {
     row.appendChild(brushLbl);
 
     const brushSlider = document.createElement('input');
-    brushSlider.type  = 'range';
-    brushSlider.min   = '1';
-    brushSlider.max   = '64';
+    brushSlider.type = 'range';
+    brushSlider.min = '1';
+    brushSlider.max = '64';
     brushSlider.value = String(this._brush);
     brushSlider.title = 'Brush size (1–64)';
     brushSlider.style.cssText = 'width:70px;flex-shrink:0;accent-color:#cba6f7;';
     const brushVal = document.createElement('span');
     brushVal.textContent = String(this._brush);
-    brushVal.style.cssText = 'font-size:10px;color:#6c7086;font-family:monospace;min-width:18px;flex-shrink:0;';
+    brushVal.style.cssText =
+      'font-size:10px;color:#6c7086;font-family:monospace;min-width:18px;flex-shrink:0;';
     brushSlider.addEventListener('input', () => {
       this._brush = parseInt(brushSlider.value, 10);
       brushVal.textContent = String(this._brush);
@@ -753,10 +882,11 @@ export class Paint {
     row.appendChild(bgLbl);
 
     const bgIn = document.createElement('input');
-    bgIn.type  = 'color';
+    bgIn.type = 'color';
     bgIn.value = this._bg === 'transparent' ? '#ffffff' : this._bg;
     bgIn.title = 'Background color';
-    bgIn.style.cssText = 'width:24px;height:24px;border:none;border-radius:3px;cursor:pointer;padding:0;background:none;flex-shrink:0;';
+    bgIn.style.cssText =
+      'width:24px;height:24px;border:none;border-radius:3px;cursor:pointer;padding:0;background:none;flex-shrink:0;';
     bgIn.addEventListener('input', () => {
       this._bg = bgIn.value;
       // Re-fill all frames background (non-destructive in bg layer sense — fills current frame's transparent bg regions using compositing is complex; we simply store new bg for new frames + render)
@@ -769,7 +899,9 @@ export class Paint {
   }
 
   _highlightSwatch(row, active) {
-    row.querySelectorAll('button').forEach(b => { b.style.borderColor = INACTIVE_BORDER; });
+    row.querySelectorAll('button').forEach((b) => {
+      b.style.borderColor = INACTIVE_BORDER;
+    });
     if (active) active.style.borderColor = ACTIVE_COLOR;
   }
 
@@ -791,13 +923,13 @@ export class Paint {
 
     // Checkerboard (transparency indicator)
     const checker = document.createElement('canvas');
-    checker.width  = this._w;
+    checker.width = this._w;
     checker.height = this._h;
     const cctx = checker.getContext('2d');
-    const cs   = 8;
+    const cs = 8;
     for (let y = 0; y < checker.height; y += cs) {
       for (let x = 0; x < checker.width; x += cs) {
-        cctx.fillStyle = ((x / cs + y / cs) % 2 === 0) ? '#888' : '#aaa';
+        cctx.fillStyle = (x / cs + y / cs) % 2 === 0 ? '#888' : '#aaa';
         cctx.fillRect(x, y, cs, cs);
       }
     }
@@ -807,7 +939,8 @@ export class Paint {
     // Backdrop slot (hidden until setBackdrop is called — positioned between
     // checker and the display canvas so strokes always render on top)
     const bdSlot = document.createElement('div');
-    bdSlot.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;overflow:hidden;display:none;';
+    bdSlot.style.cssText =
+      'position:absolute;top:0;left:0;width:100%;height:100%;overflow:hidden;display:none;';
     this._backdropSlot = bdSlot;
 
     // Display canvas
@@ -816,14 +949,14 @@ export class Paint {
 
     // Overlay for shape preview
     const ov = document.createElement('canvas');
-    ov.width  = this._w;
+    ov.width = this._w;
     ov.height = this._h;
     ov.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;';
     this._overlay = ov;
 
     // Transparent hit canvas
     const hit = document.createElement('canvas');
-    hit.width  = this._w;
+    hit.width = this._w;
     hit.height = this._h;
     hit.style.cssText = 'position:absolute;top:0;left:0;cursor:crosshair;opacity:0;';
 
@@ -836,8 +969,9 @@ export class Paint {
     this._hitCanvas = hit;
     this._textLayer = new TextLayer({
       container: wrap,
-      left: 0, top: 0,
-      width:  this._w,
+      left: 0,
+      top: 0,
+      width: this._w,
       height: this._h,
     });
 
@@ -869,7 +1003,7 @@ export class Paint {
 
   _emitStroke(bbox) {
     this._events.emit('stroke', {
-      tool:  this._tool,
+      tool: this._tool,
       color: this._color,
       frame: this._fi,
       bbox,
@@ -908,10 +1042,16 @@ export class Paint {
       this._expandBbox(p.x, p.y);
       // Performance capture: open a stroke action; points appended on move. `t`
       // is stamped at stroke start, internal dt drives animated replay.
-      this._recStroke = this._take.push({ op: 'stroke', tool: this._tool, color: this._color, size: this._brush, pts: [{ x: p.x, y: p.y, dt: 0 }] });
-      this._recLast   = performance.now();
+      this._recStroke = this._take.push({
+        op: 'stroke',
+        tool: this._tool,
+        color: this._color,
+        size: this._brush,
+        pts: [{ x: p.x, y: p.y, dt: 0 }],
+      });
+      this._recLast = performance.now();
       ctx.save();
-      ctx.lineCap  = 'round';
+      ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctx.lineWidth = this._brush;
       if (this._tool === 'eraser') {
@@ -942,12 +1082,15 @@ export class Paint {
       const fc = this._frames[this._fi];
       if (!fc) return;
       const ctx = fc.getContext('2d');
-      const lp  = this._lastXY;
-      if (!lp) { this._lastXY = p; return; }
+      const lp = this._lastXY;
+      if (!lp) {
+        this._lastXY = p;
+        return;
+      }
 
       ctx.save();
-      ctx.lineCap   = 'round';
-      ctx.lineJoin  = 'round';
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
       ctx.lineWidth = this._brush;
       if (this._tool === 'eraser') {
         ctx.globalCompositeOperation = 'destination-out';
@@ -985,11 +1128,14 @@ export class Paint {
     el.addEventListener('pointerup', (e) => {
       if (!this._drawing) return;
       this._drawing = false;
-      this._prevXY  = null;
-      this._lastXY  = null;
-      this._recStroke = null;   // close captured stroke
+      this._prevXY = null;
+      this._lastXY = null;
+      this._recStroke = null; // close captured stroke
 
-      if (this._startXY && (this._tool === 'line' || this._tool === 'rect' || this._tool === 'ellipse')) {
+      if (
+        this._startXY &&
+        (this._tool === 'line' || this._tool === 'rect' || this._tool === 'ellipse')
+      ) {
         const p = this._xyCoord(e);
         this._expandBbox(p.x, p.y);
         this._commitShape(this._startXY, p);
@@ -1012,9 +1158,8 @@ export class Paint {
     const fc = this._frames[this._fi];
     if (!fc) return;
     const [r, g, b, a] = fc.getContext('2d').getImageData(x, y, 1, 1).data;
-    const c = a === 0
-      ? '#000000'
-      : '#' + [r, g, b].map(n => n.toString(16).padStart(2, '0')).join('');
+    const c =
+      a === 0 ? '#000000' : '#' + [r, g, b].map((n) => n.toString(16).padStart(2, '0')).join('');
     this._setColor(c);
   }
 
@@ -1024,19 +1169,20 @@ export class Paint {
     const fc = this._frames[this._fi];
     if (!fc) return;
     const ctx = fc.getContext('2d');
-    const W = this._w, H = this._h;
+    const W = this._w,
+      H = this._h;
     const img = ctx.getImageData(0, 0, W, H);
-    const d   = img.data;
+    const d = img.data;
 
     const idx = (x, y) => (y * W + x) * 4;
-    const i0  = idx(px, py);
-    const [tr, tg, tb, ta] = [d[i0], d[i0+1], d[i0+2], d[i0+3]];
+    const i0 = idx(px, py);
+    const [tr, tg, tb, ta] = [d[i0], d[i0 + 1], d[i0 + 2], d[i0 + 3]];
 
     let [fr, fg, fb, fa] = [0, 0, 0, 0];
     if (this._color !== 'transparent') {
       const tmp = document.createElement('canvas');
-      tmp.width  = tmp.height = 1;
-      const tx   = tmp.getContext('2d');
+      tmp.width = tmp.height = 1;
+      const tx = tmp.getContext('2d');
       tx.fillStyle = this._color;
       tx.fillRect(0, 0, 1, 1);
       const td = tx.getImageData(0, 0, 1, 1).data;
@@ -1050,9 +1196,12 @@ export class Paint {
       const [cx, cy] = stack.pop();
       if (cx < 0 || cx >= W || cy < 0 || cy >= H) continue;
       const ci = idx(cx, cy);
-      if (d[ci] !== tr || d[ci+1] !== tg || d[ci+2] !== tb || d[ci+3] !== ta) continue;
-      d[ci] = fr; d[ci+1] = fg; d[ci+2] = fb; d[ci+3] = fa;
-      stack.push([cx-1,cy],[cx+1,cy],[cx,cy-1],[cx,cy+1]);
+      if (d[ci] !== tr || d[ci + 1] !== tg || d[ci + 2] !== tb || d[ci + 3] !== ta) continue;
+      d[ci] = fr;
+      d[ci + 1] = fg;
+      d[ci + 2] = fb;
+      d[ci + 3] = fa;
+      stack.push([cx - 1, cy], [cx + 1, cy], [cx, cy - 1], [cx, cy + 1]);
     }
 
     ctx.putImageData(img, 0, 0);
@@ -1073,24 +1222,31 @@ export class Paint {
     const ctx = this._overlay.getContext('2d');
     const col = this._color === 'transparent' ? 'rgba(128,128,128,0.6)' : this._color;
     ctx.strokeStyle = col;
-    ctx.fillStyle   = col;
-    ctx.lineWidth   = this._brush;
-    ctx.lineCap     = 'round';
-    ctx.lineJoin    = 'round';
+    ctx.fillStyle = col;
+    ctx.lineWidth = this._brush;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
 
-    const x1 = start.x, y1 = start.y, x2 = end.x, y2 = end.y;
+    const x1 = start.x,
+      y1 = start.y,
+      x2 = end.x,
+      y2 = end.y;
     ctx.beginPath();
     if (this._tool === 'line') {
       ctx.moveTo(x1, y1);
       ctx.lineTo(x2, y2);
       ctx.stroke();
     } else if (this._tool === 'rect') {
-      const rx = Math.min(x1, x2), ry = Math.min(y1, y2);
-      const rw = Math.abs(x2 - x1),  rh = Math.abs(y2 - y1);
+      const rx = Math.min(x1, x2),
+        ry = Math.min(y1, y2);
+      const rw = Math.abs(x2 - x1),
+        rh = Math.abs(y2 - y1);
       ctx.strokeRect(rx, ry, rw, rh);
     } else if (this._tool === 'ellipse') {
-      const cx = (x1 + x2) / 2, cy = (y1 + y2) / 2;
-      const rx = Math.abs(x2 - x1) / 2, ry = Math.abs(y2 - y1) / 2;
+      const cx = (x1 + x2) / 2,
+        cy = (y1 + y2) / 2;
+      const rx = Math.abs(x2 - x1) / 2,
+        ry = Math.abs(y2 - y1) / 2;
       if (rx > 0 && ry > 0) {
         ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
         ctx.stroke();
@@ -1104,20 +1260,25 @@ export class Paint {
     const ctx = fc.getContext('2d');
     const col = this._color === 'transparent' ? 'rgba(0,0,0,0)' : this._color;
     ctx.strokeStyle = col;
-    ctx.fillStyle   = col;
-    ctx.lineWidth   = this._brush;
-    ctx.lineCap     = 'round';
-    ctx.lineJoin    = 'round';
+    ctx.fillStyle = col;
+    ctx.lineWidth = this._brush;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
 
-    const x1 = start.x, y1 = start.y, x2 = end.x, y2 = end.y;
+    const x1 = start.x,
+      y1 = start.y,
+      x2 = end.x,
+      y2 = end.y;
     ctx.beginPath();
     if (this._tool === 'line') {
       ctx.moveTo(x1, y1);
       ctx.lineTo(x2, y2);
       ctx.stroke();
     } else if (this._tool === 'rect') {
-      const rx = Math.min(x1, x2), ry = Math.min(y1, y2);
-      const rw = Math.abs(x2 - x1),  rh = Math.abs(y2 - y1);
+      const rx = Math.min(x1, x2),
+        ry = Math.min(y1, y2);
+      const rw = Math.abs(x2 - x1),
+        rh = Math.abs(y2 - y1);
       if (this._color === 'transparent') {
         ctx.save();
         ctx.globalCompositeOperation = 'destination-out';
@@ -1128,8 +1289,10 @@ export class Paint {
         ctx.strokeRect(rx, ry, rw, rh);
       }
     } else if (this._tool === 'ellipse') {
-      const cx = (x1 + x2) / 2, cy = (y1 + y2) / 2;
-      const rx = Math.abs(x2 - x1) / 2, ry = Math.abs(y2 - y1) / 2;
+      const cx = (x1 + x2) / 2,
+        cy = (y1 + y2) / 2;
+      const rx = Math.abs(x2 - x1) / 2,
+        ry = Math.abs(y2 - y1) / 2;
       if (rx > 0 && ry > 0) {
         ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
         ctx.stroke();
@@ -1143,12 +1306,14 @@ export class Paint {
   // Helper: composite backdrop + bg + frame into a canvas (used by export + code).
   _compositeFrame(frameCanvas) {
     const c = document.createElement('canvas');
-    c.width  = this._w;
+    c.width = this._w;
     c.height = this._h;
     const ctx = c.getContext('2d');
     // Backdrop first
     if (this._backdropEl) {
-      try { ctx.drawImage(this._backdropEl, 0, 0, this._w, this._h); } catch (_) {}
+      try {
+        ctx.drawImage(this._backdropEl, 0, 0, this._w, this._h);
+      } catch (_) {}
     } else if (this._bg !== 'transparent') {
       ctx.fillStyle = this._bg;
       ctx.fillRect(0, 0, this._w, this._h);
@@ -1161,11 +1326,11 @@ export class Paint {
   _exportCode() {
     // Composite backdrop + current frame for the exported code snippet
     const composed = this._compositeFrame(this._frames[this._fi]);
-    const dataUrl  = composed.toDataURL('image/png');
+    const dataUrl = composed.toDataURL('image/png');
     // ADR 040: export against a `new Canvas()` (global draw is gone).
     let code;
     if (this._backdropEl) {
-      const bdUrl  = this._backdropSnapshot();
+      const bdUrl = this._backdropSnapshot();
       code = bdUrl
         ? `const canvas = new Canvas();\ncanvas.backdrop('${bdUrl}');\ncanvas.image('${this._frames[this._fi].toDataURL('image/png')}', 0, 0);`
         : `const canvas = new Canvas();\ncanvas.image('${dataUrl}', 0, 0);`;
@@ -1179,13 +1344,15 @@ export class Paint {
     const src = sheet
       ? (() => {
           const c = document.createElement('canvas');
-          c.width  = this._w * this._frames.length;
+          c.width = this._w * this._frames.length;
           c.height = this._h;
           const ctx = c.getContext('2d');
           this._frames.forEach((fc, i) => {
             // Draw backdrop (frozen snapshot for this position)
             if (this._backdropEl) {
-              try { ctx.drawImage(this._backdropEl, i * this._w, 0, this._w, this._h); } catch (_) {}
+              try {
+                ctx.drawImage(this._backdropEl, i * this._w, 0, this._w, this._h);
+              } catch (_) {}
             } else if (this._bg !== 'transparent') {
               ctx.fillStyle = this._bg;
               ctx.fillRect(i * this._w, 0, this._w, this._h);
@@ -1203,9 +1370,9 @@ export class Paint {
         })()
       : this._compositeFrame(this._frames[this._fi]);
 
-    src.toBlob(blob => {
-      const a   = document.createElement('a');
-      a.href     = URL.createObjectURL(blob);
+    src.toBlob((blob) => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
       a.download = sheet ? 'paint-sheet.png' : 'paint-frame.png';
       a.click();
       URL.revokeObjectURL(a.href);
@@ -1215,13 +1382,25 @@ export class Paint {
   // ── Event / signal public API ─────────────────────────────────────────────────
 
   /** fn({ tool, color, frame, bbox:{x,y,w,h} }) on each stroke / fill. */
-  onStroke(fn) { this._events.on('stroke', fn); return this; }
+  onStroke(fn) {
+    this._events.on('stroke', fn);
+    return this;
+  }
   /** fn({ color, prev }) when the active color changes. */
-  onColor(fn)  { this._events.on('color',  fn); return this; }
+  onColor(fn) {
+    this._events.on('color', fn);
+    return this;
+  }
   /** fn({ tool, prev }) when the active tool changes. */
-  onTool(fn)   { this._events.on('tool',   fn); return this; }
+  onTool(fn) {
+    this._events.on('tool', fn);
+    return this;
+  }
   /** fn({ action, index, count }) on add/duplicate/clear/delete/move/select frame ops. */
-  onFrame(fn)  { this._events.on('frame',  fn); return this; }
+  onFrame(fn) {
+    this._events.on('frame', fn);
+    return this;
+  }
 
   /**
    * Place a persistent text object on the canvas.
@@ -1233,7 +1412,13 @@ export class Paint {
    */
   addText(text, x, y, opts = {}) {
     if (!this._textLayer) return null;
-    return this._textLayer.addText(text, x, y, { color: this._color, ...opts }, { runScoped: false });
+    return this._textLayer.addText(
+      text,
+      x,
+      y,
+      { color: this._color, ...opts },
+      { runScoped: false },
+    );
   }
 
   /**

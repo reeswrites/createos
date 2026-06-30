@@ -87,7 +87,7 @@ _docAdd('click', (e) => {
 // registerSource with a predicate pattern so scoped subscriptions also count.
 
 let _pendingMove = null;
-let _moveRafId   = null;
+let _moveRafId = null;
 
 function _onMouseMove(e) {
   _pendingMove = e;
@@ -117,8 +117,11 @@ registerSource(
     },
     stop() {
       _docRem('mousemove', _onMouseMove);
-      if (_moveRafId !== null) { cancelAnimationFrame(_moveRafId); _moveRafId = null; }
+      if (_moveRafId !== null) {
+        cancelAnimationFrame(_moveRafId);
+        _moveRafId = null;
+      }
       _pendingMove = null;
     },
-  }
+  },
 );

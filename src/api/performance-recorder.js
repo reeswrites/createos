@@ -15,12 +15,12 @@
 
 // ── Global take (shared clock across widgets) ─────────────────────────────────
 let _globalArmed = false;
-let _globalT0    = 0;
+let _globalT0 = 0;
 const _globalTracks = new Map(); // Take → actions[]
 
 export function armGlobal() {
   _globalArmed = true;
-  _globalT0    = performance.now();
+  _globalT0 = performance.now();
   _globalTracks.clear();
 }
 
@@ -35,11 +35,16 @@ export function disarmGlobal() {
   return out;
 }
 
-export function isGlobalArmed() { return _globalArmed; }
+export function isGlobalArmed() {
+  return _globalArmed;
+}
 
 function _globalRecord(take, action) {
   let actions = _globalTracks.get(take);
-  if (!actions) { actions = []; _globalTracks.set(take, actions); }
+  if (!actions) {
+    actions = [];
+    _globalTracks.set(take, actions);
+  }
   const stored = { t: Math.round(performance.now() - _globalT0), ...action };
   actions.push(stored);
   return stored;
@@ -49,16 +54,18 @@ function _globalRecord(take, action) {
 export class Take {
   constructor(widget) {
     this._widget = widget;
-    this._log    = [];
-    this._t0     = 0;
-    this._armed  = false;
+    this._log = [];
+    this._t0 = 0;
+    this._armed = false;
   }
 
-  get armed() { return this._armed; }
+  get armed() {
+    return this._armed;
+  }
 
   arm() {
-    this._log   = [];
-    this._t0    = performance.now();
+    this._log = [];
+    this._t0 = performance.now();
     this._armed = true;
   }
 
@@ -88,7 +95,7 @@ export class Take {
 function _serialize(actions) {
   // Compact one-action-per-line array literal — readable + editable in the editor.
   if (!actions.length) return '[]';
-  return '[\n' + actions.map(a => '  ' + JSON.stringify(a)).join(',\n') + '\n]';
+  return '[\n' + actions.map((a) => '  ' + JSON.stringify(a)).join(',\n') + '\n]';
 }
 
 // Solo: construct the widget then replay its take.

@@ -29,23 +29,27 @@ export class PauseController {
    *                   read off window here) to keep the controller testable.
    */
   constructor({ intervals, timeouts, clearInterval, clearTimeout, trackedSetters }) {
-    this._intervals      = intervals;
-    this._timeouts       = timeouts;
-    this._clearInterval  = clearInterval;
-    this._clearTimeout   = clearTimeout;
+    this._intervals = intervals;
+    this._timeouts = timeouts;
+    this._clearInterval = clearInterval;
+    this._clearTimeout = clearTimeout;
     this._trackedSetters = trackedSetters;
-    this._frozen         = null;   // freezeTimers() snapshot while paused
+    this._frozen = null; // freezeTimers() snapshot while paused
   }
 
-  get paused() { return this._frozen != null; }
+  get paused() {
+    return this._frozen != null;
+  }
 
   // Freeze the editor's tracked timers (clears them, records remaining delay).
   // Idempotent: a second pause() while already paused is a no-op.
   pause() {
     if (this._frozen) return;
     this._frozen = freezeTimers(
-      this._intervals, this._timeouts,
-      this._clearInterval, this._clearTimeout,
+      this._intervals,
+      this._timeouts,
+      this._clearInterval,
+      this._clearTimeout,
     );
   }
 
@@ -60,5 +64,7 @@ export class PauseController {
 
   // Drop frozen state without restoring — used by hard reset / stop, which clears
   // the timer maps directly.
-  clear() { this._frozen = null; }
+  clear() {
+    this._frozen = null;
+  }
 }

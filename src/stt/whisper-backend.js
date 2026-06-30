@@ -20,7 +20,9 @@ export class WhisperBackend extends STTBackend {
     this._buf = [];
   }
 
-  get interim() { return false; }
+  get interim() {
+    return false;
+  }
 
   async init() {
     this._pipeline = await modelManager.load('whisper-en');
@@ -31,12 +33,17 @@ export class WhisperBackend extends STTBackend {
     this._buf.push(chunk);
     const cap = MAX_SECONDS * SAMPLE_RATE;
     let total = this._buf.reduce((n, c) => n + c.length, 0);
-    while (total > cap && this._buf.length > 1) { total -= this._buf.shift().length; }
+    while (total > cap && this._buf.length > 1) {
+      total -= this._buf.shift().length;
+    }
     return '';
   }
 
   async flush() {
-    if (!this._pipeline || this._buf.length === 0) { this._buf = []; return ''; }
+    if (!this._pipeline || this._buf.length === 0) {
+      this._buf = [];
+      return '';
+    }
     try {
       const audio = this._concat();
       this._buf = [];
@@ -58,7 +65,10 @@ export class WhisperBackend extends STTBackend {
     const total = this._buf.reduce((n, c) => n + c.length, 0);
     const out = new Float32Array(total);
     let off = 0;
-    for (const c of this._buf) { out.set(c, off); off += c.length; }
+    for (const c of this._buf) {
+      out.set(c, off);
+      off += c.length;
+    }
     return out;
   }
 }

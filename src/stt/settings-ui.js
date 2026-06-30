@@ -20,9 +20,19 @@ export function openSTTSettings() {
   }
 
   const desk = document.getElementById('desktop');
-  const w = 480, h = 360;
+  const w = 480,
+    h = 360;
   const x = Math.max(20, Math.round(((desk?.offsetWidth ?? 1000) - w) / 2));
-  window.wm?.spawn('Speech-to-Text', { id: WIN_ID, type: 'html', html: '', w, h, x, y: 40, audio: false });
+  window.wm?.spawn('Speech-to-Text', {
+    id: WIN_ID,
+    type: 'html',
+    html: '',
+    w,
+    h,
+    x,
+    y: 40,
+    audio: false,
+  });
 
   const body = document.getElementById(WIN_ID)?.querySelector('.wm-body');
   if (!body) return;
@@ -70,22 +80,26 @@ export function openSTTSettings() {
   async function render() {
     if (!document.getElementById(WIN_ID)) return; // window closed — stop
     const est = await modelManager.storageEstimate();
-    const usedMb  = (est.used  / 1e6).toFixed(0);
+    const usedMb = (est.used / 1e6).toFixed(0);
     const quotaMb = (est.quota / 1e6).toFixed(0);
 
-    const rows = await Promise.all(Object.entries(MODELS).map(async ([key, m]) => {
-      const s = await modelManager.status(key);
-      const pct = modelManager._progress[key] ?? 0;
-      const statusCell = s === 'downloading'
-        ? `<span class="pill downloading">${pct}%</span><progress value="${pct}" max="100"></progress>`
-        : `<span class="pill ${s}">${s}</span>`;
-      const action = s === 'uncached'
-        ? `<button data-act="load" data-key="${key}">Download</button>`
-        : s === 'ready'
-        ? `<button class="danger" data-act="del" data-key="${key}">Delete</button>`
-        : '—';
-      return `<tr><td>${m.label}</td><td>${m.sizeMb} MB</td><td>${statusCell}</td><td>${action}</td></tr>`;
-    }));
+    const rows = await Promise.all(
+      Object.entries(MODELS).map(async ([key, m]) => {
+        const s = await modelManager.status(key);
+        const pct = modelManager._progress[key] ?? 0;
+        const statusCell =
+          s === 'downloading'
+            ? `<span class="pill downloading">${pct}%</span><progress value="${pct}" max="100"></progress>`
+            : `<span class="pill ${s}">${s}</span>`;
+        const action =
+          s === 'uncached'
+            ? `<button data-act="load" data-key="${key}">Download</button>`
+            : s === 'ready'
+              ? `<button class="danger" data-act="del" data-key="${key}">Delete</button>`
+              : '—';
+        return `<tr><td>${m.label}</td><td>${m.sizeMb} MB</td><td>${statusCell}</td><td>${action}</td></tr>`;
+      }),
+    );
 
     root.innerHTML = `
       <table>
@@ -99,7 +113,10 @@ export function openSTTSettings() {
     const btn = e.target.closest('button[data-act]');
     if (!btn) return;
     const { act, key } = btn.dataset;
-    if (act === 'load') modelManager.load(key).catch(err => console.warn('[stt] download failed:', err?.message ?? err));
+    if (act === 'load')
+      modelManager
+        .load(key)
+        .catch((err) => console.warn('[stt] download failed:', err?.message ?? err));
     else if (act === 'del') modelManager.delete(key);
   });
 

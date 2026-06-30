@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { WidgetEvents } from '../src/api/widget-events.js';
 
 // jsdom does not implement requestAnimationFrame; stub it globally.

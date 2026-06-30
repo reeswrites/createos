@@ -21,52 +21,104 @@ import esprima from 'esprima';
 // Swizzle access: objType.prop → resultType
 const SWIZZLE = {
   vec4f: {
-    x:'f32',y:'f32',z:'f32',w:'f32',r:'f32',g:'f32',b:'f32',a:'f32',
-    xy:'vec2f',xz:'vec2f',yz:'vec2f',rg:'vec2f',rb:'vec2f',gb:'vec2f',
-    xyz:'vec3f',rgb:'vec3f',xyw:'vec3f',xzw:'vec3f',
+    x: 'f32',
+    y: 'f32',
+    z: 'f32',
+    w: 'f32',
+    r: 'f32',
+    g: 'f32',
+    b: 'f32',
+    a: 'f32',
+    xy: 'vec2f',
+    xz: 'vec2f',
+    yz: 'vec2f',
+    rg: 'vec2f',
+    rb: 'vec2f',
+    gb: 'vec2f',
+    xyz: 'vec3f',
+    rgb: 'vec3f',
+    xyw: 'vec3f',
+    xzw: 'vec3f',
   },
   vec3f: {
-    x:'f32',y:'f32',z:'f32',r:'f32',g:'f32',b:'f32',
-    xy:'vec2f',xz:'vec2f',yz:'vec2f',rg:'vec2f',rb:'vec2f',
+    x: 'f32',
+    y: 'f32',
+    z: 'f32',
+    r: 'f32',
+    g: 'f32',
+    b: 'f32',
+    xy: 'vec2f',
+    xz: 'vec2f',
+    yz: 'vec2f',
+    rg: 'vec2f',
+    rb: 'vec2f',
   },
-  vec2f: { x:'f32',y:'f32',r:'f32',g:'f32' },
-  vec4i: { x:'i32',y:'i32',z:'i32',w:'i32' },
-  vec3i: { x:'i32',y:'i32',z:'i32' },
-  vec2i: { x:'i32',y:'i32' },
+  vec2f: { x: 'f32', y: 'f32', r: 'f32', g: 'f32' },
+  vec4i: { x: 'i32', y: 'i32', z: 'i32', w: 'i32' },
+  vec3i: { x: 'i32', y: 'i32', z: 'i32' },
+  vec2i: { x: 'i32', y: 'i32' },
 };
 
-const VEC_CTORS = { vec2:'vec2f', vec3:'vec3f', vec4:'vec4f',
-                    vec2f:'vec2f', vec3f:'vec3f', vec4f:'vec4f',
-                    vec2i:'vec2i', vec3i:'vec3i', vec4i:'vec4i' };
+const VEC_CTORS = {
+  vec2: 'vec2f',
+  vec3: 'vec3f',
+  vec4: 'vec4f',
+  vec2f: 'vec2f',
+  vec3f: 'vec3f',
+  vec4f: 'vec4f',
+  vec2i: 'vec2i',
+  vec3i: 'vec3i',
+  vec4i: 'vec4i',
+};
 
 const MATH = {
-  sin:'sin',cos:'cos',tan:'tan',asin:'asin',acos:'acos',atan:'atan',atan2:'atan2',
-  abs:'abs',floor:'floor',ceil:'ceil',round:'round',sqrt:'sqrt',pow:'pow',
-  exp:'exp',exp2:'exp2',log:'log',log2:'log2',min:'min',max:'max',sign:'sign',
-  hypot:'length',
+  sin: 'sin',
+  cos: 'cos',
+  tan: 'tan',
+  asin: 'asin',
+  acos: 'acos',
+  atan: 'atan',
+  atan2: 'atan2',
+  abs: 'abs',
+  floor: 'floor',
+  ceil: 'ceil',
+  round: 'round',
+  sqrt: 'sqrt',
+  pow: 'pow',
+  exp: 'exp',
+  exp2: 'exp2',
+  log: 'log',
+  log2: 'log2',
+  min: 'min',
+  max: 'max',
+  sign: 'sign',
+  hypot: 'length',
 };
 
 // Built-in return-type inference (first-arg type or special)
 const BUILTIN_RET = {
-  length:'f32', dot:'f32', distance:'f32', determinant:'f32',
+  length: 'f32',
+  dot: 'f32',
+  distance: 'f32',
+  determinant: 'f32',
   normalize: (args, env) => env.inferType(args[0]),
-  mix:       (args, env) => env.inferType(args[0]),
-  clamp:     (args, env) => env.inferType(args[0]),
-  select:    (args, env) => env.inferType(args[0]),
-  smoothstep:(args, env) => env.inferType(args[2]) ?? 'f32',
-  step:      (args, env) => env.inferType(args[1]) ?? 'f32',
-  fract:     (args, env) => env.inferType(args[0]),
-  abs:       (args, env) => env.inferType(args[0]),
-  floor:     (args, env) => env.inferType(args[0]),
-  ceil:      (args, env) => env.inferType(args[0]),
-  round:     (args, env) => env.inferType(args[0]),
-  sqrt:      (args, env) => env.inferType(args[0]),
-  pow:       (args, env) => env.inferType(args[0]),
-  sin:       (args, env) => env.inferType(args[0]),
-  cos:       (args, env) => env.inferType(args[0]),
-  min:       (args, env) => env.inferType(args[0]),
-  max:       (args, env) => env.inferType(args[0]),
-  cross:     () => 'vec3f',
+  mix: (args, env) => env.inferType(args[0]),
+  clamp: (args, env) => env.inferType(args[0]),
+  select: (args, env) => env.inferType(args[0]),
+  smoothstep: (args, env) => env.inferType(args[2]) ?? 'f32',
+  step: (args, env) => env.inferType(args[1]) ?? 'f32',
+  fract: (args, env) => env.inferType(args[0]),
+  abs: (args, env) => env.inferType(args[0]),
+  floor: (args, env) => env.inferType(args[0]),
+  ceil: (args, env) => env.inferType(args[0]),
+  round: (args, env) => env.inferType(args[0]),
+  sqrt: (args, env) => env.inferType(args[0]),
+  pow: (args, env) => env.inferType(args[0]),
+  sin: (args, env) => env.inferType(args[0]),
+  cos: (args, env) => env.inferType(args[0]),
+  min: (args, env) => env.inferType(args[0]),
+  max: (args, env) => env.inferType(args[0]),
+  cross: () => 'vec3f',
 };
 
 // ── TypeEnv ───────────────────────────────────────────────────────────────────
@@ -77,11 +129,21 @@ class TypeEnv {
     this._f = new Map();
     this._parent = parent;
   }
-  child() { return new TypeEnv(this); }
-  set(n, t) { this._v.set(n, t); }
-  setFn(n, sig) { this._f.set(n, sig); }
-  get(n) { return this._v.has(n) ? this._v.get(n) : this._parent?.get(n) ?? null; }
-  getFn(n) { return this._f.has(n) ? this._f.get(n) : this._parent?.getFn(n) ?? null; }
+  child() {
+    return new TypeEnv(this);
+  }
+  set(n, t) {
+    this._v.set(n, t);
+  }
+  setFn(n, sig) {
+    this._f.set(n, sig);
+  }
+  get(n) {
+    return this._v.has(n) ? this._v.get(n) : (this._parent?.get(n) ?? null);
+  }
+  getFn(n) {
+    return this._f.has(n) ? this._f.get(n) : (this._parent?.getFn(n) ?? null);
+  }
 
   inferType(node) {
     if (!node) return 'f32';
@@ -89,7 +151,8 @@ class TypeEnv {
       case 'Literal': {
         if (typeof node.value === 'boolean') return 'bool';
         if (typeof node.value !== 'number') return 'f32';
-        const hasDecimal = node.raw?.includes('.') || node.raw?.includes('e') || node.raw?.includes('E');
+        const hasDecimal =
+          node.raw?.includes('.') || node.raw?.includes('e') || node.raw?.includes('E');
         return hasDecimal ? 'f32' : 'i32';
       }
       case 'Identifier': {
@@ -154,7 +217,8 @@ function emitExpr(node, env) {
       if (typeof node.value === 'boolean') return String(node.value);
       if (typeof node.value === 'number') {
         const s = String(node.value);
-        const hasDecimal = node.raw?.includes('.') || node.raw?.includes('e') || node.raw?.includes('E');
+        const hasDecimal =
+          node.raw?.includes('.') || node.raw?.includes('e') || node.raw?.includes('E');
         if (!hasDecimal && Number.isInteger(node.value)) return `${s}.0`;
         return s;
       }
@@ -167,8 +231,8 @@ function emitExpr(node, env) {
       // Math.PI etc
       if (node.object.name === 'Math') {
         const k = node.property.name;
-        if (k === 'PI')  return '3.141592653589793';
-        if (k === 'E')   return '2.718281828459045';
+        if (k === 'PI') return '3.141592653589793';
+        if (k === 'E') return '2.718281828459045';
         if (k === 'LN2') return '0.6931471805599453';
       }
       return `${emitExpr(node.object, env)}.${node.property.name}`;
@@ -198,7 +262,7 @@ function emitExpr(node, env) {
     }
     case 'CallExpression': {
       const callee = node.callee;
-      const args = node.arguments.map(a => emitExpr(a, env));
+      const args = node.arguments.map((a) => emitExpr(a, env));
       // Math.*
       if (callee.type === 'MemberExpression' && callee.object.name === 'Math') {
         const fn = callee.property.name;
@@ -213,7 +277,7 @@ function emitExpr(node, env) {
       return `${name}(${args.join(', ')})`;
     }
     case 'ArrayExpression': {
-      const args = node.elements.map(e => emitExpr(e, env));
+      const args = node.elements.map((e) => emitExpr(e, env));
       const n = args.length;
       const ctor = n >= 4 ? 'vec4f' : n === 3 ? 'vec3f' : 'vec2f';
       return `${ctor}(${args.join(', ')})`;
@@ -227,7 +291,10 @@ function emitExpr(node, env) {
 
 function emitBlock(node, env, ind) {
   if (node.type === 'BlockStatement') {
-    return node.body.map(s => emitStmt(s, env, ind)).filter(s => s != null).join('\n');
+    return node.body
+      .map((s) => emitStmt(s, env, ind))
+      .filter((s) => s != null)
+      .join('\n');
   }
   return emitStmt(node, env, ind) ?? '';
 }
@@ -235,21 +302,26 @@ function emitBlock(node, env, ind) {
 function emitStmt(node, env, ind = '') {
   switch (node.type) {
     case 'VariableDeclaration': {
-      return node.declarations.map(d => {
-        const type = d.init ? env.inferType(d.init) : 'f32';
-        env.set(d.id.name, type);
-        const init = d.init ? emitExpr(d.init, env) : _zeroOf(type);
-        const kw = node.kind === 'let' ? 'var' : 'let';
-        return `${ind}${kw} ${d.id.name}: ${type} = ${init};`;
-      }).join('\n');
+      return node.declarations
+        .map((d) => {
+          const type = d.init ? env.inferType(d.init) : 'f32';
+          env.set(d.id.name, type);
+          const init = d.init ? emitExpr(d.init, env) : _zeroOf(type);
+          const kw = node.kind === 'let' ? 'var' : 'let';
+          return `${ind}${kw} ${d.id.name}: ${type} = ${init};`;
+        })
+        .join('\n');
     }
     case 'ExpressionStatement': {
       const x = node.expression;
       // skip harness trace calls injected by live-patch (not valid WGSL)
-      if (x.type === 'CallExpression' &&
-          x.callee?.type === 'MemberExpression' &&
-          x.callee.object?.name === 'window' &&
-          String(x.callee.property?.name).startsWith('__ar')) return null;
+      if (
+        x.type === 'CallExpression' &&
+        x.callee?.type === 'MemberExpression' &&
+        x.callee.object?.name === 'window' &&
+        String(x.callee.property?.name).startsWith('__ar')
+      )
+        return null;
       if (x.type === 'UpdateExpression') {
         const op = x.operator === '++' ? '+= 1' : '-= 1';
         return `${ind}${emitExpr(x.argument, env)} ${op};`;
@@ -259,7 +331,7 @@ function emitStmt(node, env, ind = '') {
     case 'ReturnStatement': {
       if (!node.argument) return `${ind}return;`;
       if (node.argument.type === 'ArrayExpression') {
-        const a = node.argument.elements.map(e => emitExpr(e, env));
+        const a = node.argument.elements.map((e) => emitExpr(e, env));
         const n = a.length;
         const ctor = n >= 4 ? 'vec4f' : n === 3 ? 'vec3f' : 'vec2f';
         return `${ind}return ${ctor}(${a.join(', ')});`;
@@ -293,9 +365,9 @@ function emitStmt(node, env, ind = '') {
       } else if (node.init) {
         init = emitExpr(node.init, lEnv);
       }
-      const test   = node.test ? emitExpr(node.test, lEnv) : 'true';
+      const test = node.test ? emitExpr(node.test, lEnv) : 'true';
       const update = node.update ? _emitUpdate(node.update, lEnv) : '';
-      const body   = emitBlock(node.body, lEnv, ind + '  ');
+      const body = emitBlock(node.body, lEnv, ind + '  ');
       return `${ind}for (${init}; ${test}; ${update}) {\n${body}\n${ind}}`;
     }
     case 'WhileStatement': {
@@ -307,7 +379,10 @@ function emitStmt(node, env, ind = '') {
     }
     case 'BlockStatement': {
       const bEnv = env.child();
-      return node.body.map(s => emitStmt(s, bEnv, ind)).filter(s => s != null).join('\n');
+      return node.body
+        .map((s) => emitStmt(s, bEnv, ind))
+        .filter((s) => s != null)
+        .join('\n');
     }
     case 'FunctionDeclaration':
       return null; // helpers are hoisted separately
@@ -343,12 +418,12 @@ function _paramType(param, env) {
 }
 
 function emitHelperFn(node, parentEnv) {
-  const name  = node.id?.name ?? '__helper';
+  const name = node.id?.name ?? '__helper';
   const fnEnv = parentEnv.child();
 
-  const params = node.params.map(p => {
+  const params = node.params.map((p) => {
     const pname = p.type === 'AssignmentPattern' ? p.left.name : p.name;
-    const type  = _paramType(p, parentEnv);
+    const type = _paramType(p, parentEnv);
     fnEnv.set(pname, type);
     return { name: pname, type };
   });
@@ -360,9 +435,9 @@ function emitHelperFn(node, parentEnv) {
   }
 
   const bodyLines = node.body.body
-    .filter(s => s.type !== 'FunctionDeclaration')
-    .map(s => emitStmt(s, fnEnv, '  '))
-    .filter(s => s != null)
+    .filter((s) => s.type !== 'FunctionDeclaration')
+    .map((s) => emitStmt(s, fnEnv, '  '))
+    .filter((s) => s != null)
     .join('\n');
 
   // Infer return type from first return statement
@@ -381,8 +456,8 @@ function emitHelperFn(node, parentEnv) {
 
   parentEnv.setFn(name, { ret });
 
-  const paramStr = params.map(p => `${p.name}: ${p.type}`).join(', ');
-  const fnWGSL   = `fn ${name}(${paramStr}) -> ${ret} {\n${bodyLines}\n}`;
+  const paramStr = params.map((p) => `${p.name}: ${p.type}`).join(', ');
+  const fnWGSL = `fn ${name}(${paramStr}) -> ${ret} {\n${bodyLines}\n}`;
   return [...nested, fnWGSL].join('\n\n');
 }
 
@@ -390,8 +465,12 @@ function emitHelperFn(node, parentEnv) {
 
 // Known types for the fragment shader param object properties
 const KNOWN_PARAMS = {
-  uv:'vec2f', time:'f32', col:'vec4f', custom:'vec4f',
-  res:'vec2f', mouse:'vec2f',
+  uv: 'vec2f',
+  time: 'f32',
+  col: 'vec4f',
+  custom: 'vec4f',
+  res: 'vec2f',
+  mouse: 'vec2f',
 };
 
 function extractParams(fnNode) {
@@ -400,11 +479,13 @@ function extractParams(fnNode) {
   if (!p0) return { names: new Set(), usesCol: false };
 
   if (p0.type === 'ObjectPattern') {
-    const names = new Set(p0.properties.map(prop => prop.key?.name ?? prop.value?.name).filter(Boolean));
+    const names = new Set(
+      p0.properties.map((prop) => prop.key?.name ?? prop.value?.name).filter(Boolean),
+    );
     return { names, usesCol: names.has('col') };
   }
   // Multiple positional params (uv, time, col, custom)
-  const ordered = ['uv','time','col','custom','res','mouse'];
+  const ordered = ['uv', 'time', 'col', 'custom', 'res', 'mouse'];
   const names = new Set(fnNode.params.slice(0, ordered.length).map((p, i) => ordered[i]));
   return { names, usesCol: names.has('col') };
 }
@@ -454,9 +535,9 @@ export function jsToWGSL(fn, { extraParams = {}, bind = {} } = {}) {
 
   // Emit main body (skip FunctionDeclarations — already hoisted)
   const userLines = stmts
-    .filter(s => s.type !== 'FunctionDeclaration')
-    .map(s => emitStmt(s, env, '  '))
-    .filter(s => s != null)
+    .filter((s) => s.type !== 'FunctionDeclaration')
+    .map((s) => emitStmt(s, env, '  '))
+    .filter((s) => s != null)
     .join('\n');
 
   // Prepend bound-alias declarations (caller maps a param name → a WGSL expr).
@@ -467,7 +548,7 @@ export function jsToWGSL(fn, { extraParams = {}, bind = {} } = {}) {
 
   // A bind expr may reference `col` (the video sample) even when the fn never
   // names a `col` param — surface that so the caller wires the video binding.
-  const bindUsesCol = Object.values(bind).some(e => /\bcol\b/.test(String(e)));
+  const bindUsesCol = Object.values(bind).some((e) => /\bcol\b/.test(String(e)));
 
   return { body: bodyLines, helpers, usesCol: usesCol || bindUsesCol };
 }

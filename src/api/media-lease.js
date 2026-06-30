@@ -14,16 +14,24 @@
 //   acquireMicRunScoped();
 
 import { runScoped } from '../runtime/run-scoped.js';
-import { notify } from '../events/index.js';
 
-let _cameraStart = null, _cameraStop = null;
-let _micStart    = null, _micStop    = null;
-let _cameraCount = 0,    _micCount   = 0;
+let _cameraStart = null,
+  _cameraStop = null;
+let _micStart = null,
+  _micStop = null;
+let _cameraCount = 0,
+  _micCount = 0;
 
 // ── Registration (called by camera.js / mic.js at init time) ─────────────────
 
-export function initCameraLease(start, stop) { _cameraStart = start; _cameraStop = stop; }
-export function initMicLease(start, stop)    { _micStart    = start; _micStop    = stop; }
+export function initCameraLease(start, stop) {
+  _cameraStart = start;
+  _cameraStop = stop;
+}
+export function initMicLease(start, stop) {
+  _micStart = start;
+  _micStop = stop;
+}
 
 // ── Lease primitives ─────────────────────────────────────────────────────────
 
@@ -83,7 +91,11 @@ export function acquireMicRunScoped() {
 
 // ── Diagnostics ──────────────────────────────────────────────────────────────
 
-export function getCameraCount() { return _cameraCount; }
-export function getMicCount()    { return _micCount; }
+export function getCameraCount() {
+  return _cameraCount;
+}
+export function getMicCount() {
+  return _micCount;
+}
 
 // Reset teardown is owned by run-scoped.js (owner-filtered onReset) — see ADR 008.

@@ -13,7 +13,7 @@
 export class WidgetEvents {
   constructor() {
     this._hooks = new Map(); // event → fn[]
-    this._rafs  = [];        // active RAF ids (for stream)
+    this._rafs = []; // active RAF ids (for stream)
   }
 
   /**
@@ -31,9 +31,13 @@ export class WidgetEvents {
    */
   emit(event, payload = {}) {
     const specific = this._hooks.get(event) ?? [];
-    const wildcard = this._hooks.get('*')   ?? [];
+    const wildcard = this._hooks.get('*') ?? [];
     for (const fn of [...specific, ...wildcard]) {
-      try { fn(payload); } catch (err) { console.error('[WidgetEvents] listener error:', err); }
+      try {
+        fn(payload);
+      } catch (err) {
+        console.error('[WidgetEvents] listener error:', err);
+      }
     }
   }
 
@@ -52,10 +56,10 @@ export class WidgetEvents {
     // Normalise: first arg may be an opts object (no event string supplied)
     if (typeof event === 'object' && event !== null) {
       const opts = event;
-      event  = '*';
-      decay  = opts.decay  ?? decay;
+      event = '*';
+      decay = opts.decay ?? decay;
       region = opts.region ?? region;
-      match  = opts.match  ?? match;
+      match = opts.match ?? match;
     }
 
     const ref = { t: -Infinity };
@@ -63,7 +67,7 @@ export class WidgetEvents {
     // Filtered hook: stamp ref.t only when the event passes both predicates
     const hookFn = (payload) => {
       if (region !== null && !_inRegion(payload, region)) return;
-      if (match  !== null && !match(payload))              return;
+      if (match !== null && !match(payload)) return;
       ref.t = performance.now();
     };
     this.on(event, hookFn);
@@ -74,12 +78,17 @@ export class WidgetEvents {
         const dt = performance.now() - ref.t;
         return dt >= decay ? 0 : 1 - dt / decay;
       },
-      get velocity() { return sig.value; },
+      get velocity() {
+        return sig.value;
+      },
 
       /** Push value to fn on every animation frame. Returns sig for chaining. */
       stream(fn) {
         let rafId;
-        const frame = () => { fn(sig); rafId = requestAnimationFrame(frame); };
+        const frame = () => {
+          fn(sig);
+          rafId = requestAnimationFrame(frame);
+        };
         rafId = requestAnimationFrame(frame);
         self._rafs.push(rafId);
         return sig;
@@ -89,7 +98,7 @@ export class WidgetEvents {
       on(fn) {
         const filteredFn = (payload) => {
           if (region !== null && !_inRegion(payload, region)) return;
-          if (match  !== null && !match(payload))              return;
+          if (match !== null && !match(payload)) return;
           fn(payload);
         };
         self.on(event, filteredFn);
@@ -115,8 +124,10 @@ export class WidgetEvents {
  * Supports point payloads (x/y or c/r) and bbox payloads ({ bbox: { x, y, w, h } }).
  */
 function _inRegion(payload, region) {
-  const rx = region.x ?? 0, ry = region.y ?? 0;
-  const rw = region.w ?? Infinity, rh = region.h ?? Infinity;
+  const rx = region.x ?? 0,
+    ry = region.y ?? 0;
+  const rw = region.w ?? Infinity,
+    rh = region.h ?? Infinity;
 
   // bbox overlap (stroke/fill payloads)
   if (payload.bbox) {

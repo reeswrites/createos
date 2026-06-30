@@ -4,11 +4,11 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-let subscribe, registerCommand, clearRunScoped, emit;
+let subscribe, emit;
 let registerSource;
 
 beforeEach(async () => {
-  ({ subscribe, registerCommand, clearRunScoped, emit } = await import('../src/events/bus.js'));
+  ({ subscribe, emit } = await import('../src/events/bus.js'));
   ({ registerSource } = await import('../src/events/bus.js'));
 });
 

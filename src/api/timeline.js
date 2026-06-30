@@ -13,7 +13,7 @@ import { scheduleReplay } from './replay-clock.js';
 class Timeline {
   constructor() {
     this._tracks = [];
-    this._clock  = null;
+    this._clock = null;
   }
 
   // actions: [{ t, ... }] recorded for `widget`. `at`: offset ms for this take.
@@ -37,8 +37,14 @@ class Timeline {
     return this;
   }
 
-  stop() { this._clock?.stop(); this._clock = null; return this; }
+  stop() {
+    this._clock?.stop();
+    this._clock = null;
+    return this;
+  }
 }
 
-export function timeline() { return new Timeline(); }
+export function timeline() {
+  return new Timeline();
+}
 export { Timeline };

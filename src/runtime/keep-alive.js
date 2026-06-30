@@ -24,7 +24,9 @@ export function liveOutput(token) {
       released = true;
       set.delete(token);
     },
-    get token() { return token; },
+    get token() {
+      return token;
+    },
   };
 }
 

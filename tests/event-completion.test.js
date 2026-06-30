@@ -115,7 +115,7 @@ describe('eventCompletionSource', () => {
     expect(labels).toContain('beat:tick');
   });
 
-  it('validFor pattern is /:[\w.-]*/', () => {
+  it('validFor pattern is /:[w.-]*/', () => {
     const code = `on('')`;
     const insideQuote = code.indexOf("'") + 1;
     const result = eventCompletionSource(makeContext(code, insideQuote));

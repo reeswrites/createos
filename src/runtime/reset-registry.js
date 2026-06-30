@@ -27,10 +27,15 @@ export function onReset(fn) {
 // window across re-runs instead of flash-rebuilding it every ~1s.
 export function runResetHandlers(editorId, soft = false) {
   for (const fn of _handlers) {
-    try { fn(editorId, soft); }
-    catch (e) { console.error('[reset] handler failed:', e); }
+    try {
+      fn(editorId, soft);
+    } catch (e) {
+      console.error('[reset] handler failed:', e);
+    }
   }
 }
 
 // Test/inspection helper.
-export function _resetHandlerCount() { return _handlers.length; }
+export function _resetHandlerCount() {
+  return _handlers.length;
+}

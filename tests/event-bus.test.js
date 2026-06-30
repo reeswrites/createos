@@ -125,7 +125,7 @@ describe('clearRunScoped()', () => {
     // Run-scoped (active editor present)
     window.__ar_active_editor_id = 42;
     const runScoped = vi.fn();
-    const unscoped = subscribe('test:scope', runScoped);
+    subscribe('test:scope', runScoped);
     delete window.__ar_active_editor_id;
 
     clearRunScoped();

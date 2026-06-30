@@ -11,7 +11,7 @@ function walk(node, visitor) {
   visitor(node);
   for (const key of Object.keys(node)) {
     const child = node[key];
-    if (Array.isArray(child)) child.forEach(c => walk(c, visitor));
+    if (Array.isArray(child)) child.forEach((c) => walk(c, visitor));
     else if (child && typeof child === 'object' && child.type) walk(child, visitor);
   }
 }
@@ -21,22 +21,23 @@ function walk(node, visitor) {
 export const API_PATTERNS = {
   // Strudel pattern engine (ADR 035): note()/sound()/stack()/seq()/cat() sources,
   // setcps()/hush()/samples() transport, and the universal `.play()` trigger.
-  usesAudio:    /\baudio\s*\.|\bnote\s*\(|\bsound\s*\(|\bstack\s*\(|\bseq\s*\(|\bsequence\s*\(|\bcat\s*\(|\bsetcps\s*\(|\bsetcpm\s*\(|\bhush\s*\(|\bsamples\s*\(|\.play\s*\(\s*\)|\bnew\s+Drumpad\b/,
-  usesShader:   /\bnew\s+Shader\b/,
+  usesAudio:
+    /\baudio\s*\.|\bnote\s*\(|\bsound\s*\(|\bstack\s*\(|\bseq\s*\(|\bsequence\s*\(|\bcat\s*\(|\bsetcps\s*\(|\bsetcpm\s*\(|\bhush\s*\(|\bsamples\s*\(|\.play\s*\(\s*\)|\bnew\s+Drumpad\b/,
+  usesShader: /\bnew\s+Shader\b/,
   usesGLShader: /\bnew\s+GLShader\b/,
   usesShaderFX: /\bShaderFX\b/,
-  usesPixi:     /\b(?:pixi|PIXI|Stage)\b/,
-  usesSensors:  /\bsensors\s*\./,
-  usesCamera:   /\bnew\s+Camera\b|\bcamera\s*\./,
-  usesVideo:    /\bvideo\s*\./,
-  usesVision:   /\bvision\s*\./,
-  usesDesktop:  /\bdesktop\s*\./,
-  usesMedia:    /\bMedia\s*\./,
-  usesDraw:     /\bdraw\s*\.(?!toASCII\b)/,
-  usesLayer:    /\bgetLayer\s*\(/,
+  usesPixi: /\b(?:pixi|PIXI|Stage)\b/,
+  usesSensors: /\bsensors\s*\./,
+  usesCamera: /\bnew\s+Camera\b|\bcamera\s*\./,
+  usesVideo: /\bvideo\s*\./,
+  usesVision: /\bvision\s*\./,
+  usesDesktop: /\bdesktop\s*\./,
+  usesMedia: /\bMedia\s*\./,
+  usesDraw: /\bdraw\s*\.(?!toASCII\b)/,
+  usesLayer: /\bgetLayer\s*\(/,
   usesGetCanvas: /\bgetCanvas\s*\(/,
-  usesThree:    /\bnew\s+ThreeScene\b|\bTHREE\s*\./,
-  usesRoute:    /\broute\s*\(/,
+  usesThree: /\bnew\s+ThreeScene\b|\bTHREE\s*\./,
+  usesRoute: /\broute\s*\(/,
 };
 
 // ── AST-level precise detection ───────────────────────────────────────────────
@@ -47,7 +48,7 @@ function _shaderStartCalled(ast) {
   const shaderVars = new Set();
 
   // Collect: const s = new Shader(...) / let s = new GLShader(...)
-  walk(ast, node => {
+  walk(ast, (node) => {
     if (
       node.type === 'VariableDeclarator' &&
       node.init?.type === 'NewExpression' &&
@@ -62,7 +63,7 @@ function _shaderStartCalled(ast) {
 
   // Check: shaderVar.start()
   let found = false;
-  walk(ast, node => {
+  walk(ast, (node) => {
     if (
       node.type === 'CallExpression' &&
       node.callee?.type === 'MemberExpression' &&
@@ -79,13 +80,14 @@ function _shaderStartCalled(ast) {
 // Returns true when `new Shader(...).start()` inline chain is present.
 function _inlineShaderStartCalled(ast) {
   let found = false;
-  walk(ast, node => {
+  walk(ast, (node) => {
     if (
       node.type === 'CallExpression' &&
       node.callee?.type === 'MemberExpression' &&
       node.callee.property?.name === 'start' &&
       node.callee.object?.type === 'NewExpression' &&
-      (node.callee.object.callee?.name === 'Shader' || node.callee.object.callee?.name === 'GLShader')
+      (node.callee.object.callee?.name === 'Shader' ||
+        node.callee.object.callee?.name === 'GLShader')
     ) {
       found = true;
     }
@@ -112,25 +114,25 @@ function _inlineShaderStartCalled(ast) {
  */
 export function detectAPIUsage(code) {
   const result = {
-    usesAudio:    false,
-    usesShader:   false,
+    usesAudio: false,
+    usesShader: false,
     usesGLShader: false,
     usesShaderFX: false,
-    usesPixi:     false,
-    usesSensors:  false,
-    usesCamera:   false,
-    usesVideo:    false,
-    usesVision:   false,
-    usesDesktop:  false,
-    usesMedia:    false,
-    usesDraw:     false,
+    usesPixi: false,
+    usesSensors: false,
+    usesCamera: false,
+    usesVideo: false,
+    usesVision: false,
+    usesDesktop: false,
+    usesMedia: false,
+    usesDraw: false,
     usesGetCanvas: false,
-    usesLayer:    false,
-    usesThree:    false,
-    usesRoute:    false,
-    shaderStartCalled:    false,
+    usesLayer: false,
+    usesThree: false,
+    usesRoute: false,
+    shaderStartCalled: false,
     shaderConstructedOnly: false,
-    parseError:   null,
+    parseError: null,
   };
 
   // Fast text scan (catches everything even if AST parse fails)
@@ -149,7 +151,8 @@ export function detectAPIUsage(code) {
 
   if (result.usesShader || result.usesGLShader) {
     result.shaderStartCalled = _shaderStartCalled(ast) || _inlineShaderStartCalled(ast);
-    result.shaderConstructedOnly = (result.usesShader || result.usesGLShader) && !result.shaderStartCalled;
+    result.shaderConstructedOnly =
+      (result.usesShader || result.usesGLShader) && !result.shaderStartCalled;
   }
 
   return result;

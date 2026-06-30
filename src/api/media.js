@@ -8,20 +8,20 @@ export function cleanupMedia() {
 }
 
 function makeOverlayCanvas(z, opacity) {
-  const wrapper = document.getElementById("canvasWrapper");
-  const ref = wrapper?.querySelector("canvas");
-  const c = document.createElement("canvas");
+  const wrapper = document.getElementById('canvasWrapper');
+  const ref = wrapper?.querySelector('canvas');
+  const c = document.createElement('canvas');
   c.width = ref?.width ?? 1600;
   c.height = ref?.height ?? 900;
   Object.assign(c.style, {
-    position: "absolute",
-    top: "0",
-    left: "0",
-    width: "100%",
-    height: "100%",
+    position: 'absolute',
+    top: '0',
+    left: '0',
+    width: '100%',
+    height: '100%',
     zIndex: String(z),
     opacity: String(opacity),
-    pointerEvents: "none",
+    pointerEvents: 'none',
   });
   wrapper?.appendChild(c);
   return c;
@@ -30,7 +30,7 @@ function makeOverlayCanvas(z, opacity) {
 // ── ImageLayer ───────────────────────────────────────────────────────────────
 
 class ImageLayer {
-  constructor(img, { z = 25, opacity = 1.0, fit = "cover" } = {}) {
+  constructor(img, { z = 25, opacity = 1.0, fit = 'cover' } = {}) {
     this._img = img;
     this._z = z;
     this._opacity = opacity;
@@ -41,18 +41,18 @@ class ImageLayer {
   }
 
   _draw() {
-    const ctx = this._canvas.getContext("2d");
+    const ctx = this._canvas.getContext('2d');
     const cw = this._canvas.width;
     const ch = this._canvas.height;
     ctx.clearRect(0, 0, cw, ch);
     const iw = this._img.naturalWidth || this._img.width;
     const ih = this._img.naturalHeight || this._img.height;
-    if (this._fit === "cover") {
+    if (this._fit === 'cover') {
       const scale = Math.max(cw / iw, ch / ih);
       const dw = iw * scale;
       const dh = ih * scale;
       ctx.drawImage(this._img, (cw - dw) / 2, (ch - dh) / 2, dw, dh);
-    } else if (this._fit === "contain") {
+    } else if (this._fit === 'contain') {
       const scale = Math.min(cw / iw, ch / ih);
       const dw = iw * scale;
       const dh = ih * scale;
@@ -80,7 +80,9 @@ class ImageLayer {
     return this;
   }
 
-  get canvas() { return this._canvas; }
+  get canvas() {
+    return this._canvas;
+  }
 
   _destroy() {
     this._canvas?.remove();
@@ -94,15 +96,15 @@ class VideoLayer {
     this._z = z;
     this._opacity = opacity;
     this._canvas = makeOverlayCanvas(z, opacity);
-    this._ctx = this._canvas.getContext("2d");
+    this._ctx = this._canvas.getContext('2d');
     this._rafId = null;
 
-    this._video = document.createElement("video");
+    this._video = document.createElement('video');
     this._video.src = url;
     this._video.loop = loop;
     this._video.muted = muted;
     this._video.playsInline = true;
-    this._video.style.display = "none";
+    this._video.style.display = 'none';
     document.body.appendChild(this._video);
 
     _mediaLayers.push(this);
@@ -174,8 +176,12 @@ class VideoLayer {
     return this;
   }
 
-  get canvas() { return this._canvas; }
-  get video() { return this._video; }
+  get canvas() {
+    return this._canvas;
+  }
+  get video() {
+    return this._video;
+  }
 
   _destroy() {
     this.stop();
@@ -209,8 +215,11 @@ class VideoClip {
 
     this._onTime = () => {
       if (this.el.currentTime >= this._end) {
-        if (this._looping) { this.el.currentTime = this._start; }
-        else { this.el.pause(); }
+        if (this._looping) {
+          this.el.currentTime = this._start;
+        } else {
+          this.el.pause();
+        }
       }
     };
     this.el.addEventListener('timeupdate', this._onTime);
@@ -225,7 +234,10 @@ class VideoClip {
     return this;
   }
 
-  pause() { this.el.pause(); return this; }
+  pause() {
+    this.el.pause();
+    return this;
+  }
 
   stop() {
     this.el.pause();
@@ -238,11 +250,21 @@ class VideoClip {
     return this;
   }
 
-  loop(on = true) { this._looping = on; return this; }
-  mute(on = true) { this.el.muted = on; return this; }
+  loop(on = true) {
+    this._looping = on;
+    return this;
+  }
+  mute(on = true) {
+    this.el.muted = on;
+    return this;
+  }
 
-  get currentTime() { return Math.max(0, this.el.currentTime - this._start); }
-  get duration()    { return this._end - this._start; }
+  get currentTime() {
+    return Math.max(0, this.el.currentTime - this._start);
+  }
+  get duration() {
+    return this._end - this._start;
+  }
 
   _destroy() {
     this.el.removeEventListener('timeupdate', this._onTime);
@@ -258,7 +280,7 @@ export const Media = {
   image(url) {
     return new Promise((resolve, reject) => {
       const img = new Image();
-      img.crossOrigin = "anonymous";
+      img.crossOrigin = 'anonymous';
       img.onload = () => resolve(img);
       img.onerror = () => reject(new Error(`Failed to load image: ${url}`));
       img.src = url;

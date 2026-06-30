@@ -8,11 +8,11 @@ export function initMic() {
   let rafId = null;
 
   // Hidden canvas kept for shader.micVizShader() / audio.micCanvas compatibility.
-  const vizCanvas = document.getElementById("mic-viz");
+  const vizCanvas = document.getElementById('mic-viz');
   vizCanvas.width = 512;
   vizCanvas.height = 64;
   window.__ar_mic_viz = vizCanvas;
-  const ctx = vizCanvas.getContext("2d");
+  const ctx = vizCanvas.getContext('2d');
 
   const NUM_BARS = 48;
 
@@ -23,7 +23,7 @@ export function initMic() {
     const bins = analyser.frequencyBinCount;
     const data = new Uint8Array(bins);
     analyser.getByteFrequencyData(data);
-    ctx.fillStyle = "#111";
+    ctx.fillStyle = '#111';
     ctx.fillRect(0, 0, W, H);
     const half = NUM_BARS / 2;
     const barW = W / NUM_BARS;
@@ -57,7 +57,7 @@ export function initMic() {
         currentStream = stream;
         window.__ar_mic_stream = stream;
         audioCtx.createMediaStreamSource(currentStream).connect(analyser);
-        if (audioCtx.state === "suspended") audioCtx.resume();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
         if (!rafId) drawBars();
         window.__ar_mic_on = true;
         notify('mic:open', { toolbar: true });
@@ -67,16 +67,21 @@ export function initMic() {
         // Undo analyser/context setup if stream acquisition fails.
         window.__ar_mic_analyser = null;
         analyser = null;
-        try { audioCtx.close(); } catch (_) {}
+        try {
+          audioCtx.close();
+        } catch (_) {}
         audioCtx = null;
         notify('mic:error', { error: err?.message ?? String(err) });
-        console.warn("Mic unavailable:", err?.message ?? err);
+        console.warn('Mic unavailable:', err?.message ?? err);
       });
   };
 
   // _stopMic: called by media-lease on 1→0 (last consumer released).
   const _stopMic = () => {
-    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+    if (rafId) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
     ctx.clearRect(0, 0, vizCanvas.width, vizCanvas.height);
     currentStream?.getAudioTracks().forEach((t) => t.stop());
     currentStream = null;
@@ -86,19 +91,24 @@ export function initMic() {
     analyser = null;
     // Reset AudioContext so next acquire creates a fresh one.
     if (audioCtx) {
-      try { audioCtx.close(); } catch (_) {}
+      try {
+        audioCtx.close();
+      } catch (_) {}
       audioCtx = null;
     }
     notify('mic:close', { toolbar: true });
   };
 
   // Permission change watcher.
-  navigator.permissions?.query({ name: "microphone" }).then((status) => {
-    status.addEventListener("change", () => {
-      // If permission just granted and we have pending consumers (but no stream),
-      // media-lease already holds the 0→1 trigger — nothing to do here.
-    });
-  }).catch(() => {});
+  navigator.permissions
+    ?.query({ name: 'microphone' })
+    .then((status) => {
+      status.addEventListener('change', () => {
+        // If permission just granted and we have pending consumers (but no stream),
+        // media-lease already holds the 0→1 trigger — nothing to do here.
+      });
+    })
+    .catch(() => {});
 
   // Register with media-lease (ADR 023).
   initMicLease(_startMic, _stopMic);

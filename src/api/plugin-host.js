@@ -35,10 +35,7 @@ class Plugin {
     // Build blob URL if src is HTML string
     let iframeSrc = this._src;
     if (this._src.trimStart().startsWith('<')) {
-      const injected = this._src.replace(
-        /<head[^>]*>/i,
-        (m) => m + _PLUGIN_SHIM,
-      );
+      const injected = this._src.replace(/<head[^>]*>/i, (m) => m + _PLUGIN_SHIM);
       const blob = new Blob([injected], { type: 'text/html' });
       iframeSrc = URL.createObjectURL(blob);
     }
@@ -53,7 +50,8 @@ class Plugin {
     // Intercept wm.spawn and inject iframe directly
     const winId = window.wm?.spawn(title, {
       html: '<div style="position:absolute;inset:0;padding:0;"></div>',
-      w, h,
+      w,
+      h,
       onClose: () => this._stopBridge(),
       ...opts,
     });
@@ -83,7 +81,7 @@ class Plugin {
           this._mirrorCtx = this._mirrorCanvas.getContext('2d');
         }
         const bmp = msg.bitmap;
-        this._mirrorCanvas.width  = bmp.width;
+        this._mirrorCanvas.width = bmp.width;
         this._mirrorCanvas.height = bmp.height;
         this._mirrorCtx.drawImage(bmp, 0, 0);
         bmp.close();
@@ -114,15 +112,22 @@ class Plugin {
       if (!iw || !iw.document) return;
       if (iw.vlPlugin) return; // already injected via shim
       iw.vlPlugin = _makePluginAPI(this);
-    } catch (_) { /* cross-origin — shim in <head> handles it */ }
+    } catch (_) {
+      /* cross-origin — shim in <head> handles it */
+    }
   }
 
   _startBridge() {
     if (this._rafId) return;
     const loop = () => {
-      if (!this._iframe?.isConnected) { this._stopBridge(); return; }
+      if (!this._iframe?.isConnected) {
+        this._stopBridge();
+        return;
+      }
       for (const { name, fn } of this._bridges) {
-        try { this.send(name, fn()); } catch (_) {}
+        try {
+          this.send(name, fn());
+        } catch (_) {}
       }
       this._rafId = requestAnimationFrame(loop);
     };
@@ -130,17 +135,17 @@ class Plugin {
   }
 
   _stopBridge() {
-    if (this._rafId) { cancelAnimationFrame(this._rafId); this._rafId = null; }
+    if (this._rafId) {
+      cancelAnimationFrame(this._rafId);
+      this._rafId = null;
+    }
   }
 
   // ── Public API ──────────────────────────────────────────────────────────────
 
   // Send a typed message to the iframe
   send(type, payload) {
-    this._iframe?.contentWindow?.postMessage(
-      { _vlType: type, _vlPayload: payload },
-      '*',
-    );
+    this._iframe?.contentWindow?.postMessage({ _vlType: type, _vlPayload: payload }, '*');
     return this;
   }
 
@@ -151,7 +156,7 @@ class Plugin {
   }
 
   off(type, fn) {
-    this._handlers[type] = (this._handlers[type] ?? []).filter(h => h !== fn);
+    this._handlers[type] = (this._handlers[type] ?? []).filter((h) => h !== fn);
     return this;
   }
 
@@ -159,7 +164,11 @@ class Plugin {
   // fn() is evaluated each frame; result sent as send(name, value)
   bridge(name, fn) {
     this._bridges.push({ name, fn });
-    window.__ar_signalRoutes?.push({ source: name, sink: `Plugin:${this._winId ?? '?'}`, label: name });
+    window.__ar_signalRoutes?.push({
+      source: name,
+      sink: `Plugin:${this._winId ?? '?'}`,
+      label: name,
+    });
     return this;
   }
 
@@ -178,9 +187,18 @@ class Plugin {
   }
 
   // wm convenience
-  close() { window.wm?.close?.(this._winId); return this; }
-  show()  { window.wm?.show?.(this._winId);  return this; }
-  hide()  { window.wm?.hide?.(this._winId);  return this; }
+  close() {
+    window.wm?.close?.(this._winId);
+    return this;
+  }
+  show() {
+    window.wm?.show?.(this._winId);
+    return this;
+  }
+  hide() {
+    window.wm?.hide?.(this._winId);
+    return this;
+  }
 
   _destroy() {
     this._stopBridge();
@@ -195,8 +213,14 @@ class Plugin {
 
 function _makePluginAPI(host) {
   return {
-    on(type, fn)  { host.on(type, fn); return this; },
-    off(type, fn) { host.off(type, fn); return this; },
+    on(type, fn) {
+      host.on(type, fn);
+      return this;
+    },
+    off(type, fn) {
+      host.off(type, fn);
+      return this;
+    },
     send(type, payload) {
       window.parent?.postMessage({ _vlType: type, _vlPayload: payload }, '*');
       return this;
@@ -246,7 +270,7 @@ window.vlPlugin = {
     return this;
   },
 };
-<\/script>
+</script>
 `;
 
 // ── Public API ────────────────────────────────────────────────────────────────

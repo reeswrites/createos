@@ -6,7 +6,7 @@ import { onReset } from '../runtime/reset-registry.js';
 // statusBar.show()/hide() — toggle visibility
 // Not hardcoded nav chrome — lives in a wm window pinned to bottom of desktop.
 
-let _winId  = null;
+let _winId = null;
 let _textEl = null;
 let _contentEl = null;
 
@@ -21,7 +21,7 @@ function _getOrSpawn() {
   }
 
   const desktop = document.getElementById('desktop') ?? document.body;
-  const dW = desktop.offsetWidth  || 800;
+  const dW = desktop.offsetWidth || 800;
   const dH = desktop.offsetHeight || 600;
   const barH = 28;
 
@@ -30,15 +30,16 @@ function _getOrSpawn() {
   <span id="sb-content" style="display:flex;gap:6px;align-items:center;"></span>
 </div>`;
 
-  _winId = window.wm?.spawn('Status Bar', {
-    html,
-    x: 0,
-    y: dH - barH - 29,  // 29 = titlebar height, so we'd want noChrome
-    w: dW,
-    h: barH,
-    noChrome: true,
-    id: 'win-statusbar',
-  }) ?? null;
+  _winId =
+    window.wm?.spawn('Status Bar', {
+      html,
+      x: 0,
+      y: dH - barH - 29, // 29 = titlebar height, so we'd want noChrome
+      w: dW,
+      h: barH,
+      noChrome: true,
+      id: 'win-statusbar',
+    }) ?? null;
 
   if (_winId) {
     const win = document.getElementById(_winId);
@@ -48,7 +49,7 @@ function _getOrSpawn() {
       const body = win.querySelector('.wm-body');
       if (body) {
         body.style.cssText += ';padding:0;overflow:hidden;';
-        _textEl    = body.querySelector('#sb-text');
+        _textEl = body.querySelector('#sb-text');
         _contentEl = body.querySelector('#sb-content');
       }
     }
@@ -88,7 +89,7 @@ export const statusBar = {
 
   // Clear all content
   clear() {
-    if (_textEl)    _textEl.textContent = '';
+    if (_textEl) _textEl.textContent = '';
     if (_contentEl) _contentEl.innerHTML = '';
     return statusBar;
   },
@@ -108,11 +109,15 @@ export const statusBar = {
   // Destroy and remove
   close() {
     if (_winId) window.wm?.close?.(_winId);
-    _winId = null; _textEl = null; _contentEl = null;
+    _winId = null;
+    _textEl = null;
+    _contentEl = null;
     return statusBar;
   },
 
-  get isOpen() { return !!(_winId && document.getElementById(_winId)); },
+  get isOpen() {
+    return !!(_winId && document.getElementById(_winId));
+  },
 };
 
 // Register teardown with the reset registry (ADR 008).

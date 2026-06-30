@@ -38,14 +38,21 @@ function _resolveSpec(spec) {
         lease = acquireMic();
         if (window.__ar_mic_stream) return window.__ar_mic_stream;
         await new Promise((res) => {
-          const done = () => { unsubR?.(); unsubE?.(); clearTimeout(t); res(); };
+          const done = () => {
+            unsubR?.();
+            unsubE?.();
+            clearTimeout(t);
+            res();
+          };
           const unsubR = subscribe('mic:ready', done);
           const unsubE = subscribe('mic:error', done);
           const t = setTimeout(done, 4000); // fail-safe
         });
         return window.__ar_mic_stream;
       },
-      onRelease() { lease?.release(); },
+      onRelease() {
+        lease?.release();
+      },
     };
   }
   if (spec?.el) {
@@ -60,7 +67,12 @@ function _resolveSpec(spec) {
     };
   }
   if (spec?.stream instanceof MediaStream) {
-    return { key: spec.stream, async getStream() { return spec.stream; } };
+    return {
+      key: spec.stream,
+      async getStream() {
+        return spec.stream;
+      },
+    };
   }
   throw new Error('[stt] unsupported audio spec');
 }
@@ -86,7 +98,10 @@ export function acquireStt(spec, opts = {}) {
     ent.start = async () => {
       const stream = await resolved.getStream();
       if (ent.stopped) return;
-      if (!stream) { console.warn('[stt] no stream for source — engine idle.'); return; }
+      if (!stream) {
+        console.warn('[stt] no stream for source — engine idle.');
+        return;
+      }
       const backend = _makeBackend(opts.backend);
       const tap = new AudioTap(stream, backend);
       tap.addEventListener('word', (e) => {
@@ -100,13 +115,19 @@ export function acquireStt(spec, opts = {}) {
     ent.stop = () => {
       if (ent.stopped) return;
       ent.stopped = true;
-      try { ent.tap?.stop(); } catch {}
+      try {
+        ent.tap?.stop();
+      } catch {}
       ent.tap = null;
-      try { resolved.onRelease?.(); } catch {}
+      try {
+        resolved.onRelease?.();
+      } catch {}
       _engines.delete(key);
     };
     _engines.set(key, ent);
-    ent.starting = ent.start().catch((e) => console.warn('[stt] engine start failed:', e?.message ?? e));
+    ent.starting = ent
+      .start()
+      .catch((e) => console.warn('[stt] engine start failed:', e?.message ?? e));
   }
 
   ent.count++;
@@ -122,4 +143,6 @@ export function acquireStt(spec, opts = {}) {
 }
 
 // Diagnostics / tests.
-export function _sttEngineCount() { return _engines.size; }
+export function _sttEngineCount() {
+  return _engines.size;
+}

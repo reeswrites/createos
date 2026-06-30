@@ -49,7 +49,7 @@ vi.mock('tone', () => {
     Tremolo:    vi.fn(function() { return { ...makeMockNode('Tremolo'),    start: vi.fn() }; }),
     Vibrato:    vi.fn(function() { return makeMockNode('Vibrato'); }),
     Compressor: vi.fn(function() { return makeMockNode('Compressor'); }),
-    Loop:       vi.fn(function(fn) { return { start: vi.fn(), stop: vi.fn(), dispose: vi.fn() }; }),
+    Loop:       vi.fn(function(_fn) { return { start: vi.fn(), stop: vi.fn(), dispose: vi.fn() }; }),
     Sequence:   vi.fn(function() { return { dispose: vi.fn() }; }),
     LFO:        vi.fn(function() { return { ...makeMockNode('LFO'), start: vi.fn() }; }),
     AutoWah:    vi.fn(function() { return makeMockNode('AutoWah'); }),
@@ -66,8 +66,8 @@ vi.mock('tone', () => {
       schedule: vi.fn(),
     }),
     Transport: { bpm: { value: 120 } },
-    Time: (t) => ({ toSeconds: () => 1 }),
-    Frequency: (n) => ({ toFrequency: () => 440, toMidi: () => 60 }),
+    Time: (_t) => ({ toSeconds: () => 1 }),
+    Frequency: (_n) => ({ toFrequency: () => 440, toMidi: () => 60 }),
     Draw: { schedule: vi.fn() },
   };
 });

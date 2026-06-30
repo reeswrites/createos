@@ -16,9 +16,9 @@ export function matchesFilter(event, filterStr) {
     }
   }
   // Check if there are any positive include terms; if so, require a match
-  const includes = parts.filter(p => !p.startsWith('-'));
+  const includes = parts.filter((p) => !p.startsWith('-'));
   if (includes.length > 0) {
-    return includes.some(p => event.startsWith(p));
+    return includes.some((p) => event.startsWith(p));
   }
   return true;
 }
@@ -30,13 +30,13 @@ export function repr(value, depth = 0) {
   if (typeof value === 'string') return JSON.stringify(value);
   if (Array.isArray(value)) {
     if (depth >= 2) return `[…${value.length}]`;
-    const items = value.slice(0, 5).map(v => repr(v, depth + 1));
+    const items = value.slice(0, 5).map((v) => repr(v, depth + 1));
     return `[${items.join(', ')}${value.length > 5 ? ', …' : ''}]`;
   }
   if (typeof value === 'object') {
     if (depth >= 2) return `{…}`;
     const keys = Object.keys(value).slice(0, 5);
-    const pairs = keys.map(k => `${k}: ${repr(value[k], depth + 1)}`);
+    const pairs = keys.map((k) => `${k}: ${repr(value[k], depth + 1)}`);
     const extra = Object.keys(value).length > 5 ? ', …' : '';
     return `{${pairs.join(', ')}${extra}}`;
   }
@@ -45,12 +45,14 @@ export function repr(value, depth = 0) {
 
 // Rate-limit state: Map<eventName, { rowEl, badgeEl, payloadEl, count, lastTs }>
 // Exported for tests.
-export function makeRateState() { return new Map(); }
+export function makeRateState() {
+  return new Map();
+}
 
 export function applyRateLimit(rateMap, event, data, containerEl, maxRows, createRowFn) {
   const now = Date.now();
   const existing = rateMap.get(event);
-  if (existing && (now - existing.lastTs) < 200) {
+  if (existing && now - existing.lastTs < 200) {
     existing.count++;
     existing.lastTs = now;
     existing.badgeEl.textContent = existing.count > 1 ? `×${existing.count}` : '';
@@ -66,7 +68,10 @@ export function applyRateLimit(rateMap, event, data, containerEl, maxRows, creat
     const last = containerEl.lastChild;
     // Clean up rate state for removed row
     for (const [k, v] of rateMap.entries()) {
-      if (v.rowEl === last) { rateMap.delete(k); break; }
+      if (v.rowEl === last) {
+        rateMap.delete(k);
+        break;
+      }
     }
     containerEl.removeChild(last);
   }
@@ -105,17 +110,19 @@ export function openEventPanel() {
   if (!winEl) return;
 
   const filterInput = winEl.querySelector('#ep-filter');
-  const clearBtn    = winEl.querySelector('#ep-clear');
-  const rowsEl      = winEl.querySelector('#ep-rows');
-  const rateMap     = makeRateState();
-  const MAX_ROWS    = 80;
+  const clearBtn = winEl.querySelector('#ep-clear');
+  const rowsEl = winEl.querySelector('#ep-rows');
+  const rateMap = makeRateState();
+  const MAX_ROWS = 80;
 
   function createRow(event, data) {
     const rowEl = document.createElement('div');
-    rowEl.style.cssText = 'padding:3px 8px;border-bottom:1px solid #1e1e1e;cursor:pointer;display:flex;flex-direction:column;gap:2px;';
+    rowEl.style.cssText =
+      'padding:3px 8px;border-bottom:1px solid #1e1e1e;cursor:pointer;display:flex;flex-direction:column;gap:2px;';
 
     const headerEl = document.createElement('div');
-    headerEl.style.cssText = 'display:flex;align-items:baseline;gap:6px;white-space:nowrap;overflow:hidden;';
+    headerEl.style.cssText =
+      'display:flex;align-items:baseline;gap:6px;white-space:nowrap;overflow:hidden;';
 
     const nameEl = document.createElement('span');
     nameEl.textContent = event;
@@ -135,7 +142,8 @@ export function openEventPanel() {
 
     // Expanded detail (hidden by default)
     const detailEl = document.createElement('pre');
-    detailEl.style.cssText = 'display:none;margin:0;color:#aaa;white-space:pre-wrap;word-break:break-all;font:11px monospace;border-top:1px solid #2a2a2a;padding-top:3px;';
+    detailEl.style.cssText =
+      'display:none;margin:0;color:#aaa;white-space:pre-wrap;word-break:break-all;font:11px monospace;border-top:1px solid #2a2a2a;padding-top:3px;';
     rowEl.appendChild(detailEl);
 
     let expanded = false;
@@ -155,7 +163,10 @@ export function openEventPanel() {
   const removeTap = addBusTap((event, data) => {
     // Scope to active run by default, unless filter overrides
     const filterStr = filterInput?.value ?? '';
-    const hasPositive = filterStr.trim().split(/\s+/).some(p => !p.startsWith('-'));
+    const hasPositive = filterStr
+      .trim()
+      .split(/\s+/)
+      .some((p) => !p.startsWith('-'));
     if (!hasPositive && window.__ar_active_editor_id == null) return;
     if (!matchesFilter(event, filterStr)) return;
     applyRateLimit(rateMap, event, data, rowsEl, MAX_ROWS, createRow);

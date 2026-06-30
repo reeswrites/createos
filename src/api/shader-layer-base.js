@@ -20,16 +20,16 @@ export class ShaderLayerBase {
   // ── Shared constructor state ─────────────────────────────────────────────
   // Subclass constructors call this._initBase({z, opacity, container, videoSrc}).
   _initBase({ z = 30, opacity = 1.0, container = null, videoSrc = null } = {}) {
-    this._z         = z;
-    this._opacity   = opacity;
+    this._z = z;
+    this._opacity = opacity;
     this._container = container;
-    this._canvas    = null;
-    this._custom    = new Float32Array(4);
-    this._uniforms  = {};          // named uniform store for route swizzle reads
-    this._boundSignal   = null;    // audio.signal() obj
-    this._boundAnalyser = null;    // Tone.Analyser | AnalyserNode | 'mic'
-    this._videoSrc  = videoSrc;
-    this._live      = null;        // liveOutput handle
+    this._canvas = null;
+    this._custom = new Float32Array(4);
+    this._uniforms = {}; // named uniform store for route swizzle reads
+    this._boundSignal = null; // audio.signal() obj
+    this._boundAnalyser = null; // Tone.Analyser | AnalyserNode | 'mic'
+    this._videoSrc = videoSrc;
+    this._live = null; // liveOutput handle
   }
 
   // ── Video source ─────────────────────────────────────────────────────────
@@ -40,7 +40,10 @@ export class ShaderLayerBase {
     return resolveDrawable(this._videoSrc) ?? this._videoSrc ?? null;
   }
 
-  video(src) { this._videoSrc = src; return this; }
+  video(src) {
+    this._videoSrc = src;
+    return this;
+  }
 
   // ── Custom vec4 uniform ──────────────────────────────────────────────────
 
@@ -96,10 +99,10 @@ export class ShaderLayerBase {
   // GLShader overrides to add acquireMicRunScoped() for 'mic' (run-scoped media lease).
   bind(source) {
     if (isBandsSignal(source)) {
-      this._boundSignal   = source;
+      this._boundSignal = source;
       this._boundAnalyser = null;
     } else {
-      this._boundSignal   = null;
+      this._boundSignal = null;
       this._boundAnalyser = source;
     }
     return this;
@@ -111,9 +114,9 @@ export class ShaderLayerBase {
     if (this._boundSignal) {
       const s = this._boundSignal;
       this._custom[0] = s.value ?? 0;
-      this._custom[1] = s.bass  ?? 0;
-      this._custom[2] = s.mid   ?? 0;
-      this._custom[3] = s.high  ?? 0;
+      this._custom[1] = s.bass ?? 0;
+      this._custom[2] = s.mid ?? 0;
+      this._custom[3] = s.high ?? 0;
     } else if (this._boundAnalyser) {
       const b = bands(readAnalyser(this._boundAnalyser, 32));
       this._custom[0] = b.value;
@@ -137,7 +140,9 @@ export class ShaderLayerBase {
     return this;
   }
 
-  get canvas() { return this._canvas; }
+  get canvas() {
+    return this._canvas;
+  }
 
   // Pointer in THIS shader's canvas-pixel space (ADR 040). Maps the raw viewport
   // pointer (set by shader.js's mousemove listener) against this canvas's own
@@ -149,8 +154,8 @@ export class ShaderLayerBase {
     const r = c.getBoundingClientRect();
     if (!r.width || !r.height) return { x: 0, y: 0 };
     return {
-      x: (raw.clientX - r.left) / r.width  * c.width,
-      y: (raw.clientY - r.top)  / r.height * c.height,
+      x: ((raw.clientX - r.left) / r.width) * c.width,
+      y: ((raw.clientY - r.top) / r.height) * c.height,
     };
   }
 
@@ -167,7 +172,9 @@ export class ShaderLayerBase {
     if (target && typeof target === 'object' && target.winId) {
       el = document.getElementById(target.winId)?.querySelector('.wm-body') ?? null;
     } else if (typeof target === 'string') {
-      el = document.getElementById(target)?.querySelector('.wm-body') ?? document.querySelector(target);
+      el =
+        document.getElementById(target)?.querySelector('.wm-body') ??
+        document.querySelector(target);
     } else if (target instanceof HTMLElement) {
       el = target;
     }
@@ -178,9 +185,12 @@ export class ShaderLayerBase {
   show(opts = {}) {
     const { title = 'Shader', w = 700, h = 500 } = opts;
     const winId = window.wm?.spawn(title, {
-      w, h, html: '', transient: true,
+      w,
+      h,
+      html: '',
+      transient: true,
       onClose: () => this._destroy(),
-      ...(opts.noChrome    !== undefined ? { noChrome:    opts.noChrome    } : {}),
+      ...(opts.noChrome !== undefined ? { noChrome: opts.noChrome } : {}),
       ...(opts.transparent !== undefined ? { transparent: opts.transparent } : {}),
     });
     this._ownWinId = winId ?? null;
@@ -202,6 +212,11 @@ export class ShaderLayerBase {
   // ── Liveness helpers ──────────────────────────────────────────────────────
   // start() calls _registerLive(); error paths + _destroy() call _releaseLive().
 
-  _registerLive() { this._live = liveOutput(this); }
-  _releaseLive()  { this._live?.release(); this._live = null; }
+  _registerLive() {
+    this._live = liveOutput(this);
+  }
+  _releaseLive() {
+    this._live?.release();
+    this._live = null;
+  }
 }

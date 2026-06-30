@@ -11,25 +11,39 @@
 // Event plumbing delegates to WidgetEvents (src/api/widget-events.js).
 
 import * as Tone from 'tone';
-import { WidgetEvents }  from './widget-events.js';
+import { WidgetEvents } from './widget-events.js';
 import { insertSnippet } from '../editor/active-editor.js';
 import { mountWidgetShell, wireCaptureButton } from './widget-shell.js';
 import { onReset } from '../runtime/reset-registry.js';
 import { Take } from './performance-recorder.js';
 import { replayActions } from './replay-clock.js';
-import { registerMidiInstrument, unregisterMidiInstrument, notifyMidiFocus, wireMidiInstrument } from './midi-bind.js';
+import {
+  registerMidiInstrument,
+  unregisterMidiInstrument,
+  notifyMidiFocus,
+  wireMidiInstrument,
+} from './midi-bind.js';
 
 // General MIDI percussion note → voice id (ADR 033). Common aliases included.
 // Unmapped notes are ignored.
 const GM_DRUM_MAP = {
-  35: 'kick', 36: 'kick',
-  38: 'snare', 40: 'snare',
-  42: 'hhc', 44: 'hhc',
+  35: 'kick',
+  36: 'kick',
+  38: 'snare',
+  40: 'snare',
+  42: 'hhc',
+  44: 'hhc',
   46: 'hho',
   39: 'clap',
-  41: 'tomL', 43: 'tomL', 45: 'tomL',
-  47: 'tomH', 48: 'tomH', 50: 'tomH',
-  49: 'cym', 51: 'cym', 57: 'cym',
+  41: 'tomL',
+  43: 'tomL',
+  45: 'tomL',
+  47: 'tomH',
+  48: 'tomH',
+  50: 'tomH',
+  49: 'cym',
+  51: 'cym',
+  57: 'cym',
 };
 
 // ── Module-level registry ─────────────────────────────────────────────────────
@@ -47,55 +61,123 @@ const _PAD_EMOJI = ['🥁', '🪘', '🎩', '🪗', '👏', '🪩', '🥁', '�
 
 const VOICES = [
   {
-    id: 'kick',  label: 'Kick',   key: 'q', color: '#f38ba8',
-    make: () => new Tone.MembraneSynth({ pitchDecay: 0.05, octaves: 6,
-      envelope: { attack: 0.001, decay: 0.3, sustain: 0, release: 0.3 } }).toDestination(),
-    note: 'C1', dur: '8n',
+    id: 'kick',
+    label: 'Kick',
+    key: 'q',
+    color: '#f38ba8',
+    make: () =>
+      new Tone.MembraneSynth({
+        pitchDecay: 0.05,
+        octaves: 6,
+        envelope: { attack: 0.001, decay: 0.3, sustain: 0, release: 0.3 },
+      }).toDestination(),
+    note: 'C1',
+    dur: '8n',
   },
   {
-    id: 'snare', label: 'Snare',  key: 'w', color: '#fab387',
-    make: () => new Tone.NoiseSynth({ noise: { type: 'white' },
-      envelope: { attack: 0.001, decay: 0.18, sustain: 0, release: 0.12 } }).toDestination(),
-    note: null, dur: '8n',
+    id: 'snare',
+    label: 'Snare',
+    key: 'w',
+    color: '#fab387',
+    make: () =>
+      new Tone.NoiseSynth({
+        noise: { type: 'white' },
+        envelope: { attack: 0.001, decay: 0.18, sustain: 0, release: 0.12 },
+      }).toDestination(),
+    note: null,
+    dur: '8n',
   },
   {
-    id: 'hhc',   label: 'HH Cl',  key: 'e', color: '#a6e3a1',
-    make: () => new Tone.MetalSynth({ frequency: 400,
-      envelope: { attack: 0.001, decay: 0.08, release: 0.05 },
-      harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5 }).toDestination(),
-    note: null, dur: '32n',
+    id: 'hhc',
+    label: 'HH Cl',
+    key: 'e',
+    color: '#a6e3a1',
+    make: () =>
+      new Tone.MetalSynth({
+        frequency: 400,
+        envelope: { attack: 0.001, decay: 0.08, release: 0.05 },
+        harmonicity: 5.1,
+        modulationIndex: 32,
+        resonance: 4000,
+        octaves: 1.5,
+      }).toDestination(),
+    note: null,
+    dur: '32n',
   },
   {
-    id: 'hho',   label: 'HH Op',  key: 'r', color: '#89dceb',
-    make: () => new Tone.MetalSynth({ frequency: 400,
-      envelope: { attack: 0.001, decay: 0.4, release: 0.2 },
-      harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5 }).toDestination(),
-    note: null, dur: '4n',
+    id: 'hho',
+    label: 'HH Op',
+    key: 'r',
+    color: '#89dceb',
+    make: () =>
+      new Tone.MetalSynth({
+        frequency: 400,
+        envelope: { attack: 0.001, decay: 0.4, release: 0.2 },
+        harmonicity: 5.1,
+        modulationIndex: 32,
+        resonance: 4000,
+        octaves: 1.5,
+      }).toDestination(),
+    note: null,
+    dur: '4n',
   },
   {
-    id: 'clap',  label: 'Clap',   key: 'a', color: '#cba6f7',
-    make: () => new Tone.NoiseSynth({ noise: { type: 'pink' },
-      envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.05 } }).toDestination(),
-    note: null, dur: '16n',
+    id: 'clap',
+    label: 'Clap',
+    key: 'a',
+    color: '#cba6f7',
+    make: () =>
+      new Tone.NoiseSynth({
+        noise: { type: 'pink' },
+        envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.05 },
+      }).toDestination(),
+    note: null,
+    dur: '16n',
   },
   {
-    id: 'tomL',  label: 'Tom L',  key: 's', color: '#f9e2af',
-    make: () => new Tone.MembraneSynth({ pitchDecay: 0.08, octaves: 4,
-      envelope: { attack: 0.001, decay: 0.4, sustain: 0, release: 0.4 } }).toDestination(),
-    note: 'G1', dur: '8n',
+    id: 'tomL',
+    label: 'Tom L',
+    key: 's',
+    color: '#f9e2af',
+    make: () =>
+      new Tone.MembraneSynth({
+        pitchDecay: 0.08,
+        octaves: 4,
+        envelope: { attack: 0.001, decay: 0.4, sustain: 0, release: 0.4 },
+      }).toDestination(),
+    note: 'G1',
+    dur: '8n',
   },
   {
-    id: 'tomH',  label: 'Tom H',  key: 'd', color: '#89b4fa',
-    make: () => new Tone.MembraneSynth({ pitchDecay: 0.06, octaves: 4,
-      envelope: { attack: 0.001, decay: 0.3, sustain: 0, release: 0.3 } }).toDestination(),
-    note: 'C2', dur: '8n',
+    id: 'tomH',
+    label: 'Tom H',
+    key: 'd',
+    color: '#89b4fa',
+    make: () =>
+      new Tone.MembraneSynth({
+        pitchDecay: 0.06,
+        octaves: 4,
+        envelope: { attack: 0.001, decay: 0.3, sustain: 0, release: 0.3 },
+      }).toDestination(),
+    note: 'C2',
+    dur: '8n',
   },
   {
-    id: 'cym',   label: 'Cymbal', key: 'f', color: '#74c7ec',
-    make: () => new Tone.MetalSynth({ frequency: 200,
-      envelope: { attack: 0.001, decay: 1.2, release: 0.6 },
-      harmonicity: 5.1, modulationIndex: 32, resonance: 3000, octaves: 2 }).toDestination(),
-    note: null, dur: '4n',
+    id: 'cym',
+    label: 'Cymbal',
+    key: 'f',
+    color: '#74c7ec',
+    make: () =>
+      new Tone.MetalSynth({
+        frequency: 200,
+        envelope: { attack: 0.001, decay: 1.2, release: 0.6 },
+        harmonicity: 5.1,
+        modulationIndex: 32,
+        resonance: 3000,
+        octaves: 2,
+      }).toDestination(),
+    note: null,
+    dur: '4n',
   },
 ];
 
@@ -104,39 +186,56 @@ const STEPS = 16;
 // ── Drumpad class ─────────────────────────────────────────────────────────────
 
 export class Drumpad {
-  constructor({ title = 'Drum Pad', x, y, w = 500, h = 360, bpm: initBpm, patterns: initPatterns, _desktopIconId: existingIconId } = {}) {
-    this._voices   = VOICES.map(v => ({
-      ...v, synth: v.make(),
-      steps: new Array(STEPS).fill(false),
-      _pad: null, _flash: null, _cells: [],
+  constructor({
+    title = 'Drum Pad',
+    x,
+    y,
+    w = 500,
+    h = 360,
+    bpm: initBpm,
+    patterns: initPatterns,
+    _desktopIconId: existingIconId,
+  } = {}) {
+    this._voices = VOICES.map((v) => ({
+      ...v,
+      synth: v.make(),
+      steps: Array.from({ length: STEPS }, () => false),
+      _pad: null,
+      _flash: null,
+      _cells: [],
     }));
-    this._bpm           = initBpm ?? 120;
-    this._playing       = false;
-    this._paused        = false;
-    this._sequence      = null;
-    this._winId         = null;
-    this._keyMap        = {};
-    this._onKey         = null;
-    this._title         = title;
+    this._bpm = initBpm ?? 120;
+    this._playing = false;
+    this._paused = false;
+    this._sequence = null;
+    this._winId = null;
+    this._keyMap = {};
+    this._onKey = null;
+    this._title = title;
     this._desktopIconId = existingIconId ?? null;
-    this._playBtn       = null;   // set in _init; used by onDestroy
+    this._playBtn = null; // set in _init; used by onDestroy
 
     // Replaced per-instance by the shell in _init(); no-op until then.
     this._autoSave = () => {};
 
     // ── Event/signal hook state ───────────────────────────────────────────────
     this._events = new WidgetEvents();
-    this._take   = new Take(this);   // Performance capture (ADR 031)
+    this._take = new Take(this); // Performance capture (ADR 031)
     _drumpads.push(this);
 
     this._init(title, x, y, w, h);
 
     // MIDI binding (ADR 033): register, then claim focus (window spawned frontmost).
-    if (this._winId) { registerMidiInstrument(this); notifyMidiFocus(this); }
+    if (this._winId) {
+      registerMidiInstrument(this);
+      notifyMidiFocus(this);
+    }
 
     if (initPatterns) {
       initPatterns.forEach((steps, vi) => {
-        steps?.forEach((on, s) => { if (on) this.step(vi, s, true); });
+        steps?.forEach((on, s) => {
+          if (on) this.step(vi, s, true);
+        });
       });
     }
     if (!existingIconId) this._autoSave(); // create desktop icon on first spawn
@@ -145,15 +244,15 @@ export class Drumpad {
   // ── Resolve voice name/index → 0-7 or null ──────────────────────────────────
   _voiceIndex(voice) {
     if (voice == null) return null;
-    if (typeof voice === 'number') return (voice >= 0 && voice < this._voices.length) ? voice : null;
+    if (typeof voice === 'number') return voice >= 0 && voice < this._voices.length ? voice : null;
     const lo = String(voice).toLowerCase();
-    const i  = this._voices.findIndex(v => v.id === lo || v.label.toLowerCase() === lo);
+    const i = this._voices.findIndex((v) => v.id === lo || v.label.toLowerCase() === lo);
     return i >= 0 ? i : null;
   }
 
   // ── Fire hit event via WidgetEvents ──────────────────────────────────────────
   _fireHit(vi, source, step, vel = 1) {
-    const v  = this._voices[vi];
+    const v = this._voices[vi];
     const ev = { vi, id: v?.id ?? vi, label: v?.label ?? String(vi), source, step, velocity: vel };
     this._events.emit('hit', ev);
   }
@@ -165,7 +264,7 @@ export class Drumpad {
     const vel = ctx.vel ?? 1;
     try {
       if (v.note) v.synth.triggerAttackRelease(v.note, v.dur, time, vel);
-      else        v.synth.triggerAttackRelease(v.dur, time, vel);
+      else v.synth.triggerAttackRelease(v.dur, time, vel);
     } catch (_) {}
     this._fireHit(vi, ctx.source ?? 'pad', ctx.step ?? null, vel);
   }
@@ -181,7 +280,9 @@ export class Drumpad {
     this._voices[vi]._flash?.();
   }
 
-  _midiNoteOff() { /* one-shot voices — nothing to release */ }
+  _midiNoteOff() {
+    /* one-shot voices — nothing to release */
+  }
 
   // _setMidiChip is installed by wireMidiInstrument() — see midi-bind.js.
 
@@ -202,7 +303,7 @@ export class Drumpad {
 
   // Replay a captured Take.
   replay(actions, opts) {
-    return replayActions(a => this._applyAction(a), actions, opts);
+    return replayActions((a) => this._applyAction(a), actions, opts);
   }
 
   // Self-contained constructor code for the emitted snippet/timeline track.
@@ -221,22 +322,35 @@ export class Drumpad {
     // Drumpad has no frames, so it skips the frame strip/transport builders and
     // appends its pad grid / sequencer / controls straight into shell.body.
     const shell = mountWidgetShell({
-      title, x, y, w, h,
+      title,
+      x,
+      y,
+      w,
+      h,
       widgetType: 'drumpad',
       bg: '#0d0d1a',
       rows: [],
-      getState: () => ({ title: this._title, bpm: this._bpm, patterns: this._voices.map(v => [...v.steps]), _desktopIconId: this._desktopIconId }),
+      getState: () => ({
+        title: this._title,
+        bpm: this._bpm,
+        patterns: this._voices.map((v) => [...v.steps]),
+        _desktopIconId: this._desktopIconId,
+      }),
       save: {
         name: (this._title || 'Beat') + '.beat',
         type: 'beat',
         getIconId: () => this._desktopIconId,
-        setIconId: (id) => { this._desktopIconId = id; },
+        setIconId: (id) => {
+          this._desktopIconId = id;
+        },
       },
       history: {
-        capture: () => ({ bpm: this._bpm, patterns: this._voices.map(v => [...v.steps]) }),
+        capture: () => ({ bpm: this._bpm, patterns: this._voices.map((v) => [...v.steps]) }),
         restore: (snap) => {
           this._bpm = snap.bpm;
-          try { Tone.getTransport().bpm.value = snap.bpm; } catch (_) {}
+          try {
+            Tone.getTransport().bpm.value = snap.bpm;
+          } catch (_) {}
           snap.patterns.forEach((steps, vi) => {
             const v = this._voices[vi];
             if (!v) return;
@@ -251,14 +365,15 @@ export class Drumpad {
       onDestroy: () => this._destroy(this._playBtn),
     });
     if (!shell) return;
-    this._winId    = shell.winId;
+    this._winId = shell.winId;
     this._autoSave = shell.save;
-    this._history  = shell.history;
+    this._history = shell.history;
     const body = shell.body;
 
     // ── Pad grid (2 rows × 4 cols) ────────────────────────────────────────────
     const padGrid = document.createElement('div');
-    padGrid.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:10px 10px 6px;flex-shrink:0;';
+    padGrid.style.cssText =
+      'display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:10px 10px 6px;flex-shrink:0;';
 
     this._voices.forEach((v, vi) => {
       const pad = document.createElement('button');
@@ -269,23 +384,29 @@ export class Drumpad {
         `align-items:center;gap:3px;user-select:none;`,
         `transition:background 0.06s,border-color 0.06s,transform 0.06s;`,
       ].join('');
-      pad.innerHTML = `<span style="font-size:18px;line-height:1;">${_PAD_EMOJI[vi] ?? '🎵'}</span>` +
-                      `<span>${v.label}</span>` +
-                      `<span style="font-size:8px;opacity:0.45;">[${v.key}]</span>`;
+      pad.innerHTML =
+        `<span style="font-size:18px;line-height:1;">${_PAD_EMOJI[vi] ?? '🎵'}</span>` +
+        `<span>${v.label}</span>` +
+        `<span style="font-size:8px;opacity:0.45;">[${v.key}]</span>`;
 
       const flash = () => {
-        pad.style.background   = v.color + '55';
-        pad.style.borderColor  = v.color;
-        pad.style.transform    = 'scale(0.94)';
+        pad.style.background = v.color + '55';
+        pad.style.borderColor = v.color;
+        pad.style.transform = 'scale(0.94)';
         setTimeout(() => {
-          pad.style.background  = '#1e1e2e';
+          pad.style.background = '#1e1e2e';
           pad.style.borderColor = v.color + '44';
-          pad.style.transform   = '';
+          pad.style.transform = '';
         }, 100);
       };
 
-      pad.addEventListener('pointerdown', (e) => { e.preventDefault(); this._take.push({ vi }); this._trigger(vi, Tone.now(), { source: 'pad' }); flash(); });
-      v._pad   = pad;
+      pad.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        this._take.push({ vi });
+        this._trigger(vi, Tone.now(), { source: 'pad' });
+        flash();
+      });
+      v._pad = pad;
       v._flash = flash;
       this._keyMap[v.key] = vi;
       padGrid.appendChild(pad);
@@ -295,11 +416,13 @@ export class Drumpad {
 
     // ── Step sequencer (one row per voice, 16 steps) ──────────────────────────
     const seqWrap = document.createElement('div');
-    seqWrap.style.cssText = 'flex:1;overflow-y:auto;padding:0 10px 4px;display:flex;flex-direction:column;gap:3px;min-height:0;';
+    seqWrap.style.cssText =
+      'flex:1;overflow-y:auto;padding:0 10px 4px;display:flex;flex-direction:column;gap:3px;min-height:0;';
 
     this._voices.forEach((v) => {
       const row = document.createElement('div');
-      row.style.cssText = 'display:grid;grid-template-columns:42px repeat(16,1fr);gap:2px;align-items:center;';
+      row.style.cssText =
+        'display:grid;grid-template-columns:42px repeat(16,1fr);gap:2px;align-items:center;';
 
       const lbl = document.createElement('span');
       lbl.style.cssText = `font-size:9px;color:${v.color};font-family:monospace;text-align:right;padding-right:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;`;
@@ -310,7 +433,8 @@ export class Drumpad {
         const cell = document.createElement('button');
         // Group visual: darken every 4th boundary
         const groupStart = s % 4 === 0;
-        cell.style.cssText = `height:18px;border-radius:2px;border:1px solid #313244;` +
+        cell.style.cssText =
+          `height:18px;border-radius:2px;border:1px solid #313244;` +
           `background:#1a1a2e;cursor:pointer;padding:0;` +
           (groupStart && s > 0 ? 'margin-left:2px;' : '');
         cell.dataset.step = s;
@@ -330,19 +454,24 @@ export class Drumpad {
 
     // ── Transport bar ─────────────────────────────────────────────────────────
     const ctrl = document.createElement('div');
-    ctrl.style.cssText = 'display:flex;align-items:center;gap:6px;padding:6px 10px;background:#13131f;border-top:1px solid #2a2a3e;flex-shrink:0;';
+    ctrl.style.cssText =
+      'display:flex;align-items:center;gap:6px;padding:6px 10px;background:#13131f;border-top:1px solid #2a2a3e;flex-shrink:0;';
 
     const _mkBtn = (label, color) => {
       const b = document.createElement('button');
       b.style.cssText = `background:#1e1e2e;color:${color};border:1px solid #313244;border-radius:4px;padding:3px 10px;font-size:11px;cursor:pointer;font-family:monospace;transition:background 0.1s;`;
       b.textContent = label;
-      b.addEventListener('mouseenter', () => { b.style.background = '#313244'; });
-      b.addEventListener('mouseleave', () => { b.style.background = '#1e1e2e'; });
+      b.addEventListener('mouseenter', () => {
+        b.style.background = '#313244';
+      });
+      b.addEventListener('mouseleave', () => {
+        b.style.background = '#1e1e2e';
+      });
       return b;
     };
 
-    const playBtn  = _mkBtn('▶ Play', '#a6e3a1');
-    const stopBtn  = _mkBtn('■ Stop', '#f38ba8');
+    const playBtn = _mkBtn('▶ Play', '#a6e3a1');
+    const stopBtn = _mkBtn('■ Stop', '#f38ba8');
     const clearBtn = _mkBtn('✕ Clear', '#6c7086');
 
     const bpmLbl = document.createElement('span');
@@ -350,31 +479,44 @@ export class Drumpad {
     bpmLbl.textContent = 'BPM:';
 
     const bpmIn = document.createElement('input');
-    bpmIn.type = 'number'; bpmIn.min = '40'; bpmIn.max = '300'; bpmIn.value = String(this._bpm);
-    bpmIn.style.cssText = 'width:52px;background:#1e1e2e;color:#cdd6f4;border:1px solid #313244;border-radius:3px;padding:2px 4px;font-size:11px;font-family:monospace;text-align:center;';
+    bpmIn.type = 'number';
+    bpmIn.min = '40';
+    bpmIn.max = '300';
+    bpmIn.value = String(this._bpm);
+    bpmIn.style.cssText =
+      'width:52px;background:#1e1e2e;color:#cdd6f4;border:1px solid #313244;border-radius:3px;padding:2px 4px;font-size:11px;font-family:monospace;text-align:center;';
 
     playBtn.addEventListener('click', () => {
       if (!this._playing) {
         // Start fresh
         this._playing = true;
-        this._paused  = false;
+        this._paused = false;
         Tone.getTransport().bpm.value = parseInt(bpmIn.value) || 120;
         let step = 0;
-        this._sequence = new Tone.Sequence((time) => {
-          const s = step;
-          requestAnimationFrame(() => {
-            this._voices.forEach(v => {
-              v._cells.forEach((c, i) => { c.style.boxShadow = i === s ? `0 0 0 2px ${v.color}` : ''; });
+        this._sequence = new Tone.Sequence(
+          (time) => {
+            const s = step;
+            requestAnimationFrame(() => {
+              this._voices.forEach((v) => {
+                v._cells.forEach((c, i) => {
+                  c.style.boxShadow = i === s ? `0 0 0 2px ${v.color}` : '';
+                });
+              });
             });
-          });
-          const activeVoices = [];
-          this._voices.forEach((v, vi) => {
-            if (v.steps[s]) { this._trigger(vi, time, { source: 'seq', step: s }); activeVoices.push(vi); }
-          });
-          const stepEv = { step: s, activeVoices };
-          this._events.emit('step', stepEv);
-          step = (step + 1) % STEPS;
-        }, [...Array(STEPS).keys()], '16n');
+            const activeVoices = [];
+            this._voices.forEach((v, vi) => {
+              if (v.steps[s]) {
+                this._trigger(vi, time, { source: 'seq', step: s });
+                activeVoices.push(vi);
+              }
+            });
+            const stepEv = { step: s, activeVoices };
+            this._events.emit('step', stepEv);
+            step = (step + 1) % STEPS;
+          },
+          [...Array(STEPS).keys()],
+          '16n',
+        );
         this._sequence.start(0);
         Tone.getTransport().start();
         playBtn.textContent = '⏸ Pause';
@@ -397,9 +539,11 @@ export class Drumpad {
     stopBtn.addEventListener('click', () => this._stop(playBtn));
 
     clearBtn.addEventListener('click', () => {
-      this._voices.forEach(v => {
+      this._voices.forEach((v) => {
         v.steps.fill(false);
-        v._cells.forEach(c => { c.style.background = '#1a1a2e'; });
+        v._cells.forEach((c) => {
+          c.style.background = '#1a1a2e';
+        });
       });
       this._history?.commit();
       this._autoSave();
@@ -420,7 +564,7 @@ export class Drumpad {
       const lines = [`const dp = audio.drumpad({ title: '${title}', bpm: ${this._bpm} });`];
       this._voices.forEach((v, vi) => {
         if (v.steps.some(Boolean)) {
-          const pat = v.steps.map(on => on ? 'x' : '.').join(' ');
+          const pat = v.steps.map((on) => (on ? 'x' : '.')).join(' ');
           lines.push(`dp.pattern(${vi}, '${pat}'); // ${v.label}`);
         }
       });
@@ -436,11 +580,14 @@ export class Drumpad {
     // ── MIDI chip (ADR 033) — opt-in / target indicator ─────────────────────────
     const midiChip = _mkBtn('🎹', '#45475a');
     midiChip.style.padding = '3px 7px';
-    wireMidiInstrument(this, { chip: midiChip, tooltips: {
-      target:  'MIDI input → this Drum Pad (GM map)',
-      idle:    'MIDI on — focus this Drum Pad to play it',
-      dormant: 'Enable MIDI input',
-    }});
+    wireMidiInstrument(this, {
+      chip: midiChip,
+      tooltips: {
+        target: 'MIDI input → this Drum Pad (GM map)',
+        idle: 'MIDI on — focus this Drum Pad to play it',
+        dormant: 'Enable MIDI input',
+      },
+    });
 
     ctrl.appendChild(playBtn);
     ctrl.appendChild(stopBtn);
@@ -457,7 +604,11 @@ export class Drumpad {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.target instanceof HTMLInputElement) return;
       const vi = this._keyMap[e.key?.toLowerCase()];
-      if (vi != null) { this._take.push({ vi }); this._trigger(vi, Tone.now(), { source: 'key' }); this._voices[vi]._flash?.(); }
+      if (vi != null) {
+        this._take.push({ vi });
+        this._trigger(vi, Tone.now(), { source: 'key' });
+        this._voices[vi]._flash?.();
+      }
     };
     document.addEventListener('keydown', this._onKey);
 
@@ -468,7 +619,13 @@ export class Drumpad {
   // ── Public methods ────────────────────────────────────────────────────────────
 
   /** Set BPM */
-  bpm(val) { this._bpm = val; Tone.getTransport().bpm.value = val; this._history?.commit(); this._autoSave(); return this; }
+  bpm(val) {
+    this._bpm = val;
+    Tone.getTransport().bpm.value = val;
+    this._history?.commit();
+    this._autoSave();
+    return this;
+  }
 
   /** Toggle a step on/off: voice index (0-7), step (0-15) */
   step(vi, s, on = true) {
@@ -509,7 +666,9 @@ export class Drumpad {
       console.warn(`[Drumpad] onPad: unknown voice '${voice}'. Use index 0-7 or name like 'kick'.`);
       return this;
     }
-    this._events.on('hit', e => { if (e.vi === vi) fn(e); });
+    this._events.on('hit', (e) => {
+      if (e.vi === vi) fn(e);
+    });
     return this;
   }
 
@@ -530,10 +689,10 @@ export class Drumpad {
    * @returns {{ value: number, velocity: number, stream(fn): sig, on(fn): sig }}
    */
   signal(voice = null, { decay = 250 } = {}) {
-    const vi = (voice != null) ? this._voiceIndex(voice) : null;
+    const vi = voice != null ? this._voiceIndex(voice) : null;
     return this._events.signal('hit', {
       decay,
-      match: e => vi === null || e.vi === vi,
+      match: (e) => vi === null || e.vi === vi,
     });
   }
 
@@ -543,12 +702,27 @@ export class Drumpad {
   }
 
   _stop(playBtn) {
-    if (this._sequence) { try { this._sequence.stop(); this._sequence.dispose(); } catch (_) {} this._sequence = null; }
-    try { Tone.getTransport().stop(); } catch (_) {}
+    if (this._sequence) {
+      try {
+        this._sequence.stop();
+        this._sequence.dispose();
+      } catch (_) {}
+      this._sequence = null;
+    }
+    try {
+      Tone.getTransport().stop();
+    } catch (_) {}
     this._playing = false;
-    this._paused  = false;
-    this._voices.forEach(v => v._cells.forEach(c => { c.style.boxShadow = ''; }));
-    if (playBtn) { playBtn.textContent = '▶ Play'; playBtn.style.background = '#1e1e2e'; }
+    this._paused = false;
+    this._voices.forEach((v) =>
+      v._cells.forEach((c) => {
+        c.style.boxShadow = '';
+      }),
+    );
+    if (playBtn) {
+      playBtn.textContent = '▶ Play';
+      playBtn.style.background = '#1e1e2e';
+    }
   }
 
   _destroy(playBtn) {
@@ -557,8 +731,15 @@ export class Drumpad {
     unregisterMidiInstrument(this);
     const idx = _drumpads.indexOf(this);
     if (idx >= 0) _drumpads.splice(idx, 1);
-    if (this._onKey) { document.removeEventListener('keydown', this._onKey); this._onKey = null; }
-    this._voices.forEach(v => { try { v.synth?.dispose(); } catch (_) {} });
+    if (this._onKey) {
+      document.removeEventListener('keydown', this._onKey);
+      this._onKey = null;
+    }
+    this._voices.forEach((v) => {
+      try {
+        v.synth?.dispose();
+      } catch (_) {}
+    });
   }
 }
 

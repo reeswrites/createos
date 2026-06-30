@@ -38,7 +38,7 @@ export class Layer {
     if (s.brightness !== null) parts.push(`brightness(${s.brightness})`);
     if (s.saturate !== null) parts.push(`saturate(${s.saturate})`);
     if (s.invert !== null) parts.push(`invert(${s.invert})`);
-    this.#canvas.style.filter = parts.join(" ");
+    this.#canvas.style.filter = parts.join(' ');
   }
 
   #applyTransform() {
@@ -49,7 +49,7 @@ export class Layer {
     if (s.rotateX !== null) parts.push(`rotateX(${s.rotateX}deg)`);
     if (s.rotateY !== null) parts.push(`rotateY(${s.rotateY}deg)`);
     if (s.scale !== null) parts.push(`scale(${s.scale})`);
-    this.#canvas.style.transform = parts.join(" ");
+    this.#canvas.style.transform = parts.join(' ');
   }
 
   blur(px) {
@@ -144,11 +144,11 @@ export class Layer {
       perspective: 600,
       clip: null,
     };
-    this.#canvas.style.filter = "";
-    this.#canvas.style.opacity = "";
-    this.#canvas.style.mixBlendMode = "";
-    this.#canvas.style.transform = "";
-    this.#canvas.style.clipPath = "";
+    this.#canvas.style.filter = '';
+    this.#canvas.style.opacity = '';
+    this.#canvas.style.mixBlendMode = '';
+    this.#canvas.style.transform = '';
+    this.#canvas.style.clipPath = '';
     return this;
   }
 }
@@ -161,21 +161,29 @@ export class Layer {
 //
 // Returns { canvas, parent, sizeRef, refCanvas, resizeObserver } — the caller
 // keeps resizeObserver to disconnect on its own teardown.
-export function mountLayerCanvas({ z = 30, opacity = 1, container = null, webgpu = false, onResize = null } = {}) {
-  const wrapper     = window.__ar_canvasWrapper ?? document.getElementById('canvasWrapper');
-  const fsContainer = window.__ar_fsContainer  ?? document.getElementById('fsContainer');
-  const parent    = container ?? fsContainer ?? wrapper;
-  const sizeRef   = container ?? wrapper ?? parent;
+export function mountLayerCanvas({
+  z = 30,
+  opacity = 1,
+  container = null,
+  webgpu = false,
+  onResize = null,
+} = {}) {
+  const wrapper = window.__ar_canvasWrapper ?? document.getElementById('canvasWrapper');
+  const fsContainer = window.__ar_fsContainer ?? document.getElementById('fsContainer');
+  const parent = container ?? fsContainer ?? wrapper;
+  const sizeRef = container ?? wrapper ?? parent;
   const refCanvas = (container ?? wrapper)?.querySelector('canvas');
 
   const canvas = document.createElement('canvas');
-  if (webgpu) canvas._ar_webgpu = true;   // mirror copy loop skips WebGPU canvases
-  canvas.width  = refCanvas?.width  ?? 1600;
+  if (webgpu) canvas._ar_webgpu = true; // mirror copy loop skips WebGPU canvases
+  canvas.width = refCanvas?.width ?? 1600;
   canvas.height = refCanvas?.height ?? 900;
   Object.assign(canvas.style, {
     position: 'absolute',
-    top: '0', left: '0',
-    width: '100%', height: '100%',
+    top: '0',
+    left: '0',
+    width: '100%',
+    height: '100%',
     zIndex: String(z),
     opacity: String(opacity),
     pointerEvents: 'none',
@@ -187,10 +195,10 @@ export function mountLayerCanvas({ z = 30, opacity = 1, container = null, webgpu
   parent?.appendChild(canvas);
 
   const resizeObserver = new ResizeObserver(() => {
-    const w = Math.round((sizeRef?.clientWidth  ?? 0) * devicePixelRatio) || 1600;
+    const w = Math.round((sizeRef?.clientWidth ?? 0) * devicePixelRatio) || 1600;
     const h = Math.round((sizeRef?.clientHeight ?? 0) * devicePixelRatio) || 900;
     if (canvas.width !== w || canvas.height !== h) {
-      canvas.width  = w;
+      canvas.width = w;
       canvas.height = h;
       onResize?.(w, h);
     }

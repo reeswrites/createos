@@ -16,9 +16,9 @@ import { recordStream, compositeCanvasStream } from './recorder.js';
 // base→overlay→text filter dance: every plane composites in zIndex order.
 export function zSortedCanvases(body) {
   return [...body.querySelectorAll('canvas')]
-    .map(c => [c, parseInt(getComputedStyle(c).zIndex, 10) || 0])
+    .map((c) => [c, parseInt(getComputedStyle(c).zIndex, 10) || 0])
     .sort((a, b) => a[1] - b[1])
-    .map(e => e[0]);
+    .map((e) => e[0]);
 }
 
 function _defaultName(win, fallback, ext) {
@@ -37,15 +37,22 @@ export function snapshotWindow(win, body, visualEl, { name, download = false } =
     h = visualEl.videoHeight || visualEl.naturalHeight || visualEl.height || 240;
   }
   const c = document.createElement('canvas');
-  c.width = w; c.height = h;
+  c.width = w;
+  c.height = h;
   const ctx = c.getContext('2d');
   if (canvases.length > 0) {
-    for (const src of canvases) { try { ctx.drawImage(src, 0, 0, w, h); } catch (_) {} }
+    for (const src of canvases) {
+      try {
+        ctx.drawImage(src, 0, 0, w, h);
+      } catch (_) {}
+    }
   } else {
-    try { ctx.drawImage(visualEl, 0, 0, w, h); } catch (_) {}
+    try {
+      ctx.drawImage(visualEl, 0, 0, w, h);
+    } catch (_) {}
   }
   const snapName = name ?? _defaultName(win, 'snapshot', '.png');
-  c.toBlob(blob => {
+  c.toBlob((blob) => {
     if (!blob) return;
     window.desktop?.addBlob(blob, { name: snapName, type: 'image', download });
   }, 'image/png');
@@ -56,7 +63,8 @@ export function snapshotWindow(win, body, visualEl, { name, download = false } =
 export function recordWindow(win, body, visualEl, { fps = 30, name } = {}) {
   // All canvases, z-sorted → composite order (base → … → overlay → text).
   const all = zSortedCanvases(body);
-  let stream, stopCompositor = null;
+  let stream,
+    stopCompositor = null;
   if (all.length > 1) {
     const comp = compositeCanvasStream(all, fps);
     stream = comp.stream;
@@ -69,7 +77,7 @@ export function recordWindow(win, body, visualEl, { fps = 30, name } = {}) {
   if (!stream) return null;
   const recName = name ?? _defaultName(win, 'recording', '.webm');
   const rec = recordStream(stream, {
-    onStop: blob => window.desktop?.addBlob(blob, { name: recName, type: 'video' }),
+    onStop: (blob) => window.desktop?.addBlob(blob, { name: recName, type: 'video' }),
   });
   if (stopCompositor) rec._stopCompositor = stopCompositor;
   return rec;

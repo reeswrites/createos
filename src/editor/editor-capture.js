@@ -70,7 +70,7 @@ class DOMCapture {
     if (!this._styles) this._styles = this._extractStyles();
 
     const clone = el.cloneNode(true);
-    clone.querySelectorAll('textarea, script').forEach(t => t.remove());
+    clone.querySelectorAll('textarea, script').forEach((t) => t.remove());
 
     const svgStr =
       `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">` +
@@ -89,7 +89,10 @@ class DOMCapture {
       URL.revokeObjectURL(url);
       this._pending = false;
     };
-    img.onerror = () => { URL.revokeObjectURL(url); this._pending = false; };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      this._pending = false;
+    };
     img.src = url;
   }
 }
@@ -102,7 +105,12 @@ export function initDOMCaptures(nativeSetInterval, nativeClearInterval) {
 export function captureWindow(target, fps = 12) {
   const el = typeof target === 'string' ? document.querySelector(target) : target;
   if (!el) return null;
-  if (el instanceof HTMLCanvasElement || el instanceof HTMLVideoElement || el instanceof HTMLImageElement) return el;
+  if (
+    el instanceof HTMLCanvasElement ||
+    el instanceof HTMLVideoElement ||
+    el instanceof HTMLImageElement
+  )
+    return el;
   const key = `__cap_${_captureCounter++}`;
   const c = new DOMCapture(el, fps);
   c.start();

@@ -23,13 +23,13 @@ import { SYSTEM_EVENTS } from './system-events.js';
 // to native globals when there's no active editor (e.g. tests).
 function _trackedTimers() {
   const id = window.__ar_active_editor_id;
-  const si = id != null ? window[`__ar_e${id}_setInterval`]   : null;
+  const si = id != null ? window[`__ar_e${id}_setInterval`] : null;
   const ci = id != null ? window[`__ar_e${id}_clearInterval`] : null;
   return { setInterval: si || window.setInterval, clearInterval: ci || window.clearInterval };
 }
 
 // Build lookup maps from the catalog at module load.
-const _eventsMap = new Map(SYSTEM_EVENTS.map(e => [e.name, e]));
+const _eventsMap = new Map(SYSTEM_EVENTS.map((e) => [e.name, e]));
 
 // ── EventSelector ────────────────────────────────────────────────────────────
 
@@ -37,20 +37,29 @@ export class EventSelector {
   constructor(events) {
     // Accept a single string (on) or an array (any)
     this._events = Array.isArray(events) ? events : [events];
-    this._every  = null;
-    this._after  = null;
+    this._every = null;
+    this._after = null;
     this._within = null;
-    this._when   = null;   // fn predicate only (object patterns are compiled here)
+    this._when = null; // fn predicate only (object patterns are compiled here)
   }
 
   // Fire only every Nth occurrence of each subscribed event.
-  every(n)     { this._every  = n;         return this; }
+  every(n) {
+    this._every = n;
+    return this;
+  }
 
   // Require that `event` has fired at least once before this one triggers.
-  after(event) { this._after  = event;     return this; }
+  after(event) {
+    this._after = event;
+    return this;
+  }
 
   // Combined with after(): require the after-event fired within `ms` milliseconds ago.
-  within(ms)   { this._within = ms;        return this; }
+  within(ms) {
+    this._within = ms;
+    return this;
+  }
 
   // .when() — three modes detected by argument shape:
   //   when(fn)              → predicate modifier (returns this)
@@ -79,23 +88,28 @@ export class EventSelector {
       if (allFunctions) {
         // Mode 3: terse dispatch — look up primary from catalog
         if (this._events.length !== 1) {
-          throw new Error('.when(map) dispatch requires a single event (not any(...)). Use .when("prop", map) explicitly.');
+          throw new Error(
+            '.when(map) dispatch requires a single event (not any(...)). Use .when("prop", map) explicitly.',
+          );
         }
         const meta = _eventsMap.get(this._events[0]);
         if (!meta?.primary) {
-          throw new Error(`.when(map) dispatch: event '${this._events[0]}' has no primary field in the catalog. Use .when('propName', map) instead.`);
+          throw new Error(
+            `.when(map) dispatch: event '${this._events[0]}' has no primary field in the catalog. Use .when('propName', map) instead.`,
+          );
         }
         return this._dispatchOn(meta.primary, patternOrFn);
       } else {
         // Mode 2: property-filter modifier — compile to predicate
-        this._when = d => entries.every(([k, v]) =>
-          Array.isArray(v) ? v.includes(d[k]) : d[k] === v
-        );
+        this._when = (d) =>
+          entries.every(([k, v]) => (Array.isArray(v) ? v.includes(d[k]) : d[k] === v));
         return this;
       }
     }
 
-    throw new TypeError('.when() expects a function, an object pattern, or (propName, handlerMap).');
+    throw new TypeError(
+      '.when() expects a function, an object pattern, or (propName, handlerMap).',
+    );
   }
 
   // Dispatch terminal — internal shared impl for Mode 3 and Mode 4.
@@ -106,26 +120,32 @@ export class EventSelector {
     let lastFired = null;
 
     if (this._after) {
-      cleanups.push(subscribe(this._after, () => { lastAfter = Date.now(); }));
+      cleanups.push(
+        subscribe(this._after, () => {
+          lastAfter = Date.now();
+        }),
+      );
     }
 
     for (const event of this._events) {
       let count = 0;
-      cleanups.push(subscribe(event, (data) => {
-        count++;
-        if (this._every  !== null && count % this._every !== 0) return;
-        if (this._when   !== null && !this._when(data))         return;
-        if (this._after  !== null && lastAfter === null)        return;
-        if (this._within !== null) {
-          const refTime = this._after !== null ? lastAfter : lastFired;
-          if (refTime !== null && Date.now() - refTime > this._within) return;
-        }
-        lastFired = Date.now();
-        map[data[prop]]?.(data);
-      }));
+      cleanups.push(
+        subscribe(event, (data) => {
+          count++;
+          if (this._every !== null && count % this._every !== 0) return;
+          if (this._when !== null && !this._when(data)) return;
+          if (this._after !== null && lastAfter === null) return;
+          if (this._within !== null) {
+            const refTime = this._after !== null ? lastAfter : lastFired;
+            if (refTime !== null && Date.now() - refTime > this._within) return;
+          }
+          lastFired = Date.now();
+          map[data[prop]]?.(data);
+        }),
+      );
     }
 
-    return () => cleanups.forEach(c => c());
+    return () => cleanups.forEach((c) => c());
   }
 
   // .hold() — terminal, returns a live state object rather than wiring a callback.
@@ -138,7 +158,7 @@ export class EventSelector {
       throw new Error('.hold() requires a single event (not any(...)). Use on("event").hold().');
     }
     const event = this._events[0];
-    const meta  = _eventsMap.get(event);
+    const meta = _eventsMap.get(event);
     const whenFn = this._when; // capture current filter
 
     if (meta?.release && meta?.primary) {
@@ -171,26 +191,32 @@ export class EventSelector {
     let lastFired = null;
 
     if (this._after) {
-      cleanups.push(subscribe(this._after, () => { lastAfter = Date.now(); }));
+      cleanups.push(
+        subscribe(this._after, () => {
+          lastAfter = Date.now();
+        }),
+      );
     }
 
     for (const event of this._events) {
       let count = 0;
-      cleanups.push(subscribe(event, (data) => {
-        count++;
-        if (this._every  !== null && count % this._every !== 0) return;
-        if (this._when   !== null && !this._when(data))         return;
-        if (this._after  !== null && lastAfter === null)        return;
-        if (this._within !== null) {
-          const refTime = this._after !== null ? lastAfter : lastFired;
-          if (refTime !== null && Date.now() - refTime > this._within) return;
-        }
-        lastFired = Date.now();
-        fn(data);
-      }));
+      cleanups.push(
+        subscribe(event, (data) => {
+          count++;
+          if (this._every !== null && count % this._every !== 0) return;
+          if (this._when !== null && !this._when(data)) return;
+          if (this._after !== null && lastAfter === null) return;
+          if (this._within !== null) {
+            const refTime = this._after !== null ? lastAfter : lastFired;
+            if (refTime !== null && Date.now() - refTime > this._within) return;
+          }
+          lastFired = Date.now();
+          fn(data);
+        }),
+      );
     }
 
-    return () => cleanups.forEach(c => c());
+    return () => cleanups.forEach((c) => c());
   }
 }
 
@@ -212,19 +238,29 @@ export function any(...events) {
 
 class TickSelector {
   constructor(ms) {
-    this._ms     = ms;
-    this._every  = null;
-    this._after  = null;
+    this._ms = ms;
+    this._every = null;
+    this._after = null;
     this._within = null;
-    this._when   = null;
+    this._when = null;
   }
 
-  every(n)     { this._every  = n;    return this; }
-  after(event) { this._after  = event; return this; }
-  within(ms)   { this._within = ms;   return this; }
+  every(n) {
+    this._every = n;
+    return this;
+  }
+  after(event) {
+    this._after = event;
+    return this;
+  }
+  within(ms) {
+    this._within = ms;
+    return this;
+  }
 
   when(pred) {
-    if (typeof pred !== 'function') throw new TypeError('tick().when() expects a predicate function.');
+    if (typeof pred !== 'function')
+      throw new TypeError('tick().when() expects a predicate function.');
     this._when = pred;
     return this;
   }
@@ -235,16 +271,20 @@ class TickSelector {
     let lastFired = null;
 
     if (this._after) {
-      cleanups.push(subscribe(this._after, () => { lastAfter = Date.now(); }));
+      cleanups.push(
+        subscribe(this._after, () => {
+          lastAfter = Date.now();
+        }),
+      );
     }
 
     let count = 0;
     const T = _trackedTimers();
     const id = T.setInterval(() => {
       count++;
-      if (this._every  !== null && count % this._every !== 0) return;
-      if (this._when   !== null && !this._when())              return;
-      if (this._after  !== null && lastAfter === null)         return;
+      if (this._every !== null && count % this._every !== 0) return;
+      if (this._when !== null && !this._when()) return;
+      if (this._after !== null && lastAfter === null) return;
       if (this._within !== null) {
         const refTime = this._after !== null ? lastAfter : lastFired;
         if (refTime !== null && Date.now() - refTime > this._within) return;
@@ -254,7 +294,7 @@ class TickSelector {
     }, this._ms);
 
     cleanups.push(() => T.clearInterval(id));
-    return () => cleanups.forEach(c => c());
+    return () => cleanups.forEach((c) => c());
   }
 }
 
@@ -266,7 +306,7 @@ export function tick(ms) {
 // tween(duration, fn(t), { easing?, onDone? }) → cancel
 // Calls fn with t in [0,1] every ~16ms for `duration` ms, then calls onDone.
 // Uses the active editor's tracked setInterval so it pauses/cleans with the harness (ADR 027).
-export function tween(duration, fn, { easing = t => t, onDone } = {}) {
+export function tween(duration, fn, { easing = (t) => t, onDone } = {}) {
   const start = Date.now();
   const T = _trackedTimers();
   const id = T.setInterval(() => {
@@ -297,15 +337,33 @@ export function hold(event) {
     // Set mode — persistent subscriptions that survive reset
     const primary = meta.primary;
     const set = new Set();
-    subscribe(event,        (data) => { set.add(data[primary]); },    { persistent: true });
-    subscribe(meta.release, (data) => { set.delete(data[primary]); }, { persistent: true });
+    subscribe(
+      event,
+      (data) => {
+        set.add(data[primary]);
+      },
+      { persistent: true },
+    );
+    subscribe(
+      meta.release,
+      (data) => {
+        set.delete(data[primary]);
+      },
+      { persistent: true },
+    );
     _holdCache.set(event, set);
     return set;
   } else {
     // Object mode
     const last = getLastPayload(event);
     const state = last ? { ...last } : {};
-    subscribe(event, (data) => { Object.assign(state, data); }, { persistent: true });
+    subscribe(
+      event,
+      (data) => {
+        Object.assign(state, data);
+      },
+      { persistent: true },
+    );
     _holdCache.set(event, state);
     return state;
   }

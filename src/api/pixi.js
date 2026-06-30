@@ -22,8 +22,10 @@ export function initPixi() {
 
   Object.assign(_app.view.style, {
     position: 'absolute',
-    top: '0', left: '0',
-    width: '100%', height: '100%',
+    top: '0',
+    left: '0',
+    width: '100%',
+    height: '100%',
     zIndex: '25',
     pointerEvents: 'none',
   });
@@ -45,13 +47,19 @@ export function initPixi() {
   // pixi.mount(target) — mount the view as the z=25 plane of a window. target is
   //   a Canvas (has .winId), a window id, or a DOM element.
   // pixi.show(opts) — spawn a bare window and mount into it (standalone).
-  _app.mount = (target) => { _mountPixi(target); return _app; };
+  _app.mount = (target) => {
+    _mountPixi(target);
+    return _app;
+  };
   _app.show = (opts = {}) => {
     const { title = 'Pixi', w = 700, h = 500 } = opts;
     const winId = window.wm?.spawn(title, {
-      w, h, html: '', transient: true,
+      w,
+      h,
+      html: '',
+      transient: true,
       onClose: () => cleanupPixi(),
-      ...(opts.noChrome    !== undefined ? { noChrome:    opts.noChrome    } : {}),
+      ...(opts.noChrome !== undefined ? { noChrome: opts.noChrome } : {}),
       ...(opts.transparent !== undefined ? { transparent: opts.transparent } : {}),
     });
     _ownWinId = winId ?? null;
@@ -59,19 +67,20 @@ export function initPixi() {
     return _app;
   };
 
-  window.pixi  = _app;
+  window.pixi = _app;
   window.Stage = _app.stage;
 }
 
 function _mountPixi(target) {
   if (!_app) return;
-  let body = null, winId = null;
+  let body = null,
+    winId = null;
   if (target && typeof target === 'object' && target.winId) winId = target.winId;
   else if (typeof target === 'string') winId = target;
   else if (target instanceof HTMLElement) body = target;
 
   if (winId) {
-    window.wm?.layer?.(winId, 25, { adopt: _app.view });   // register as the window's z=25 plane
+    window.wm?.layer?.(winId, 25, { adopt: _app.view }); // register as the window's z=25 plane
     body = document.getElementById(winId)?.querySelector('.wm-body') ?? null;
   } else if (body) {
     if (getComputedStyle(body).position === 'static') body.style.position = 'relative';
@@ -81,7 +90,7 @@ function _mountPixi(target) {
   if (body) {
     _resizeObserver?.disconnect();
     _resizeObserver = new ResizeObserver(() => {
-      const rw = Math.round((body.clientWidth  ?? 0) * devicePixelRatio) || 1600;
+      const rw = Math.round((body.clientWidth ?? 0) * devicePixelRatio) || 1600;
       const rh = Math.round((body.clientHeight ?? 0) * devicePixelRatio) || 900;
       _app.renderer.resize(rw, rh);
     });
@@ -96,8 +105,16 @@ export function cleanupPixi() {
   _app.stage.removeChildren();
   _resizeObserver?.disconnect();
   _resizeObserver = null;
-  if (_ownWinId) { const id = _ownWinId; _ownWinId = null; window.wm?.remove?.(id, { animate: false }); }
-  try { _app.view.remove(); } catch (_) { /* window already gone */ }
+  if (_ownWinId) {
+    const id = _ownWinId;
+    _ownWinId = null;
+    window.wm?.remove?.(id, { animate: false });
+  }
+  try {
+    _app.view.remove();
+  } catch (_) {
+    /* window already gone */
+  }
 }
 
 export { PIXI };

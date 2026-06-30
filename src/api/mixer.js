@@ -23,12 +23,15 @@ import { liveOutput } from '../runtime/keep-alive.js';
 
 const _STORE_KEY = 'vl_mixer';
 
-const _strips   = new Map();   // name → Strip (live, has Tone nodes)
-const _settings = new Map();   // name → { volume, pan, mute, solo, eq } (persisted, survives teardown)
+const _strips = new Map(); // name → Strip (live, has Tone nodes)
+const _settings = new Map(); // name → { volume, pan, mute, solo, eq } (persisted, survives teardown)
 const _changeListeners = new Set();
 
-let _masterIn = null, _masterVol = null, _masterEQ = null, _masterMeter = null;
-let _nameCounters = {};        // type → running counter for auto-names
+let _masterIn = null,
+  _masterVol = null,
+  _masterEQ = null,
+  _masterMeter = null;
+let _nameCounters = {}; // type → running counter for auto-names
 
 // ── Persistence ────────────────────────────────────────────────────────────
 
@@ -39,7 +42,12 @@ function _loadSettings() {
   } catch (_) {}
 }
 let _settingsLoaded = false;
-function _ensureSettingsLoaded() { if (!_settingsLoaded) { _settingsLoaded = true; _loadSettings(); } }
+function _ensureSettingsLoaded() {
+  if (!_settingsLoaded) {
+    _settingsLoaded = true;
+    _loadSettings();
+  }
+}
 
 function _saveSettings() {
   try {
@@ -49,7 +57,9 @@ function _saveSettings() {
   } catch (_) {}
 }
 
-function _defaults() { return { volume: 0, pan: 0, mute: false, solo: false, eq: null }; }
+function _defaults() {
+  return { volume: 0, pan: 0, mute: false, solo: false, eq: null };
+}
 function _settingsFor(name) {
   _ensureSettingsLoaded();
   if (!_settings.has(name)) _settings.set(name, _defaults());
@@ -79,7 +89,7 @@ export function restoreMixer(data) {
 
 function _ensureMaster() {
   if (_masterIn) return;
-  _masterIn  = new Tone.Gain();
+  _masterIn = new Tone.Gain();
   _masterVol = new Tone.Volume(0);
   _masterMeter = new Tone.Meter();
   _masterIn.connect(_masterVol);
@@ -96,23 +106,25 @@ function _ensureMasterEQ() {
   _ensureMaster();
   _masterEQ = new EQChain();
   _masterIn.disconnect(_masterVol);
-  _masterIn.chain(...(_masterEQ.nodes), _masterVol);
+  _masterIn.chain(..._masterEQ.nodes, _masterVol);
   return _masterEQ;
 }
 
 // ── 4-band parametric EQ chain (low-shelf, 2 peaking, high-shelf) ─────────────
 
 const EQ_DEFAULT = [
-  { type: 'lowshelf',  freq: 120,   gain: 0, q: 0.7 },
-  { type: 'peaking',   freq: 500,   gain: 0, q: 1   },
-  { type: 'peaking',   freq: 2500,  gain: 0, q: 1   },
-  { type: 'highshelf', freq: 8000,  gain: 0, q: 0.7 },
+  { type: 'lowshelf', freq: 120, gain: 0, q: 0.7 },
+  { type: 'peaking', freq: 500, gain: 0, q: 1 },
+  { type: 'peaking', freq: 2500, gain: 0, q: 1 },
+  { type: 'highshelf', freq: 8000, gain: 0, q: 0.7 },
 ];
 
 class EQChain {
   constructor() {
-    this.bands = EQ_DEFAULT.map(b => ({ ...b }));
-    this.nodes = this.bands.map(b => new Tone.Filter({ type: b.type, frequency: b.freq, Q: b.q, gain: b.gain }));
+    this.bands = EQ_DEFAULT.map((b) => ({ ...b }));
+    this.nodes = this.bands.map(
+      (b) => new Tone.Filter({ type: b.type, frequency: b.freq, Q: b.q, gain: b.gain }),
+    );
   }
   _apply(bands) {
     if (!bands) return;
@@ -123,12 +135,20 @@ class EQChain {
       try {
         if (b.freq != null) n.frequency.value = b.freq;
         if (b.gain != null) n.gain.value = b.gain;
-        if (b.q    != null) n.Q.value = b.q;
+        if (b.q != null) n.Q.value = b.q;
       } catch (_) {}
     });
   }
-  serialize() { return this.bands.map(b => ({ ...b })); }
-  dispose() { this.nodes.forEach(n => { try { n.dispose(); } catch (_) {} }); }
+  serialize() {
+    return this.bands.map((b) => ({ ...b }));
+  }
+  dispose() {
+    this.nodes.forEach((n) => {
+      try {
+        n.dispose();
+      } catch (_) {}
+    });
+  }
 }
 
 // ── Strip ─────────────────────────────────────────────────────────────────────
@@ -138,14 +158,14 @@ class Strip {
     _ensureMaster();
     this.name = name;
     this.type = type;
-    this.owner = owner;          // editorId | winId | null
-    this.lifecycle = lifecycle;  // 'run' | 'window' | 'persistent'
-    this.patterns = new Set();   // pattern ids riding this instrument (sub-rows)
+    this.owner = owner; // editorId | winId | null
+    this.lifecycle = lifecycle; // 'run' | 'window' | 'persistent'
+    this.patterns = new Set(); // pattern ids riding this instrument (sub-rows)
 
-    this._in      = new Tone.Gain();
-    this._channel = new Tone.Channel();   // volume + pan
-    this._meter   = new Tone.Meter();
-    this._eq      = null;                  // lazy EQChain
+    this._in = new Tone.Gain();
+    this._channel = new Tone.Channel(); // volume + pan
+    this._meter = new Tone.Meter();
+    this._eq = null; // lazy EQChain
 
     this._in.connect(this._channel);
     this._channel.connect(_masterIn);
@@ -154,16 +174,29 @@ class Strip {
     this._applySettings();
   }
 
-  get input() { return this._in; }          // sources connect here (Tone node)
+  get input() {
+    return this._in;
+  } // sources connect here (Tone node)
   // Connect a raw/native AudioNode into this strip.
-  connectFrom(node) { try { Tone.connect(node, this._in); } catch (_) {} return this; }
+  connectFrom(node) {
+    try {
+      Tone.connect(node, this._in);
+    } catch (_) {}
+    return this;
+  }
 
-  _settings() { return _settingsFor(this.name); }
+  _settings() {
+    return _settingsFor(this.name);
+  }
 
   _applySettings() {
     const s = this._settings();
-    try { this._channel.volume.value = s.volume; } catch (_) {}
-    try { this._channel.pan.value = s.pan; } catch (_) {}
+    try {
+      this._channel.volume.value = s.volume;
+    } catch (_) {}
+    try {
+      this._channel.pan.value = s.pan;
+    } catch (_) {}
     if (s.eq) this._ensureEQ()._apply(s.eq);
     _recomputeDucking();
   }
@@ -173,24 +206,68 @@ class Strip {
     this._eq = new EQChain();
     // Splice EQ between _in and channel — only _in's single output re-patches,
     // so connected sources never click (ADR 032).
-    try { this._in.disconnect(this._channel); } catch (_) {}
+    try {
+      this._in.disconnect(this._channel);
+    } catch (_) {}
     this._in.chain(...this._eq.nodes, this._channel);
     return this._eq;
   }
 
   // ── setters (return this; blocks-friendly) ──────────────────────────────────
-  setVolume(db)  { this._settings().volume = db;  try { this._channel.volume.value = db; } catch (_) {} _persistAndNotify(); return this; }
-  setPan(v)      { this._settings().pan = v;       try { this._channel.pan.value = v; } catch (_) {} _persistAndNotify(); return this; }
-  setMute(b)     { this._settings().mute = !!b;    _recomputeDucking(); _persistAndNotify(); return this; }
-  setSolo(b)     { this._settings().solo = !!b;    _recomputeDucking(); _persistAndNotify(); return this; }
-  setEQ(bands)   { this._ensureEQ()._apply(bands); this._settings().eq = this._eq.serialize(); _persistAndNotify(); return this; }
+  setVolume(db) {
+    this._settings().volume = db;
+    try {
+      this._channel.volume.value = db;
+    } catch (_) {}
+    _persistAndNotify();
+    return this;
+  }
+  setPan(v) {
+    this._settings().pan = v;
+    try {
+      this._channel.pan.value = v;
+    } catch (_) {}
+    _persistAndNotify();
+    return this;
+  }
+  setMute(b) {
+    this._settings().mute = !!b;
+    _recomputeDucking();
+    _persistAndNotify();
+    return this;
+  }
+  setSolo(b) {
+    this._settings().solo = !!b;
+    _recomputeDucking();
+    _persistAndNotify();
+    return this;
+  }
+  setEQ(bands) {
+    this._ensureEQ()._apply(bands);
+    this._settings().eq = this._eq.serialize();
+    _persistAndNotify();
+    return this;
+  }
 
-  _level() { try { const v = this._meter.getValue(); return typeof v === 'number' ? v : (v?.[0] ?? -Infinity); } catch (_) { return -Infinity; } }
+  _level() {
+    try {
+      const v = this._meter.getValue();
+      return typeof v === 'number' ? v : (v?.[0] ?? -Infinity);
+    } catch (_) {
+      return -Infinity;
+    }
+  }
 
   dispose() {
-    try { this._in.dispose(); } catch (_) {}
-    try { this._channel.dispose(); } catch (_) {}
-    try { this._meter.dispose(); } catch (_) {}
+    try {
+      this._in.dispose();
+    } catch (_) {}
+    try {
+      this._channel.dispose();
+    } catch (_) {}
+    try {
+      this._meter.dispose();
+    } catch (_) {}
     this._eq?.dispose();
   }
 }
@@ -206,19 +283,32 @@ function _recomputeDucking() {
   for (const [name, strip] of _strips) {
     const s = _settingsFor(name);
     const muted = s.mute || (solo && !s.solo);
-    try { strip._channel.mute = muted; } catch (_) {}
+    try {
+      strip._channel.mute = muted;
+    } catch (_) {}
   }
   // master never ducks; it only obeys its own mute
   if (_masterVol) {
     const ms = _settingsFor('master');
-    try { _masterVol.volume.value = ms.mute ? -Infinity : ms.volume; } catch (_) {}
+    try {
+      _masterVol.volume.value = ms.mute ? -Infinity : ms.volume;
+    } catch (_) {}
   }
 }
 
 // ── Registry / discovery ───────────────────────────────────────────────────────
 
-function _emitChange() { for (const fn of _changeListeners) { try { fn(); } catch (_) {} } }
-function _persistAndNotify() { _saveSettings(); _emitChange(); }
+function _emitChange() {
+  for (const fn of _changeListeners) {
+    try {
+      fn();
+    } catch (_) {}
+  }
+}
+function _persistAndNotify() {
+  _saveSettings();
+  _emitChange();
+}
 
 function _autoName(label) {
   _nameCounters[label] = (_nameCounters[label] || 0) + 1;
@@ -236,7 +326,7 @@ export function acquireStrip(name, opts = {}) {
     strip = new Strip(name, opts);
     strip._autoNamed = auto;
     _strips.set(name, strip);
-    _recomputeDucking();   // now that the strip is registered, duck it if a solo is active
+    _recomputeDucking(); // now that the strip is registered, duck it if a solo is active
     notify('mixer:strip:add', { name, type: strip.type });
     _emitChange();
   }
@@ -253,8 +343,12 @@ export function releaseStrip(name) {
   _emitChange();
 }
 
-export function getStrip(name) { return _strips.get(name) || null; }
-export function liveStripNames() { return [..._strips.keys()]; }
+export function getStrip(name) {
+  return _strips.get(name) || null;
+}
+export function liveStripNames() {
+  return [..._strips.keys()];
+}
 
 // ── Reset ──────────────────────────────────────────────────────────────────────
 
@@ -276,69 +370,179 @@ onReset(cleanupMixer);
 
 // ── Discovery wiring: patterns ride their instrument's strip as sub-rows ───────
 
-subscribe('pattern:started', ({ id, strip: stripName }) => {
-  if (!stripName) return;
-  _strips.get(stripName)?.patterns.add(id);
-  _emitChange();
-}, { persistent: true });
-subscribe('pattern:stopped', ({ id }) => {
-  for (const [, s] of _strips) s.patterns.delete(id);
-  _emitChange();
-}, { persistent: true });
+subscribe(
+  'pattern:started',
+  ({ id, strip: stripName }) => {
+    if (!stripName) return;
+    _strips.get(stripName)?.patterns.add(id);
+    _emitChange();
+  },
+  { persistent: true },
+);
+subscribe(
+  'pattern:stopped',
+  ({ id }) => {
+    for (const [, s] of _strips) s.patterns.delete(id);
+    _emitChange();
+  },
+  { persistent: true },
+);
 
 // ── Public handle (window.mixer.strip(name) / .master) ─────────────────────────
 
 class StripHandle {
-  constructor(name) { this._name = name; }
-  _live() { return _strips.get(this._name) || null; }
-  _set() { return _settingsFor(this._name); }
-  volume(db) { const l = this._live(); if (l) l.setVolume(db); else { this._set().volume = db; _persistAndNotify(); } return this; }
-  pan(v)     { const l = this._live(); if (l) l.setPan(v);   else { this._set().pan = v; _persistAndNotify(); } return this; }
-  mute(b = true)  { const l = this._live(); if (l) l.setMute(b); else { this._set().mute = !!b; _recomputeDucking(); _persistAndNotify(); } return this; }
-  solo(b = true)  { const l = this._live(); if (l) l.setSolo(b); else { this._set().solo = !!b; _recomputeDucking(); _persistAndNotify(); } return this; }
-  eq(bands)  { const l = this._live(); if (l) l.setEQ(bands); else { this._set().eq = bands; _persistAndNotify(); } return this; }
-  get name() { return this._name; }
+  constructor(name) {
+    this._name = name;
+  }
+  _live() {
+    return _strips.get(this._name) || null;
+  }
+  _set() {
+    return _settingsFor(this._name);
+  }
+  volume(db) {
+    const l = this._live();
+    if (l) l.setVolume(db);
+    else {
+      this._set().volume = db;
+      _persistAndNotify();
+    }
+    return this;
+  }
+  pan(v) {
+    const l = this._live();
+    if (l) l.setPan(v);
+    else {
+      this._set().pan = v;
+      _persistAndNotify();
+    }
+    return this;
+  }
+  mute(b = true) {
+    const l = this._live();
+    if (l) l.setMute(b);
+    else {
+      this._set().mute = !!b;
+      _recomputeDucking();
+      _persistAndNotify();
+    }
+    return this;
+  }
+  solo(b = true) {
+    const l = this._live();
+    if (l) l.setSolo(b);
+    else {
+      this._set().solo = !!b;
+      _recomputeDucking();
+      _persistAndNotify();
+    }
+    return this;
+  }
+  eq(bands) {
+    const l = this._live();
+    if (l) l.setEQ(bands);
+    else {
+      this._set().eq = bands;
+      _persistAndNotify();
+    }
+    return this;
+  }
+  get name() {
+    return this._name;
+  }
 }
 
 class MasterHandle extends StripHandle {
-  constructor() { super('master'); }
-  volume(db) { _ensureMaster(); this._set().volume = db; try { _masterVol.volume.value = this._set().mute ? -Infinity : db; } catch (_) {} _persistAndNotify(); return this; }
-  mute(b = true) { _ensureMaster(); this._set().mute = !!b; _recomputeDucking(); _persistAndNotify(); return this; }
-  pan() { return this; }   // master is post-sum; pan is a no-op
-  solo() { return this; }  // master never solos
-  eq(bands) { _ensureMaster(); _ensureMasterEQ()._apply(bands); this._set().eq = _masterEQ.serialize(); _persistAndNotify(); return this; }
+  constructor() {
+    super('master');
+  }
+  volume(db) {
+    _ensureMaster();
+    this._set().volume = db;
+    try {
+      _masterVol.volume.value = this._set().mute ? -Infinity : db;
+    } catch (_) {}
+    _persistAndNotify();
+    return this;
+  }
+  mute(b = true) {
+    _ensureMaster();
+    this._set().mute = !!b;
+    _recomputeDucking();
+    _persistAndNotify();
+    return this;
+  }
+  pan() {
+    return this;
+  } // master is post-sum; pan is a no-op
+  solo() {
+    return this;
+  } // master never solos
+  eq(bands) {
+    _ensureMaster();
+    _ensureMasterEQ()._apply(bands);
+    this._set().eq = _masterEQ.serialize();
+    _persistAndNotify();
+    return this;
+  }
 }
 
 class Mixer {
-  show()   { _ensurePanel(); _panelSet(true);  return this; }
-  hide()   { _panelSet(false); return this; }
-  toggle() { _ensurePanel(); _panelSet(!_panelVisible()); return this; }
-  strip(name) { return new StripHandle(name); }
-  get master() { return new MasterHandle(); }
+  show() {
+    _ensurePanel();
+    _panelSet(true);
+    return this;
+  }
+  hide() {
+    _panelSet(false);
+    return this;
+  }
+  toggle() {
+    _ensurePanel();
+    _panelSet(!_panelVisible());
+    return this;
+  }
+  strip(name) {
+    return new StripHandle(name);
+  }
+  get master() {
+    return new MasterHandle();
+  }
   // Add an arbitrary WebAudio/Tone node to the mix. Mixer owns the strip's
   // channel; the caller owns the node's own lifecycle (ADR 032).
   add(node, { name, persist } = {}) {
-    const strip = acquireStrip(name, { type: 'node', owner: window.__ar_active_editor_id ?? null, lifecycle: persist ? 'persistent' : 'run' });
+    const strip = acquireStrip(name, {
+      type: 'node',
+      owner: window.__ar_active_editor_id ?? null,
+      lifecycle: persist ? 'persistent' : 'run',
+    });
     try {
-      if (node?.connect && node?.toDestination) node.connect(strip.input);   // Tone node
-      else if (node) strip.connectFrom(node);                                // raw AudioNode
+      if (node?.connect && node?.toDestination)
+        node.connect(strip.input); // Tone node
+      else if (node) strip.connectFrom(node); // raw AudioNode
     } catch (_) {}
     return new StripHandle(strip.name);
   }
-  names() { return liveStripNames(); }
+  names() {
+    return liveStripNames();
+  }
 }
 
 export const mixer = new Mixer();
 
 // ── Panel (lazy, built against window.wm) ──────────────────────────────────────
 
-let _panel = null;       // { winId, root, rafId, live }
-function _panelVisible() { const w = _panel && document.getElementById(_panel.winId); return !!w && w.style.display !== 'none'; }
+let _panel = null; // { winId, root, rafId, live }
+function _panelVisible() {
+  const w = _panel && document.getElementById(_panel.winId);
+  return !!w && w.style.display !== 'none';
+}
 function _panelSet(v) {
   if (!_panel) return;
   const w = document.getElementById(_panel.winId);
   if (w) w.style.display = v ? 'flex' : 'none';
-  if (v) _startPanelLoop(); else _stopPanelLoop();
+  if (v) _startPanelLoop();
+  else _stopPanelLoop();
 }
 
 function _ensurePanel() {
@@ -348,12 +552,18 @@ function _ensurePanel() {
   const win = document.getElementById(winId);
   const body = win?.querySelector('.wm-body');
   if (!body) return;
-  body.style.cssText += 'background:#0d0d14;overflow-x:auto;overflow-y:hidden;padding:6px;display:flex;gap:6px;align-items:stretch;';
+  body.style.cssText +=
+    'background:#0d0d14;overflow-x:auto;overflow-y:hidden;padding:6px;display:flex;gap:6px;align-items:stretch;';
   const root = document.createElement('div');
   root.style.cssText = 'display:flex;gap:6px;align-items:stretch;min-height:0;height:100%;';
   body.appendChild(root);
   _panel = { winId, root, rafId: null, live: null };
-  if (win) win._wmCleanup = () => { _stopPanelLoop(); _changeListeners.delete(_renderPanel); _panel = null; };
+  if (win)
+    win._wmCleanup = () => {
+      _stopPanelLoop();
+      _changeListeners.delete(_renderPanel);
+      _panel = null;
+    };
   win._widgetType = 'mixer';
   _renderPanel();
   _changeListeners.add(_renderPanel);
@@ -388,7 +598,8 @@ function _renderStrip(name, isMaster, orphan = false) {
   const title = document.createElement('div');
   title.textContent = name;
   title.title = name;
-  title.style.cssText = 'font:600 11px monospace;color:#cdd6f4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+  title.style.cssText =
+    'font:600 11px monospace;color:#cdd6f4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
   if (!isMaster && !orphan) {
     title.style.cursor = 'text';
     title.ondblclick = () => {
@@ -401,7 +612,8 @@ function _renderStrip(name, isMaster, orphan = false) {
   // pattern sub-rows
   if (strip && strip.patterns.size) {
     const sub = document.createElement('div');
-    sub.style.cssText = 'font:9px monospace;color:#7f849c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+    sub.style.cssText =
+      'font:9px monospace;color:#7f849c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
     sub.textContent = '▸ ' + [...strip.patterns].join(', ');
     col.appendChild(sub);
   }
@@ -410,15 +622,29 @@ function _renderStrip(name, isMaster, orphan = false) {
   const meterWrap = document.createElement('div');
   meterWrap.style.cssText = 'height:8px;background:#080810;border-radius:3px;overflow:hidden;';
   const meterFill = document.createElement('div');
-  meterFill.style.cssText = 'height:100%;width:0%;background:linear-gradient(90deg,#a6e3a1,#f9e2af,#f38ba8);';
+  meterFill.style.cssText =
+    'height:100%;width:0%;background:linear-gradient(90deg,#a6e3a1,#f9e2af,#f38ba8);';
   meterWrap.appendChild(meterFill);
   col.appendChild(meterWrap);
   _meterEls.set(name, meterFill);
 
   // volume
-  col.appendChild(_slider('vol', -48, 6, 0.5, s.volume, v => _handleFor(name, isMaster).volume(v), `${s.volume>0?'+':''}${s.volume.toFixed(1)}dB`));
+  col.appendChild(
+    _slider(
+      'vol',
+      -48,
+      6,
+      0.5,
+      s.volume,
+      (v) => _handleFor(name, isMaster).volume(v),
+      `${s.volume > 0 ? '+' : ''}${s.volume.toFixed(1)}dB`,
+    ),
+  );
   // pan (not master)
-  if (!isMaster) col.appendChild(_slider('pan', -1, 1, 0.05, s.pan, v => _handleFor(name).pan(v), `pan ${s.pan.toFixed(2)}`));
+  if (!isMaster)
+    col.appendChild(
+      _slider('pan', -1, 1, 0.05, s.pan, (v) => _handleFor(name).pan(v), `pan ${s.pan.toFixed(2)}`),
+    );
 
   // M / S buttons
   const btns = document.createElement('div');
@@ -430,7 +656,10 @@ function _renderStrip(name, isMaster, orphan = false) {
     btns.appendChild(sBtn);
   }
   // EQ toggle
-  const eqBtn = _toggleBtn('EQ', !!s.eq, '#89b4fa', () => { _handleFor(name, isMaster).eq(s.eq || EQ_DEFAULT.map(b => ({ ...b }))); _renderPanel(); });
+  const eqBtn = _toggleBtn('EQ', !!s.eq, '#89b4fa', () => {
+    _handleFor(name, isMaster).eq(s.eq || EQ_DEFAULT.map((b) => ({ ...b })));
+    _renderPanel();
+  });
   btns.appendChild(eqBtn);
   col.appendChild(btns);
 
@@ -438,8 +667,13 @@ function _renderStrip(name, isMaster, orphan = false) {
   if (orphan) {
     const x = document.createElement('button');
     x.textContent = '✕ clear';
-    x.style.cssText = 'font:9px monospace;background:#23233a;color:#bac2de;border:none;border-radius:3px;cursor:pointer;padding:2px;';
-    x.onclick = () => { _settings.delete(name); _saveSettings(); _renderPanel(); };
+    x.style.cssText =
+      'font:9px monospace;background:#23233a;color:#bac2de;border:none;border-radius:3px;cursor:pointer;padding:2px;';
+    x.onclick = () => {
+      _settings.delete(name);
+      _saveSettings();
+      _renderPanel();
+    };
     col.appendChild(x);
   }
 
@@ -449,7 +683,9 @@ function _renderStrip(name, isMaster, orphan = false) {
   return col;
 }
 
-function _handleFor(name, isMaster) { return isMaster ? mixer.master : mixer.strip(name); }
+function _handleFor(name, isMaster) {
+  return isMaster ? mixer.master : mixer.strip(name);
+}
 
 function _slider(kind, min, max, step, value, onInput, label) {
   const wrap = document.createElement('div');
@@ -457,15 +693,24 @@ function _slider(kind, min, max, step, value, onInput, label) {
   lab.textContent = label;
   lab.style.cssText = 'font:9px monospace;color:#9399b2;';
   const r = document.createElement('input');
-  r.type = 'range'; r.min = min; r.max = max; r.step = step; r.value = value;
+  r.type = 'range';
+  r.min = min;
+  r.max = max;
+  r.step = step;
+  r.value = value;
   r.style.cssText = 'width:100%;';
-  r.addEventListener('mousedown', e => e.stopPropagation());
-  r.addEventListener('input', e => { e.stopPropagation(); onInput(parseFloat(r.value)); lab.textContent = _relabel(kind, parseFloat(r.value)); });
-  wrap.appendChild(lab); wrap.appendChild(r);
+  r.addEventListener('mousedown', (e) => e.stopPropagation());
+  r.addEventListener('input', (e) => {
+    e.stopPropagation();
+    onInput(parseFloat(r.value));
+    lab.textContent = _relabel(kind, parseFloat(r.value));
+  });
+  wrap.appendChild(lab);
+  wrap.appendChild(r);
   return wrap;
 }
 function _relabel(kind, v) {
-  if (kind === 'vol') return `${v>0?'+':''}${v.toFixed(1)}dB`;
+  if (kind === 'vol') return `${v > 0 ? '+' : ''}${v.toFixed(1)}dB`;
   if (kind === 'pan') return `pan ${v.toFixed(2)}`;
   return String(v);
 }
@@ -474,26 +719,41 @@ function _toggleBtn(text, active, color, onClick) {
   const b = document.createElement('button');
   b.textContent = text;
   b.style.cssText = `flex:1;font:600 10px monospace;border:1px solid #2a2a40;border-radius:3px;cursor:pointer;padding:3px 0;background:${active ? color : '#1c1c2c'};color:${active ? '#11111b' : '#bac2de'};`;
-  b.addEventListener('mousedown', e => e.stopPropagation());
-  b.addEventListener('click', e => { e.stopPropagation(); onClick(); });
+  b.addEventListener('mousedown', (e) => e.stopPropagation());
+  b.addEventListener('click', (e) => {
+    e.stopPropagation();
+    onClick();
+  });
   return b;
 }
 
 // Compact draggable 4-band EQ curve.
 function _eqCanvas(name, isMaster, bands) {
   const c = document.createElement('canvas');
-  c.style.cssText = 'width:100%;height:60px;display:block;background:#080810;border-radius:4px;cursor:ns-resize;margin-top:2px;';
-  const W = () => c.width, H = () => c.height;
-  const ro = new ResizeObserver(() => { c.width = c.offsetWidth * devicePixelRatio; c.height = c.offsetHeight * devicePixelRatio; _drawEQ(); });
+  c.style.cssText =
+    'width:100%;height:60px;display:block;background:#080810;border-radius:4px;cursor:ns-resize;margin-top:2px;';
+  const W = () => c.width,
+    H = () => c.height;
+  const ro = new ResizeObserver(() => {
+    c.width = c.offsetWidth * devicePixelRatio;
+    c.height = c.offsetHeight * devicePixelRatio;
+    _drawEQ();
+  });
   ro.observe(c);
-  const f2x = f => Math.log10(f / 20) / Math.log10(1000) * W();
-  const db2y = db => H() / 2 - (db / 12) * (H() / 2);
+  const f2x = (f) => (Math.log10(f / 20) / Math.log10(1000)) * W();
+  const db2y = (db) => H() / 2 - (db / 12) * (H() / 2);
   function _drawEQ() {
-    const ctx = c.getContext('2d'); if (!ctx || !W()) return;
+    const ctx = c.getContext('2d');
+    if (!ctx || !W()) return;
     ctx.clearRect(0, 0, W(), H());
-    ctx.strokeStyle = '#1e1e2e'; const y0 = db2y(0);
-    ctx.beginPath(); ctx.moveTo(0, y0); ctx.lineTo(W(), y0); ctx.stroke();
-    ctx.strokeStyle = '#89b4fa'; ctx.lineWidth = 1.5 * devicePixelRatio;
+    ctx.strokeStyle = '#1e1e2e';
+    const y0 = db2y(0);
+    ctx.beginPath();
+    ctx.moveTo(0, y0);
+    ctx.lineTo(W(), y0);
+    ctx.stroke();
+    ctx.strokeStyle = '#89b4fa';
+    ctx.lineWidth = 1.5 * devicePixelRatio;
     ctx.beginPath();
     for (let px = 0; px <= W(); px += 3) {
       const f = 20 * Math.pow(1000, px / W());
@@ -507,27 +767,38 @@ function _eqCanvas(name, isMaster, bands) {
     }
     ctx.stroke();
     for (const b of bands) {
-      ctx.beginPath(); ctx.arc(f2x(b.freq), db2y(b.gain), 4 * devicePixelRatio, 0, 7); ctx.fillStyle = '#f9e2af'; ctx.fill();
+      ctx.beginPath();
+      ctx.arc(f2x(b.freq), db2y(b.gain), 4 * devicePixelRatio, 0, 7);
+      ctx.fillStyle = '#f9e2af';
+      ctx.fill();
     }
   }
   let drag = null;
-  c.addEventListener('mousedown', e => {
+  c.addEventListener('mousedown', (e) => {
     const rect = c.getBoundingClientRect();
     const mx = (e.clientX - rect.left) * devicePixelRatio;
-    bands.forEach((b, i) => { if (Math.abs(f2x(b.freq) - mx) < 16 * devicePixelRatio) drag = { i, startY: e.clientY, startG: b.gain }; });
+    bands.forEach((b, i) => {
+      if (Math.abs(f2x(b.freq) - mx) < 16 * devicePixelRatio)
+        drag = { i, startY: e.clientY, startG: b.gain };
+    });
     if (drag) e.preventDefault();
   });
-  const mv = e => {
+  const mv = (e) => {
     if (!drag) return;
     const dDb = (drag.startY - e.clientY) / (c.getBoundingClientRect().height / 24);
     bands[drag.i].gain = Math.max(-12, Math.min(12, Math.round((drag.startG + dDb) * 2) / 2));
-    _handleFor(name, isMaster).eq(bands.map(b => ({ ...b })));
+    _handleFor(name, isMaster).eq(bands.map((b) => ({ ...b })));
     _drawEQ();
   };
-  const up = () => { drag = null; };
+  const up = () => {
+    drag = null;
+  };
   document.addEventListener('mousemove', mv);
   document.addEventListener('mouseup', up);
-  c._eqCleanup = () => { document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up); };
+  c._eqCleanup = () => {
+    document.removeEventListener('mousemove', mv);
+    document.removeEventListener('mouseup', up);
+  };
   _drawEQ();
   return c;
 }
@@ -540,8 +811,12 @@ function _startPanelLoop() {
     _panel.rafId = requestAnimationFrame(tick);
     for (const [name, el] of _meterEls) {
       let db = -Infinity;
-      if (name === 'master') { try { db = _masterMeter?.getValue() ?? -Infinity; if (typeof db !== 'number') db = db?.[0] ?? -Infinity; } catch (_) {} }
-      else db = _strips.get(name)?._level() ?? -Infinity;
+      if (name === 'master') {
+        try {
+          db = _masterMeter?.getValue() ?? -Infinity;
+          if (typeof db !== 'number') db = db?.[0] ?? -Infinity;
+        } catch (_) {}
+      } else db = _strips.get(name)?._level() ?? -Infinity;
       const pct = Math.max(0, Math.min(100, ((db + 48) / 48) * 100));
       el.style.width = pct + '%';
     }
@@ -552,7 +827,8 @@ function _stopPanelLoop() {
   if (!_panel) return;
   if (_panel.rafId) cancelAnimationFrame(_panel.rafId);
   _panel.rafId = null;
-  _panel.live?.release(); _panel.live = null;
+  _panel.live?.release();
+  _panel.live = null;
 }
 
 // Public rename — used when a pattern binds an instrument with an explicit id
@@ -567,12 +843,21 @@ export function renameStrip(oldName, newName, { force = false } = {}) {
 }
 
 function _renameStrip(oldName, newName) {
-  if (_settings.has(oldName)) { _settings.set(newName, _settings.get(oldName)); _settings.delete(oldName); }
+  if (_settings.has(oldName)) {
+    _settings.set(newName, _settings.get(oldName));
+    _settings.delete(oldName);
+  }
   const strip = _strips.get(oldName);
-  if (strip) { strip.name = newName; _strips.delete(oldName); _strips.set(newName, strip); }
+  if (strip) {
+    strip.name = newName;
+    _strips.delete(oldName);
+    _strips.set(newName, strip);
+  }
   _saveSettings();
   _renderPanel();
 }
 
 // Panel open helper for the toolbar button / restorer.
-export function openMixerPanel() { mixer.show(); }
+export function openMixerPanel() {
+  mixer.show();
+}

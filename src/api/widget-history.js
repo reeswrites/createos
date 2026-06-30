@@ -22,7 +22,7 @@ export function installWidgetHistoryKeys() {
     if (win?._widgetHistory) _activeHistoryWin = win;
   };
   desktop.addEventListener('mousedown', trackActive, true);
-  desktop.addEventListener('focusin',   trackActive, true);
+  desktop.addEventListener('focusin', trackActive, true);
 
   document.addEventListener('keydown', (e) => {
     const meta = e.metaKey || e.ctrlKey;
@@ -53,16 +53,16 @@ export function installWidgetHistoryKeys() {
  */
 export class WidgetHistory {
   constructor({ capture, restore, max = 60, debounce = 350, onChange = () => {} } = {}) {
-    this._capture    = capture;
-    this._restore    = restore;
-    this._max        = max;
-    this._debounce   = debounce;
-    this._onChange   = onChange;
-    this._undoStack  = [];
-    this._redoStack  = [];
-    this._current    = capture();  // snapshot before any edits
-    this._timer      = null;
-    this.restoring   = false;      // public flag: widgets check this to skip recursive commit
+    this._capture = capture;
+    this._restore = restore;
+    this._max = max;
+    this._debounce = debounce;
+    this._onChange = onChange;
+    this._undoStack = [];
+    this._redoStack = [];
+    this._current = capture(); // snapshot before any edits
+    this._timer = null;
+    this.restoring = false; // public flag: widgets check this to skip recursive commit
   }
 
   /**
@@ -113,6 +113,10 @@ export class WidgetHistory {
     this._onChange();
   }
 
-  canUndo() { return this._undoStack.length > 0; }
-  canRedo() { return this._redoStack.length > 0; }
+  canUndo() {
+    return this._undoStack.length > 0;
+  }
+  canRedo() {
+    return this._redoStack.length > 0;
+  }
 }

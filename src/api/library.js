@@ -23,13 +23,13 @@
 //   library.list()  // → [{type, name, preview}]
 
 const STORAGE_KEY = 'vl_library';
-const VERSION     = 1;
+const VERSION = 1;
 
 // In-memory maps — populated by initLibrary() at boot
-const _glsl     = new Map();  // name → GLSL body string
-const _wgsl     = new Map();  // name → WGSL body string or arrow fn
-const _snippets = new Map();  // name → arbitrary code string
-const _blocks   = new Map();  // name → block descriptor (JSON-serializable)
+const _glsl = new Map(); // name → GLSL body string
+const _wgsl = new Map(); // name → WGSL body string or arrow fn
+const _snippets = new Map(); // name → arbitrary code string
+const _blocks = new Map(); // name → block descriptor (JSON-serializable)
 
 // ── Block definition builder ──────────────────────────────────────────────────
 //
@@ -47,11 +47,15 @@ const _blocks   = new Map();  // name → block descriptor (JSON-serializable)
 
 function _fieldArg(f) {
   switch (f.type) {
-    case 'number':  return { type: 'field_number',   name: f.name, value:   f.default ?? 0 };
+    case 'number':
+      return { type: 'field_number', name: f.name, value: f.default ?? 0 };
     case 'color':
-    case 'colour':  return { type: 'field_colour',   name: f.name, colour:  f.default ?? '#ffffff' };
-    case 'boolean': return { type: 'field_checkbox', name: f.name, checked: f.default ?? false };
-    default:        return { type: 'field_input',    name: f.name, text:    String(f.default ?? '') };
+    case 'colour':
+      return { type: 'field_colour', name: f.name, colour: f.default ?? '#ffffff' };
+    case 'boolean':
+      return { type: 'field_checkbox', name: f.name, checked: f.default ?? false };
+    default:
+      return { type: 'field_input', name: f.name, text: String(f.default ?? '') };
   }
 }
 
@@ -78,18 +82,18 @@ export function _buildBlockDef(name, descriptor) {
   }
 
   const def = {
-    type:     `user_${name}`,
+    type: `user_${name}`,
     message0: parts.join(' '),
     args0,
     colour,
-    tooltip:  label,
+    tooltip: label,
   };
 
   if (returns) {
     def.output = null;
   } else {
     def.previousStatement = null;
-    def.nextStatement     = null;
+    def.nextStatement = null;
   }
 
   return def;
@@ -103,7 +107,7 @@ export function _buildGenerator(descriptor) {
 
     // {FIELD_NAME} → field value (numbers unquoted, others JSON-stringified)
     for (const f of fields) {
-      const v   = block.getFieldValue(f.name);
+      const v = block.getFieldValue(f.name);
       const val = f.type === 'number' ? String(v) : JSON.stringify(v);
       code = code.replace(new RegExp(`\\{${f.name}\\}`, 'g'), val);
     }
@@ -131,13 +135,16 @@ export function _buildGenerator(descriptor) {
 
 function _persist() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      version:  VERSION,
-      glsl:     Object.fromEntries(_glsl),
-      wgsl:     Object.fromEntries(_wgsl),
-      snippets: Object.fromEntries(_snippets),
-      blocks:   Object.fromEntries(_blocks),
-    }));
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        version: VERSION,
+        glsl: Object.fromEntries(_glsl),
+        wgsl: Object.fromEntries(_wgsl),
+        snippets: Object.fromEntries(_snippets),
+        blocks: Object.fromEntries(_blocks),
+      }),
+    );
   } catch (e) {
     console.warn('vl_library: localStorage write failed', e);
   }
@@ -150,10 +157,10 @@ export function initLibrary() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return;
     const data = JSON.parse(raw);
-    if (data.glsl)     Object.entries(data.glsl).forEach(([k, v]) => _glsl.set(k, v));
-    if (data.wgsl)     Object.entries(data.wgsl).forEach(([k, v]) => _wgsl.set(k, v));
+    if (data.glsl) Object.entries(data.glsl).forEach(([k, v]) => _glsl.set(k, v));
+    if (data.wgsl) Object.entries(data.wgsl).forEach(([k, v]) => _wgsl.set(k, v));
     if (data.snippets) Object.entries(data.snippets).forEach(([k, v]) => _snippets.set(k, v));
-    if (data.blocks)   Object.entries(data.blocks).forEach(([k, v]) => _blocks.set(k, v));
+    if (data.blocks) Object.entries(data.blocks).forEach(([k, v]) => _blocks.set(k, v));
   } catch (e) {
     console.warn('vl_library: localStorage read failed', e);
   }
@@ -164,8 +171,12 @@ export function initLibrary() {
 export function populateLibraryToolkit() {
   _glsl.forEach((_, name) => window.__ar_addToolkitEntry?.('My Library', _glslCmd(name)));
   _wgsl.forEach((_, name) => window.__ar_addToolkitEntry?.('My Library', _wgslCmd(name)));
-  _snippets.forEach((code, name) => window.__ar_addToolkitEntry?.('My Library', _snippetCmd(name, code)));
-  _blocks.forEach((desc, name) => window.__ar_addToolkitEntry?.('My Library', _blockCmd(name, desc)));
+  _snippets.forEach((code, name) =>
+    window.__ar_addToolkitEntry?.('My Library', _snippetCmd(name, code)),
+  );
+  _blocks.forEach((desc, name) =>
+    window.__ar_addToolkitEntry?.('My Library', _blockCmd(name, desc)),
+  );
 }
 
 // Register stored custom blocks with Blockly + add to palette.
@@ -173,7 +184,7 @@ export function populateLibraryToolkit() {
 export function populateLibraryBlocks() {
   _blocks.forEach((descriptor, name) => {
     const definition = _buildBlockDef(name, descriptor);
-    const generator  = _buildGenerator(descriptor);
+    const generator = _buildGenerator(descriptor);
     window.__ar_applyLibraryBlock?.(definition, generator);
   });
 }
@@ -215,36 +226,36 @@ export function defineSnippet(name, code) {
 function _glslCmd(name) {
   return {
     label: name,
-    hint:  `Saved GLSL shader "${name}" — use by name in GLShader or pipeline`,
-    code:  `new GLShader('${name}').start();\n// or: pipe(cam).glshader('${name}').show('${name}', { w: 700, h: 500 });`,
-    tags:  ['library', 'glsl', 'shader', name],
+    hint: `Saved GLSL shader "${name}" — use by name in GLShader or pipeline`,
+    code: `new GLShader('${name}').start();\n// or: pipe(cam).glshader('${name}').show('${name}', { w: 700, h: 500 });`,
+    tags: ['library', 'glsl', 'shader', name],
   };
 }
 
 function _wgslCmd(name) {
   return {
     label: name,
-    hint:  `Saved WGSL shader "${name}" — use by name in Shader or pipeline`,
-    code:  `new Shader('${name}').start();\n// or: pipe(cam).shader('${name}').show('${name}', { w: 700, h: 500 });`,
-    tags:  ['library', 'wgsl', 'shader', name],
+    hint: `Saved WGSL shader "${name}" — use by name in Shader or pipeline`,
+    code: `new Shader('${name}').start();\n// or: pipe(cam).shader('${name}').show('${name}', { w: 700, h: 500 });`,
+    tags: ['library', 'wgsl', 'shader', name],
   };
 }
 
 function _snippetCmd(name, code) {
   return {
     label: name,
-    hint:  `Saved snippet "${name}"`,
+    hint: `Saved snippet "${name}"`,
     code,
-    tags:  ['library', 'snippet', name],
+    tags: ['library', 'snippet', name],
   };
 }
 
 function _blockCmd(name, descriptor) {
   return {
     label: `[block] ${descriptor.label ?? name}`,
-    hint:  `Custom block "${descriptor.label ?? name}" — available in My Library blocks palette`,
-    code:  descriptor.code ?? `// block: ${name}`,
-    tags:  ['library', 'block', name],
+    hint: `Custom block "${descriptor.label ?? name}" — available in My Library blocks palette`,
+    code: descriptor.code ?? `// block: ${name}`,
+    tags: ['library', 'block', name],
   };
 }
 
@@ -289,7 +300,7 @@ export const library = {
     _blocks.set(name, descriptor);
     _persist();
     const definition = _buildBlockDef(name, descriptor);
-    const generator  = _buildGenerator(descriptor);
+    const generator = _buildGenerator(descriptor);
     window.__ar_applyLibraryBlock?.(definition, generator);
     window.__ar_addToolkitEntry?.('My Library', _blockCmd(name, descriptor));
     return library;
@@ -297,44 +308,63 @@ export const library = {
 
   list() {
     const out = [];
-    _glsl.forEach((body, name) => out.push({ type: 'glsl',    name, preview: body.slice(0, 80).trim() }));
-    _wgsl.forEach((body, name) => out.push({ type: 'wgsl',    name, preview: (typeof body === 'string' ? body : body.toString()).slice(0, 80).trim() }));
-    _snippets.forEach((code, name) => out.push({ type: 'snippet', name, preview: code.slice(0, 80).trim() }));
-    _blocks.forEach((desc, name) => out.push({ type: 'block',   name, preview: (desc.code ?? '').slice(0, 80).trim() }));
+    _glsl.forEach((body, name) =>
+      out.push({ type: 'glsl', name, preview: body.slice(0, 80).trim() }),
+    );
+    _wgsl.forEach((body, name) =>
+      out.push({
+        type: 'wgsl',
+        name,
+        preview: (typeof body === 'string' ? body : body.toString()).slice(0, 80).trim(),
+      }),
+    );
+    _snippets.forEach((code, name) =>
+      out.push({ type: 'snippet', name, preview: code.slice(0, 80).trim() }),
+    );
+    _blocks.forEach((desc, name) =>
+      out.push({ type: 'block', name, preview: (desc.code ?? '').slice(0, 80).trim() }),
+    );
     return out;
   },
 
   remove(type, name) {
-    if (type === 'glsl')         _glsl.delete(name);
-    else if (type === 'wgsl')    _wgsl.delete(name);
+    if (type === 'glsl') _glsl.delete(name);
+    else if (type === 'wgsl') _wgsl.delete(name);
     else if (type === 'snippet') _snippets.delete(name);
-    else if (type === 'block')   _blocks.delete(name);
+    else if (type === 'block') _blocks.delete(name);
     _persist();
     return library;
   },
 
   clear() {
-    _glsl.clear(); _wgsl.clear(); _snippets.clear(); _blocks.clear();
+    _glsl.clear();
+    _wgsl.clear();
+    _snippets.clear();
+    _blocks.clear();
     _persist();
     return library;
   },
 
   export() {
-    return JSON.stringify({
-      version:  VERSION,
-      glsl:     Object.fromEntries(_glsl),
-      wgsl:     Object.fromEntries(_wgsl),
-      snippets: Object.fromEntries(_snippets),
-      blocks:   Object.fromEntries(_blocks),
-    }, null, 2);
+    return JSON.stringify(
+      {
+        version: VERSION,
+        glsl: Object.fromEntries(_glsl),
+        wgsl: Object.fromEntries(_wgsl),
+        snippets: Object.fromEntries(_snippets),
+        blocks: Object.fromEntries(_blocks),
+      },
+      null,
+      2,
+    );
   },
 
   import(jsonOrObj) {
     const data = typeof jsonOrObj === 'string' ? JSON.parse(jsonOrObj) : jsonOrObj;
-    if (data.glsl)     Object.entries(data.glsl).forEach(([k, v]) => _glsl.set(k, v));
-    if (data.wgsl)     Object.entries(data.wgsl).forEach(([k, v]) => _wgsl.set(k, v));
+    if (data.glsl) Object.entries(data.glsl).forEach(([k, v]) => _glsl.set(k, v));
+    if (data.wgsl) Object.entries(data.wgsl).forEach(([k, v]) => _wgsl.set(k, v));
     if (data.snippets) Object.entries(data.snippets).forEach(([k, v]) => _snippets.set(k, v));
-    if (data.blocks)   Object.entries(data.blocks).forEach(([k, v]) => _blocks.set(k, v));
+    if (data.blocks) Object.entries(data.blocks).forEach(([k, v]) => _blocks.set(k, v));
     _persist();
     populateLibraryToolkit();
     populateLibraryBlocks();
@@ -345,5 +375,8 @@ export const library = {
 // ── Test helper ───────────────────────────────────────────────────────────────
 
 export function _resetForTesting() {
-  _glsl.clear(); _wgsl.clear(); _snippets.clear(); _blocks.clear();
+  _glsl.clear();
+  _wgsl.clear();
+  _snippets.clear();
+  _blocks.clear();
 }

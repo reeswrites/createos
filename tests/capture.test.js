@@ -14,7 +14,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 function makeIDBMock() {
   const stores = {};
   const openReq = (storeName) => ({
-    transaction(s, mode) {
+    transaction(_s, _mode) {
       if (!stores[storeName]) stores[storeName] = {};
       return {
         objectStore() {
@@ -28,7 +28,6 @@ function makeIDBMock() {
             delete(key) { delete stores[storeName][key]; return {}; },
           };
         },
-        oncomplete: null,
         get _complete() { return this; },
         set oncomplete(fn) { if (fn) Promise.resolve().then(fn); },
       };
@@ -274,7 +273,7 @@ describe('CameraStream capture methods', () => {
     window.__ar_active_editor_id = 1;
     const a = await Camera.open({ deviceId: 'camT' });   // editor 1
     window.__ar_active_editor_id = 2;
-    const b = await Camera.open({ deviceId: 'camT' });   // editor 2, shares stream
+    await Camera.open({ deviceId: 'camT' });   // editor 2, shares stream
     window.__ar_active_editor_id = prev;
 
     cleanupCameras(2);                       // editor 2 resets

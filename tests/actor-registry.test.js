@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 // ── Minimal event bus stub ────────────────────────────────────────────────────
 
@@ -35,7 +35,7 @@ vi.mock('tone', () => {
   }
   return {
     Loop:          FakeLoop,
-    Time:          (t) => ({ toSeconds: () => 1 }),
+    Time:          (_t) => ({ toSeconds: () => 1 }),
     getTransport:  () => ({ bpm: { value: 120 }, stop: vi.fn(), cancel: vi.fn(), scheduleRepeat: vi.fn() }),
     getDestination: () => ({ volume: { rampTo: vi.fn() } }),
     now:           () => 0,

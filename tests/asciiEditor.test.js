@@ -464,7 +464,7 @@ describe('Frame strip operations', () => {
 
 describe('cleanupAsciiEditors', () => {
   it('destroys all active editors', () => {
-    const e1 = new AsciiEditor();
+    new AsciiEditor();
     const e2 = new AsciiEditor();
     e2.play(12);
     expect(e2._iid).not.toBeNull();

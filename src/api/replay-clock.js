@@ -24,18 +24,22 @@ export function scheduleReplay(ops, { loop = false, label = 'replay' } = {}) {
 
 // Helper for a single-track replay: maps each `{t,...}` action to an op that
 // applies it via `applyFn`. `offset` shifts the whole take (timeline tracks).
-export function replayActions(applyFn, actions, { loop = false, offset = 0, label = 'replay' } = {}) {
-  const ops = (actions || []).map(a => ({ at: offset + (a.t || 0), fn: () => applyFn(a) }));
+export function replayActions(
+  applyFn,
+  actions,
+  { loop = false, offset = 0, label = 'replay' } = {},
+) {
+  const ops = (actions || []).map((a) => ({ at: offset + (a.t || 0), fn: () => applyFn(a) }));
   return scheduleReplay(ops, { loop, label });
 }
 
 class ReplayClock {
   constructor(ops, { loop, label }) {
-    this._ops    = [...ops].sort((a, b) => a.at - b.at);
-    this._loop   = loop;
-    this._label  = label;
+    this._ops = [...ops].sort((a, b) => a.at - b.at);
+    this._loop = loop;
+    this._label = label;
     this._timers = [];
-    this._h      = null;
+    this._h = null;
     this._destroyed = false;
     this._duration = this._ops.length ? this._ops[this._ops.length - 1].at : 0;
   }
@@ -51,10 +55,17 @@ class ReplayClock {
 
   _scheduleCycle() {
     for (const op of this._ops) {
-      const id = window.setTimeout(() => {
-        if (this._destroyed) return;
-        try { op.fn(); } catch (e) { console.error('[replay] action failed:', e); }
-      }, Math.max(0, op.at));
+      const id = window.setTimeout(
+        () => {
+          if (this._destroyed) return;
+          try {
+            op.fn();
+          } catch (e) {
+            console.error('[replay] action failed:', e);
+          }
+        },
+        Math.max(0, op.at),
+      );
       this._timers.push(id);
     }
     // End marker: loop wrap, or release keep-alive when the take finishes. Only
@@ -73,7 +84,10 @@ class ReplayClock {
 
   // Both stop triggers — the end-of-take marker / external .stop(), and the global
   // reset — funnel through the handle's idempotent dispose() → onStop → _teardown.
-  stop() { this._h?.dispose(); if (!this._h) this._teardown(); }
+  stop() {
+    this._h?.dispose();
+    if (!this._h) this._teardown();
+  }
 
   _teardown() {
     if (this._destroyed) return;
@@ -85,4 +99,6 @@ class ReplayClock {
 }
 
 // Test/inspection helper.
-export function _activeReplayCount() { return _clocks.size; }
+export function _activeReplayCount() {
+  return _clocks.size;
+}

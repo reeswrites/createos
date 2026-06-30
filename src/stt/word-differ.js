@@ -13,7 +13,7 @@
 export class WordDiffer {
   constructor(stableAfter = 3) {
     this.committed = [];
-    this.frontier  = [];
+    this.frontier = [];
     this.stability = new Map();
     this.STABLE_AFTER = stableAfter;
   }
@@ -25,12 +25,13 @@ export class WordDiffer {
       divergeAt < this.committed.length &&
       divergeAt < newWords.length &&
       this.committed[divergeAt] === newWords[divergeAt]
-    ) divergeAt++;
+    )
+      divergeAt++;
 
     const newFrontier = newWords.slice(divergeAt);
 
     for (let i = 0; i < newFrontier.length; i++) {
-      const word    = newFrontier[i];
+      const word = newFrontier[i];
       const prevWord = this.frontier[i];
       if (word !== prevWord) {
         this.stability.set(divergeAt + i, 0);
@@ -50,7 +51,9 @@ export class WordDiffer {
 
   flush() {
     const events = this.frontier.map((word, i) => ({
-      word, final: true, index: this.committed.length + i
+      word,
+      final: true,
+      index: this.committed.length + i,
     }));
     this.committed.push(...this.frontier);
     this.frontier = [];
@@ -60,7 +63,7 @@ export class WordDiffer {
 
   reset() {
     this.committed = [];
-    this.frontier  = [];
+    this.frontier = [];
     this.stability.clear();
   }
 

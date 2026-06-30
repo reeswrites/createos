@@ -4,30 +4,74 @@ import {
   GestureRecognizer,
   FaceLandmarker,
   PoseLandmarker,
-} from "@mediapipe/tasks-vision";
+} from '@mediapipe/tasks-vision';
 import { onReset } from '../runtime/reset-registry.js';
 import { notify, subscribe } from '../events/index.js';
 import { acquireCameraRunScoped } from './media-lease.js';
 
-const WASM_CDN = "https://unpkg.com/@mediapipe/tasks-vision@0.10.35/wasm";
-const MODEL_BASE = "https://storage.googleapis.com/mediapipe-models";
+const WASM_CDN = 'https://unpkg.com/@mediapipe/tasks-vision@0.10.35/wasm';
+const MODEL_BASE = 'https://storage.googleapis.com/mediapipe-models';
 
 const HAND_CONNECTIONS = [
-  [0,1],[1,2],[2,3],[3,4],
-  [0,5],[5,6],[6,7],[7,8],
-  [0,9],[9,10],[10,11],[11,12],
-  [0,13],[13,14],[14,15],[15,16],
-  [0,17],[17,18],[18,19],[19,20],
-  [5,9],[9,13],[13,17],
+  [0, 1],
+  [1, 2],
+  [2, 3],
+  [3, 4],
+  [0, 5],
+  [5, 6],
+  [6, 7],
+  [7, 8],
+  [0, 9],
+  [9, 10],
+  [10, 11],
+  [11, 12],
+  [0, 13],
+  [13, 14],
+  [14, 15],
+  [15, 16],
+  [0, 17],
+  [17, 18],
+  [18, 19],
+  [19, 20],
+  [5, 9],
+  [9, 13],
+  [13, 17],
 ];
 
 const POSE_CONNECTIONS = [
-  [0,1],[1,2],[2,3],[3,7],[0,4],[4,5],[5,6],[6,8],
-  [9,10],
-  [11,12],[11,13],[13,15],[15,17],[15,19],[17,19],
-  [12,14],[14,16],[16,18],[16,20],[18,20],
-  [11,23],[12,24],[23,24],[23,25],[24,26],[25,27],[26,28],
-  [27,29],[28,30],[29,31],[30,32],[27,31],[28,32],
+  [0, 1],
+  [1, 2],
+  [2, 3],
+  [3, 7],
+  [0, 4],
+  [4, 5],
+  [5, 6],
+  [6, 8],
+  [9, 10],
+  [11, 12],
+  [11, 13],
+  [13, 15],
+  [15, 17],
+  [15, 19],
+  [17, 19],
+  [12, 14],
+  [14, 16],
+  [16, 18],
+  [16, 20],
+  [18, 20],
+  [11, 23],
+  [12, 24],
+  [23, 24],
+  [23, 25],
+  [24, 26],
+  [25, 27],
+  [26, 28],
+  [27, 29],
+  [28, 30],
+  [29, 31],
+  [30, 32],
+  [27, 31],
+  [28, 32],
 ];
 
 function toTurtle(px, py, vw, vh, cw, ch) {
@@ -46,11 +90,11 @@ function classifyExpression(blendshapes) {
   const frown = ((bs.mouthFrownLeft ?? 0) + (bs.mouthFrownRight ?? 0)) / 2;
   const jaw = bs.jawOpen ?? 0;
   const brow = bs.browInnerUp ?? 0;
-  if (smile > 0.4) return "smile";
-  if (brow > 0.5 && jaw > 0.3) return "surprise";
-  if (frown > 0.3) return "frown";
-  if (jaw > 0.5) return "mouth_open";
-  return "neutral";
+  if (smile > 0.4) return 'smile';
+  if (brow > 0.5 && jaw > 0.3) return 'surprise';
+  if (frown > 0.3) return 'frown';
+  if (jaw > 0.5) return 'mouth_open';
+  return 'neutral';
 }
 
 // ── Gaze (ADR 034) ────────────────────────────────────────────────────────────
@@ -62,43 +106,52 @@ function classifyExpression(blendshapes) {
 // an interactive calibration pass.
 
 // Iris landmark groups in the 478-point mesh.
-const LEFT_IRIS  = [468, 469, 470, 471, 472];
+const LEFT_IRIS = [468, 469, 470, 471, 472];
 const RIGHT_IRIS = [473, 474, 475, 476, 477];
 // Eye-corner anchors used to normalize iris offset (scale/position invariance).
-const LEFT_EYE   = { outer: 33,  inner: 133, top: 159, bottom: 145 };
-const RIGHT_EYE  = { outer: 263, inner: 362, top: 386, bottom: 374 };
+const LEFT_EYE = { outer: 33, inner: 133, top: 159, bottom: 145 };
+const RIGHT_EYE = { outer: 263, inner: 362, top: 386, bottom: 374 };
 
 const GAZE_CALIB_KEY = 'vl_gaze_calib';
 
-let _calib = null;            // { wX:[…], wY:[…] } active regression weights
-let _calibDeviceId = null;    // resolved camera deviceId for the current key
+let _calib = null; // { wX:[…], wY:[…] } active regression weights
+let _calibDeviceId = null; // resolved camera deviceId for the current key
 let _calibMap = _loadCalibMap();
-let _gazeWarned = false;      // route-level warn-once handled in route.js; this is for region handlers
+let _gazeWarned = false; // route-level warn-once handled in route.js; this is for region handlers
 
 function _loadCalibMap() {
-  try { return JSON.parse(localStorage.getItem(GAZE_CALIB_KEY) || '{}'); }
-  catch { return {}; }
+  try {
+    return JSON.parse(localStorage.getItem(GAZE_CALIB_KEY) || '{}');
+  } catch {
+    return {};
+  }
 }
 function _calibKey(deviceId) {
   return `${deviceId || 'default'}@${screen.width}x${screen.height}`;
 }
 
 function _avgPoint(lm, idxs) {
-  let x = 0, y = 0;
-  for (const i of idxs) { x += lm[i].x; y += lm[i].y; }
+  let x = 0,
+    y = 0;
+  for (const i of idxs) {
+    x += lm[i].x;
+    y += lm[i].y;
+  }
   return { x: x / idxs.length, y: y / idxs.length };
 }
 
 // Iris position within an eye socket, normalized to [-1,1]ish on both axes.
 function _eyeGaze(lm, iris, eye) {
   const c = _avgPoint(lm, iris);
-  const ox = lm[eye.outer].x, ix = lm[eye.inner].x;
-  const ty = lm[eye.top].y,   by = lm[eye.bottom].y;
-  const w = (ix - ox) || 1e-6;
-  const h = (by - ty) || 1e-6;
+  const ox = lm[eye.outer].x,
+    ix = lm[eye.inner].x;
+  const ty = lm[eye.top].y,
+    by = lm[eye.bottom].y;
+  const w = ix - ox || 1e-6;
+  const h = by - ty || 1e-6;
   return {
-    x: ((c.x - ox) / w) * 2 - 1,        // -1 outer … +1 inner
-    y: ((c.y - ty) / h) * 2 - 1,        // -1 top … +1 bottom
+    x: ((c.x - ox) / w) * 2 - 1, // -1 outer … +1 inner
+    y: ((c.y - ty) / h) * 2 - 1, // -1 top … +1 bottom
   };
 }
 
@@ -107,9 +160,11 @@ function _eyeGaze(lm, iris, eye) {
 function _headPose(matrix) {
   if (!matrix?.data) return { yaw: 0, pitch: 0 };
   const m = matrix.data;
-  const fx = m[8], fy = m[9], fz = m[10];
+  const fx = m[8],
+    fy = m[9],
+    fz = m[10];
   return {
-    yaw:   Math.atan2(fx, fz),
+    yaw: Math.atan2(fx, fz),
     pitch: Math.atan2(-fy, Math.hypot(fx, fz)),
   };
 }
@@ -128,7 +183,8 @@ function _gazeFeatures(lm, matrix) {
 function _applyCalib(feat) {
   if (!_calib) return { vx: null, vy: null };
   const dot = (w) => feat.reduce((s, f, i) => s + f * w[i], 0);
-  const vx = dot(_calib.wX), vy = dot(_calib.wY);
+  const vx = dot(_calib.wX),
+    vy = dot(_calib.wY);
   return {
     vx: Math.max(0, Math.min(window.innerWidth, vx)),
     vy: Math.max(0, Math.min(window.innerHeight, vy)),
@@ -137,14 +193,19 @@ function _applyCalib(feat) {
 
 // Ridge least squares: solve (FᵀF + λI) w = FᵀY for each output column.
 function _fitRidge(features, targets, lambda = 1e-3) {
-  const n = features.length, d = features[0].length;
+  const n = features.length,
+    d = features[0].length;
   // Normal equation accumulators.
   const A = Array.from({ length: d }, () => new Float64Array(d));
-  const bx = new Float64Array(d), by = new Float64Array(d);
+  const bx = new Float64Array(d),
+    by = new Float64Array(d);
   for (let s = 0; s < n; s++) {
-    const f = features[s], tx = targets[s][0], ty = targets[s][1];
+    const f = features[s],
+      tx = targets[s][0],
+      ty = targets[s][1];
     for (let i = 0; i < d; i++) {
-      bx[i] += f[i] * tx; by[i] += f[i] * ty;
+      bx[i] += f[i] * tx;
+      by[i] += f[i] * ty;
       for (let j = 0; j < d; j++) A[i][j] += f[i] * f[j];
     }
   }
@@ -175,21 +236,36 @@ function deriveGaze(blendshapes, matrix, landmarks) {
   const bs = {};
   for (const { categoryName, score } of blendshapes[0].categories) bs[categoryName] = score;
 
-  const x = (((bs.eyeLookOutRight ?? 0) - (bs.eyeLookInRight ?? 0)) +
-             ((bs.eyeLookInLeft  ?? 0) - (bs.eyeLookOutLeft ?? 0))) / 2;   // +right
-  const y = (((bs.eyeLookUpLeft   ?? 0) + (bs.eyeLookUpRight   ?? 0)) -
-             ((bs.eyeLookDownLeft ?? 0) + (bs.eyeLookDownRight ?? 0))) / 2; // +up
-  const blinkL = bs.eyeBlinkLeft  ?? 0;
+  const x =
+    ((bs.eyeLookOutRight ?? 0) -
+      (bs.eyeLookInRight ?? 0) +
+      ((bs.eyeLookInLeft ?? 0) - (bs.eyeLookOutLeft ?? 0))) /
+    2; // +right
+  const y =
+    ((bs.eyeLookUpLeft ?? 0) +
+      (bs.eyeLookUpRight ?? 0) -
+      ((bs.eyeLookDownLeft ?? 0) + (bs.eyeLookDownRight ?? 0))) /
+    2; // +up
+  const blinkL = bs.eyeBlinkLeft ?? 0;
   const blinkR = bs.eyeBlinkRight ?? 0;
-  const blink  = (blinkL + blinkR) / 2;
-  const leftClosed  = blinkL > 0.5;
+  const blink = (blinkL + blinkR) / 2;
+  const leftClosed = blinkL > 0.5;
   const rightClosed = blinkR > 0.5;
 
-  const dir = (Math.abs(x) < 0.15 && Math.abs(y) < 0.15) ? 'center'
-            : Math.abs(x) > Math.abs(y) ? (x > 0 ? 'right' : 'left')
-            : (y > 0 ? 'up' : 'down');
+  const dir =
+    Math.abs(x) < 0.15 && Math.abs(y) < 0.15
+      ? 'center'
+      : Math.abs(x) > Math.abs(y)
+        ? x > 0
+          ? 'right'
+          : 'left'
+        : y > 0
+          ? 'up'
+          : 'down';
 
-  let vx = null, vy = null, feat = null;
+  let vx = null,
+    vy = null,
+    feat = null;
   if (landmarks?.length >= 478) {
     feat = _gazeFeatures(landmarks, matrix);
     ({ vx, vy } = _applyCalib(feat));
@@ -198,7 +274,7 @@ function deriveGaze(blendshapes, matrix, landmarks) {
 }
 
 function _defaultCtx() {
-  return document.getElementById("turtle")?.getContext("2d") ?? null;
+  return document.getElementById('turtle')?.getContext('2d') ?? null;
 }
 
 function _applyMirror(ctx, mirror) {
@@ -210,17 +286,23 @@ function _applyMirror(ctx, mirror) {
 
 // Track camera flip state persistently (not run-scoped).
 let _cameraFlipped = false;
-subscribe('camera:flip', ({ mirrored }) => { _cameraFlipped = !!mirrored; }, { persistent: true });
+subscribe(
+  'camera:flip',
+  ({ mirrored }) => {
+    _cameraFlipped = !!mirrored;
+  },
+  { persistent: true },
+);
 
 const _cache = { objects: [], hands: [], face: null, pose: null, gaze: null };
 
 const _gestureHandlers = [];
 const _expressionHandlers = [];
-const _gazeDirHandlers = [];     // { dir, fn, prev }
-const _gazeRegionHandlers = [];  // { target, fn, prev }  (target = el | {x,y,w,h})
-const _blinkHandlers = [];       // { fn, prev }
-const _winkHandlers = [];        // { eye, fn, prev }
-let _prevDir = null;             // for gaze:look edge
+const _gazeDirHandlers = []; // { dir, fn, prev }
+const _gazeRegionHandlers = []; // { target, fn, prev }  (target = el | {x,y,w,h})
+const _blinkHandlers = []; // { fn, prev }
+const _winkHandlers = []; // { eye, fn, prev }
+let _prevDir = null; // for gaze:look edge
 
 let _initPromise = null;
 let _ready = false;
@@ -253,25 +335,25 @@ async function _init() {
       ObjectDetector.createFromOptions(wasmFileset, {
         baseOptions: {
           modelAssetPath: `${MODEL_BASE}/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite`,
-          delegate: "GPU",
+          delegate: 'GPU',
         },
-        runningMode: "VIDEO",
+        runningMode: 'VIDEO',
         scoreThreshold: 0.5,
       }),
       GestureRecognizer.createFromOptions(wasmFileset, {
         baseOptions: {
           modelAssetPath: `${MODEL_BASE}/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task`,
-          delegate: "GPU",
+          delegate: 'GPU',
         },
-        runningMode: "VIDEO",
+        runningMode: 'VIDEO',
         numHands: _handsConfig.numHands ?? 1,
       }),
       FaceLandmarker.createFromOptions(wasmFileset, {
         baseOptions: {
           modelAssetPath: `${MODEL_BASE}/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
-          delegate: "GPU",
+          delegate: 'GPU',
         },
-        runningMode: "VIDEO",
+        runningMode: 'VIDEO',
         outputFaceBlendshapes: true,
         // Head pose matrix (ADR 034) — stabilizes gaze features against head movement.
         outputFacialTransformationMatrixes: true,
@@ -286,15 +368,18 @@ async function _initPose() {
   if (_initPosePromise) return _initPosePromise;
   _initPosePromise = (async () => {
     const wasmFileset = await FilesetResolver.forVisionTasks(WASM_CDN);
-    const modelName = _poseConfig.model === 'heavy' ? 'pose_landmarker_heavy'
-                    : _poseConfig.model === 'full'  ? 'pose_landmarker_full'
-                    : 'pose_landmarker_lite';
+    const modelName =
+      _poseConfig.model === 'heavy'
+        ? 'pose_landmarker_heavy'
+        : _poseConfig.model === 'full'
+          ? 'pose_landmarker_full'
+          : 'pose_landmarker_lite';
     _poseLandmarker = await PoseLandmarker.createFromOptions(wasmFileset, {
       baseOptions: {
         modelAssetPath: `${MODEL_BASE}/pose_landmarker/${modelName}/float16/1/${modelName}.task`,
-        delegate: "GPU",
+        delegate: 'GPU',
       },
-      runningMode: "VIDEO",
+      runningMode: 'VIDEO',
       numPoses: _poseConfig.numPoses ?? 1,
     });
   })();
@@ -313,9 +398,9 @@ function _loop() {
   if (now - _lastDetectionTime < DETECTION_INTERVAL_MS) return;
   _lastDetectionTime = now;
 
-  const vw = video instanceof HTMLVideoElement ? (video.videoWidth || 600) : (video.width || 600);
-  const vh = video instanceof HTMLVideoElement ? (video.videoHeight || 600) : (video.height || 600);
-  const canvasEl = document.getElementById("turtle");
+  const vw = video instanceof HTMLVideoElement ? video.videoWidth || 600 : video.width || 600;
+  const vh = video instanceof HTMLVideoElement ? video.videoHeight || 600 : video.height || 600;
+  const canvasEl = document.getElementById('turtle');
   const cw = canvasEl?.width ?? 600;
   const ch = canvasEl?.height ?? 600;
 
@@ -327,9 +412,14 @@ function _loop() {
         const px = bb.originX + bb.width / 2;
         const py = bb.originY + bb.height / 2;
         return {
-          label: d.categories[0]?.categoryName ?? "unknown",
+          label: d.categories[0]?.categoryName ?? 'unknown',
           confidence: d.categories[0]?.score ?? 0,
-          bbox: { x: bb.originX / vw, y: bb.originY / vh, width: bb.width / vw, height: bb.height / vh },
+          bbox: {
+            x: bb.originX / vw,
+            y: bb.originY / vh,
+            width: bb.width / vw,
+            height: bb.height / vh,
+          },
           ...toTurtle(px, py, vw, vh, cw, ch),
         };
       });
@@ -344,15 +434,16 @@ function _loop() {
       const r = _gestureRecognizer.recognizeForVideo(video, now);
       _cache.hands = (r.gestures ?? []).map((g, i) => {
         const lm = r.landmarks?.[i] ?? [];
-        let cx = 0, cy = 0;
+        let cx = 0,
+          cy = 0;
         if (lm.length) {
           const wrist = lm[0];
           ({ cx, cy } = toTurtle(wrist.x * vw, wrist.y * vh, vw, vh, cw, ch));
         }
         return {
-          gesture: g[0]?.categoryName ?? "None",
+          gesture: g[0]?.categoryName ?? 'None',
           confidence: g[0]?.score ?? 0,
-          handedness: r.handedness?.[i]?.[0]?.categoryName ?? null,  // 'Left' | 'Right'
+          handedness: r.handedness?.[i]?.[0]?.categoryName ?? null, // 'Left' | 'Right'
           cx,
           cy,
           landmarks: lm,
@@ -370,7 +461,13 @@ function _loop() {
         const avgY = lm.reduce((s, p) => s + p.y, 0) / lm.length;
         const { cx, cy } = toTurtle(avgX * vw, avgY * vh, vw, vh, cw, ch);
         const gaze = deriveGaze(r.faceBlendshapes, r.facialTransformationMatrixes?.[0], lm);
-        _cache.face = { expression: classifyExpression(r.faceBlendshapes), cx, cy, landmarks: lm, gaze };
+        _cache.face = {
+          expression: classifyExpression(r.faceBlendshapes),
+          cx,
+          cy,
+          landmarks: lm,
+          gaze,
+        };
         _cache.gaze = gaze;
         _resolveCalibLazy();
         notify('gesture:face', { expression: _cache.face.expression, cx, cy, landmarks: lm });
@@ -396,11 +493,15 @@ function _loop() {
 
   // Edge-triggered gesture handlers
   const g = _cache.hands[0]?.gesture;
-  const currGesture = !g || g === "None" ? null : g;
+  const currGesture = !g || g === 'None' ? null : g;
   for (const h of _gestureHandlers) {
     const active = currGesture === h.gesture;
     if (active && !h.prev) {
-      notify('gesture:detected', { type: currGesture, hand: _cache.hands[0], confidence: _cache.hands[0]?.confidence ?? 0 });
+      notify('gesture:detected', {
+        type: currGesture,
+        hand: _cache.hands[0],
+        confidence: _cache.hands[0]?.confidence ?? 0,
+      });
       h.fn();
     }
     h.prev = active;
@@ -413,9 +514,18 @@ function _loop() {
     if (active && !h.prev) {
       const face = _cache.face;
       if (currExpr === 'smile') {
-        notify('gesture:smile', { confidence: face?.confidence ?? 0, cx: face?.cx ?? 0, cy: face?.cy ?? 0 });
+        notify('gesture:smile', {
+          confidence: face?.confidence ?? 0,
+          cx: face?.cx ?? 0,
+          cy: face?.cy ?? 0,
+        });
       }
-      notify('gesture:expression', { expression: currExpr, confidence: face?.confidence ?? 0, cx: face?.cx ?? 0, cy: face?.cy ?? 0 });
+      notify('gesture:expression', {
+        expression: currExpr,
+        confidence: face?.confidence ?? 0,
+        cx: face?.cx ?? 0,
+        cy: face?.cy ?? 0,
+      });
       h.fn();
     }
     h.prev = active;
@@ -455,7 +565,10 @@ function _notifyGaze(g) {
   // Blink (both eyes) — edge on rising.
   const bothClosed = g.leftClosed && g.rightClosed;
   for (const h of _blinkHandlers) {
-    if (bothClosed && !h.prev) { notify('gaze:blink', {}); h.fn(); }
+    if (bothClosed && !h.prev) {
+      notify('gaze:blink', {});
+      h.fn();
+    }
     h.prev = bothClosed;
   }
 
@@ -464,19 +577,32 @@ function _notifyGaze(g) {
   const winkR = g.rightClosed && !g.leftClosed;
   for (const h of _winkHandlers) {
     const active = h.eye === 'left' ? winkL : winkR;
-    if (active && !h.prev) { notify('gaze:wink', { eye: h.eye }); h.fn(); }
+    if (active && !h.prev) {
+      notify('gaze:wink', { eye: h.eye });
+      h.fn();
+    }
     h.prev = active;
   }
 
   // Region gaze (needs calibration — vx/vy). No-op + warn once if uncalibrated.
   if (_gazeRegionHandlers.length) {
     if (g.vx == null) {
-      if (!_gazeWarned) { console.warn('vision.onGaze(region): gaze not calibrated — call vision.calibrate() or click the gaze chip'); _gazeWarned = true; }
+      if (!_gazeWarned) {
+        console.warn(
+          'vision.onGaze(region): gaze not calibrated — call vision.calibrate() or click the gaze chip',
+        );
+        _gazeWarned = true;
+      }
     } else {
       for (const h of _gazeRegionHandlers) {
         const inside = _inRect(g.vx, g.vy, h.target);
-        if (inside && !h.prev) { notify('gaze:enter', { target: h.label }); h.fn(true); }
-        else if (!inside && h.prev) { notify('gaze:leave', { target: h.label }); h.fn(false); }
+        if (inside && !h.prev) {
+          notify('gaze:enter', { target: h.label });
+          h.fn(true);
+        } else if (!inside && h.prev) {
+          notify('gaze:leave', { target: h.label });
+          h.fn(false);
+        }
         h.prev = inside;
       }
     }
@@ -497,12 +623,17 @@ function _inRect(vx, vy, target) {
 
 function _ensureStarted() {
   if (_running) return;
-  if (!_cameraLeased && !_videoSource) { acquireCameraRunScoped(); _cameraLeased = true; }
+  if (!_cameraLeased && !_videoSource) {
+    acquireCameraRunScoped();
+    _cameraLeased = true;
+  }
   _running = true;
   if (_ready) {
     _loop();
   } else {
-    _init().then(() => { if (_running) _loop(); });
+    _init().then(() => {
+      if (_running) _loop();
+    });
   }
 }
 
@@ -521,7 +652,10 @@ export function stopVision() {
   _running = false;
   _cameraLeased = false; // allow re-acquire on next run
   _videoSource = null;
-  if (_rafId) { cancelAnimationFrame(_rafId); _rafId = null; }
+  if (_rafId) {
+    cancelAnimationFrame(_rafId);
+    _rafId = null;
+  }
   _cache.objects = [];
   _cache.hands = [];
   _cache.face = null;
@@ -540,13 +674,15 @@ export function stopVision() {
 
 // Grid of viewport target points for an N-point calibration.
 function _calibTargets(points) {
-  const mx = window.innerWidth * 0.1, my = window.innerHeight * 0.1;
-  const W = window.innerWidth - 2 * mx, H = window.innerHeight - 2 * my;
+  const mx = window.innerWidth * 0.1,
+    my = window.innerHeight * 0.1;
+  const W = window.innerWidth - 2 * mx,
+    H = window.innerHeight - 2 * my;
   const at = (fx, fy) => ({ x: mx + fx * W, y: my + fy * H });
-  if (points <= 5) return [at(.5,.5), at(0,0), at(1,0), at(0,1), at(1,1)];
-  const cols = points >= 13 ? [0,.25,.5,.75,1] : [0,.5,1];
+  if (points <= 5) return [at(0.5, 0.5), at(0, 0), at(1, 0), at(0, 1), at(1, 1)];
+  const cols = points >= 13 ? [0, 0.25, 0.5, 0.75, 1] : [0, 0.5, 1];
   const out = [];
-  for (const fy of [0,.5,1]) for (const fx of cols) out.push(at(fx, fy));
+  for (const fy of [0, 0.5, 1]) for (const fx of cols) out.push(at(fx, fy));
   return out;
 }
 
@@ -559,26 +695,45 @@ function _runCalibration({ points = 9, dwell = 1100, settle = 500 } = {}) {
   const overlay = document.createElement('div');
   overlay.className = 'ar-gaze-calib';
   Object.assign(overlay.style, {
-    position: 'fixed', inset: '0', zIndex: '99999', background: 'rgba(0,0,0,0.92)',
+    position: 'fixed',
+    inset: '0',
+    zIndex: '99999',
+    background: 'rgba(0,0,0,0.92)',
     cursor: 'none',
   });
   const dot = document.createElement('div');
   Object.assign(dot.style, {
-    position: 'fixed', width: '22px', height: '22px', marginLeft: '-11px', marginTop: '-11px',
-    borderRadius: '50%', background: '#0ff', boxShadow: '0 0 18px #0ff', transition: 'opacity .15s',
+    position: 'fixed',
+    width: '22px',
+    height: '22px',
+    marginLeft: '-11px',
+    marginTop: '-11px',
+    borderRadius: '50%',
+    background: '#0ff',
+    boxShadow: '0 0 18px #0ff',
+    transition: 'opacity .15s',
   });
   const hint = document.createElement('div');
   Object.assign(hint.style, {
-    position: 'fixed', left: '0', right: '0', bottom: '6%', textAlign: 'center',
-    color: '#8ff', font: '14px system-ui', opacity: '0.8',
+    position: 'fixed',
+    left: '0',
+    right: '0',
+    bottom: '6%',
+    textAlign: 'center',
+    color: '#8ff',
+    font: '14px system-ui',
+    opacity: '0.8',
   });
   hint.textContent = 'Follow the dot with your eyes — keep your head still';
   overlay.append(dot, hint);
   document.body.appendChild(overlay);
 
-  const feats = [], tgts = [];
+  const feats = [],
+    tgts = [];
   return new Promise((resolve) => {
-    let i = 0, phaseStart = performance.now(), sampling = false;
+    let i = 0,
+      phaseStart = performance.now(),
+      sampling = false;
     const place = () => {
       const t = targets[i];
       dot.style.left = t.x + 'px';
@@ -593,12 +748,20 @@ function _runCalibration({ points = 9, dwell = 1100, settle = 500 } = {}) {
       if (!sampling && el >= settle) sampling = true;
       if (sampling) {
         const f = _cache.gaze?._feat;
-        if (f) { feats.push(f); tgts.push([targets[i].x, targets[i].y]); }
+        if (f) {
+          feats.push(f);
+          tgts.push([targets[i].x, targets[i].y]);
+        }
       }
       if (el >= dwell) {
         i++;
-        if (i >= targets.length) { finish(); return; }
-        phaseStart = now; sampling = false; place();
+        if (i >= targets.length) {
+          finish();
+          return;
+        }
+        phaseStart = now;
+        sampling = false;
+        place();
       }
       requestAnimationFrame(step);
     };
@@ -609,7 +772,9 @@ function _runCalibration({ points = 9, dwell = 1100, settle = 500 } = {}) {
         const dev = _activeDeviceId();
         _calibDeviceId = dev;
         _calibMap[_calibKey(dev)] = { wX: [..._calib.wX], wY: [..._calib.wY] };
-        try { localStorage.setItem(GAZE_CALIB_KEY, JSON.stringify(_calibMap)); } catch {}
+        try {
+          localStorage.setItem(GAZE_CALIB_KEY, JSON.stringify(_calibMap));
+        } catch {}
         _gazeWarned = false;
         _removeGazeChip();
       }
@@ -629,15 +794,30 @@ function _ensureGazeChip() {
   chip.className = 'ar-gaze-chip';
   chip.textContent = '🎯 Calibrate gaze';
   Object.assign(chip.style, {
-    position: 'fixed', right: '14px', bottom: '14px', zIndex: '9998',
-    padding: '7px 12px', borderRadius: '14px', border: '1px solid #0ff8',
-    background: '#012', color: '#8ff', font: '13px system-ui', cursor: 'pointer',
+    position: 'fixed',
+    right: '14px',
+    bottom: '14px',
+    zIndex: '9998',
+    padding: '7px 12px',
+    borderRadius: '14px',
+    border: '1px solid #0ff8',
+    background: '#012',
+    color: '#8ff',
+    font: '13px system-ui',
+    cursor: 'pointer',
   });
-  chip.onclick = async () => { chip.disabled = true; await _runCalibration(); _removeGazeChip(); };
+  chip.onclick = async () => {
+    chip.disabled = true;
+    await _runCalibration();
+    _removeGazeChip();
+  };
   _gazeChip = chip;
   document.body.appendChild(chip);
 }
-function _removeGazeChip() { _gazeChip?.remove(); _gazeChip = null; }
+function _removeGazeChip() {
+  _gazeChip?.remove();
+  _gazeChip = null;
+}
 
 export const vision = {
   configure(opts = {}) {
@@ -664,29 +844,53 @@ export const vision = {
     return this;
   },
 
-  objects() { _ensureStarted(); return _cache.objects; },
+  objects() {
+    _ensureStarted();
+    return _cache.objects;
+  },
   nearest(label) {
     _ensureStarted();
     const list = label ? _cache.objects.filter((o) => o.label === label) : _cache.objects;
     if (!list.length) return null;
     return list.reduce((best, o) => (o.confidence > best.confidence ? o : best));
   },
-  all(label)   { _ensureStarted(); return _cache.objects.filter((o) => o.label === label); },
-  count(label) { _ensureStarted(); return _cache.objects.filter((o) => o.label === label).length; },
-  any(label)   { _ensureStarted(); return _cache.objects.some((o) => o.label === label); },
+  all(label) {
+    _ensureStarted();
+    return _cache.objects.filter((o) => o.label === label);
+  },
+  count(label) {
+    _ensureStarted();
+    return _cache.objects.filter((o) => o.label === label).length;
+  },
+  any(label) {
+    _ensureStarted();
+    return _cache.objects.some((o) => o.label === label);
+  },
 
-  hands()    { _ensureStarted(); return _cache.hands; },
-  gesture()  {
+  hands() {
+    _ensureStarted();
+    return _cache.hands;
+  },
+  gesture() {
     _ensureStarted();
     if (!_cache.hands.length) return null;
     const g = _cache.hands[0].gesture;
-    return g === "None" ? null : g;
+    return g === 'None' ? null : g;
   },
 
-  face()       { _ensureStarted(); return _cache.face; },
-  expression() { _ensureStarted(); return _cache.face?.expression ?? null; },
+  face() {
+    _ensureStarted();
+    return _cache.face;
+  },
+  expression() {
+    _ensureStarted();
+    return _cache.face?.expression ?? null;
+  },
 
-  pose() { _ensurePoseStarted(); return _cache.pose; },
+  pose() {
+    _ensurePoseStarted();
+    return _cache.pose;
+  },
 
   // ── Gaze (ADR 034) ─────────────────────────────────────────────────────────
   gaze() {
@@ -706,10 +910,14 @@ export const vision = {
     return { x: g.vx - b.left, y: g.vy - b.top };
   },
 
-  get calibrated() { return !!_calib; },
+  get calibrated() {
+    return !!_calib;
+  },
 
   // Run an interactive calibration pass. Resolves to true if calibration succeeded.
-  calibrate(opts) { return _runCalibration(opts); },
+  calibrate(opts) {
+    return _runCalibration(opts);
+  },
 
   // Polymorphic: a direction string ('left'/'right'/'up'/'down'/'center') registers a
   // calibration-free handler; an element or {x,y,w,h} viewport rect registers a region
@@ -725,8 +933,16 @@ export const vision = {
     }
     return this;
   },
-  onBlink(fn) { _ensureStarted(); _blinkHandlers.push({ fn, prev: false }); return this; },
-  onWink(eye, fn) { _ensureStarted(); _winkHandlers.push({ eye, fn, prev: false }); return this; },
+  onBlink(fn) {
+    _ensureStarted();
+    _blinkHandlers.push({ fn, prev: false });
+    return this;
+  },
+  onWink(eye, fn) {
+    _ensureStarted();
+    _winkHandlers.push({ eye, fn, prev: false });
+    return this;
+  },
 
   onGesture(gesture, fn) {
     _ensureStarted();
@@ -739,7 +955,10 @@ export const vision = {
     return this;
   },
 
-  drawBoxes(ctx, { color = 'lime', font = '14px sans-serif', lineWidth = 2, mirror = 'auto' } = {}) {
+  drawBoxes(
+    ctx,
+    { color = 'lime', font = '14px sans-serif', lineWidth = 2, mirror = 'auto' } = {},
+  ) {
     _ensureStarted();
     if (!ctx) ctx = _defaultCtx();
     if (!ctx) return;
@@ -753,7 +972,10 @@ export const vision = {
     for (const obj of _cache.objects) {
       const { bbox } = obj;
       if (!bbox) continue;
-      const x = bbox.x * cw, y = bbox.y * ch, w = bbox.width * cw, h = bbox.height * ch;
+      const x = bbox.x * cw,
+        y = bbox.y * ch,
+        w = bbox.width * cw,
+        h = bbox.height * ch;
       ctx.strokeRect(x, y, w, h);
       ctx.fillText(`${obj.label} ${(obj.confidence * 100).toFixed(0)}%`, x + 2, y - 4);
     }
@@ -804,7 +1026,10 @@ export const vision = {
     ctx.restore();
   },
 
-  drawPose(ctx, { color = 'magenta', lineWidth = 2, pointSize = 4, minVisibility = 0.5, mirror = 'auto' } = {}) {
+  drawPose(
+    ctx,
+    { color = 'magenta', lineWidth = 2, pointSize = 4, minVisibility = 0.5, mirror = 'auto' } = {},
+  ) {
     _ensurePoseStarted();
     if (!ctx) ctx = _defaultCtx();
     if (!ctx || !_cache.pose) return;
@@ -816,7 +1041,8 @@ export const vision = {
     ctx.fillStyle = color;
     ctx.lineWidth = lineWidth;
     for (const [a, b] of POSE_CONNECTIONS) {
-      if ((lm[a].visibility ?? 1) < minVisibility || (lm[b].visibility ?? 1) < minVisibility) continue;
+      if ((lm[a].visibility ?? 1) < minVisibility || (lm[b].visibility ?? 1) < minVisibility)
+        continue;
       ctx.beginPath();
       ctx.moveTo(lm[a].x * cw, lm[a].y * ch);
       ctx.lineTo(lm[b].x * cw, lm[b].y * ch);

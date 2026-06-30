@@ -46,7 +46,7 @@ function fakePort(readableChunks = []) {
 
 // ── Bus / module access (reset per describe block) ────────────────────────────
 
-let emit, notify, subscribe, clearRunScoped;
+let emit, subscribe, clearRunScoped;
 
 // ── serial:connect / serial:status ────────────────────────────────────────────
 
@@ -60,7 +60,7 @@ describe('serial:connect / serial:status', () => {
       value: { requestPort: vi.fn(() => Promise.resolve(port)) },
       configurable: true, writable: true,
     });
-    ({ emit, notify, subscribe, clearRunScoped } = await import('../src/events/bus.js'));
+    ({ emit, subscribe, clearRunScoped } = await import('../src/events/bus.js'));
     await import('../src/api/serial.js');
   });
 
@@ -116,7 +116,7 @@ describe('sensor:serial:data and gpio:pin — text mode', () => {
       value: { requestPort: vi.fn(() => Promise.resolve(port)) },
       configurable: true, writable: true,
     });
-    ({ emit, notify, subscribe, clearRunScoped } = await import('../src/events/bus.js'));
+    ({ emit, subscribe, clearRunScoped } = await import('../src/events/bus.js'));
     await import('../src/api/serial.js');
   });
 
@@ -151,7 +151,7 @@ describe('sensor:serial:data and gpio:pin — text mode', () => {
       value: { requestPort: vi.fn(() => Promise.resolve(badPort)) },
       configurable: true, writable: true,
     });
-    ({ emit, notify, subscribe } = await import('../src/events/bus.js'));
+    ({ emit, subscribe } = await import('../src/events/bus.js'));
     await import('../src/api/serial.js');
 
     const dataFn = vi.fn();
@@ -181,7 +181,7 @@ describe('custom parse', () => {
       value: { requestPort: vi.fn(() => Promise.resolve(port)) },
       configurable: true, writable: true,
     });
-    ({ emit, notify, subscribe } = await import('../src/events/bus.js'));
+    ({ emit, subscribe } = await import('../src/events/bus.js'));
     await import('../src/api/serial.js');
   });
 
@@ -228,7 +228,7 @@ describe('gpio:write and serial:write', () => {
       value: { requestPort: vi.fn(() => Promise.resolve(port)) },
       configurable: true, writable: true,
     });
-    ({ emit, notify, subscribe } = await import('../src/events/bus.js'));
+    ({ emit, subscribe } = await import('../src/events/bus.js'));
     await import('../src/api/serial.js');
   });
 
@@ -273,7 +273,7 @@ describe('port survives reset', () => {
       value: { requestPort: vi.fn(() => Promise.resolve(port)) },
       configurable: true, writable: true,
     });
-    ({ emit, notify, subscribe, clearRunScoped } = await import('../src/events/bus.js'));
+    ({ emit, subscribe, clearRunScoped } = await import('../src/events/bus.js'));
     await import('../src/api/serial.js');
   });
 

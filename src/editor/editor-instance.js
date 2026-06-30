@@ -1,23 +1,60 @@
-import { EditorView, keymap, lineNumbers, highlightActiveLine, drawSelection, dropCursor } from '@codemirror/view';
+import {
+  EditorView,
+  keymap,
+  lineNumbers,
+  highlightActiveLine,
+  drawSelection,
+  dropCursor,
+} from '@codemirror/view';
 import { EditorState, StateEffect, StateField, RangeSetBuilder } from '@codemirror/state';
 import { Decoration } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
 import { javascript, javascriptLanguage } from '@codemirror/lang-javascript';
-import { bracketMatching, foldGutter, codeFolding, foldKeymap, indentOnInput, foldCode, syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
-import { closeBrackets, closeBracketsKeymap, autocompletion, completionKeymap } from '@codemirror/autocomplete';
+import {
+  bracketMatching,
+  foldGutter,
+  codeFolding,
+  foldKeymap,
+  indentOnInput,
+  foldCode,
+  syntaxHighlighting,
+  defaultHighlightStyle,
+} from '@codemirror/language';
+import {
+  closeBrackets,
+  closeBracketsKeymap,
+  autocompletion,
+  completionKeymap,
+} from '@codemirror/autocomplete';
 import { highlightSelectionMatches } from '@codemirror/search';
 import { linter, lintGutter } from '@codemirror/lint';
 import esprima from 'esprima';
-import { transformCode, makeLoopProtectionVisitor, makeTraceVisitor, friendlyError, extractScriptLine } from './live-patch.js';
+import {
+  transformCode,
+  makeLoopProtectionVisitor,
+  makeTraceVisitor,
+  friendlyError,
+  extractScriptLine,
+} from './live-patch.js';
 import { detectAPIUsage } from './api-detector.js';
 import { _beginRun, _endRun } from '../runtime/api-registry.js';
-import { initInlineWidgets, inlineWidgetsExtension, toggleInlayHintsEffect, inlayHintsEnabledField } from './inline-widgets.js';
+import {
+  initInlineWidgets,
+  inlineWidgetsExtension,
+  toggleInlayHintsEffect,
+  inlayHintsEnabledField,
+} from './inline-widgets.js';
 import { searchMarksField, initSearch } from './cm-search.js';
 import { paramHintsExtension } from './param-hints.js';
 import { windowMemberCompletionSource } from './completions.js';
 import { shaderSignalPickerExtension } from './shader-signal-picker.js';
 import { startAudio } from '../api/audio.js';
-import { addEditorIcon, removeEditorIcon, updateEditorIconLabel, duplicateEditor } from '../api/desktop-files.js';
+import {
+  addEditorIcon,
+  removeEditorIcon,
+  updateEditorIconLabel,
+  duplicateEditor,
+} from '../api/desktop-files.js';
 // Per-subsystem cleanups are no longer imported here — each module self-registers
 // via onReset() and runResetHandlers() runs them all on reset (ADR 008).
 import { runResetHandlers } from '../runtime/reset-registry.js';
@@ -25,8 +62,12 @@ import { emit, clearRunScoped } from '../events/index.js';
 import { eventCompletionSource } from './event-completion.js';
 import { PauseController } from '../runtime/pause-controller.js';
 import {
-  initBlockly, getWorkspaceCode, resizeBlockly, workspaceIsEmpty,
-  loadWorkspaceJSON, registerSidebarDeleteZone,
+  initBlockly,
+  getWorkspaceCode,
+  resizeBlockly,
+  workspaceIsEmpty,
+  loadWorkspaceJSON,
+  registerSidebarDeleteZone,
 } from '../blocks/blocks.js';
 import { jsToBlocks } from '../blocks/js-to-blocks.js';
 
@@ -57,19 +98,18 @@ function _jsLinterSource(view) {
   if (!err) return [];
   // esprima error has .lineNumber, .column, .description, .index
   const from = err.index ?? 0;
-  const to   = Math.min(from + 1, view.state.doc.length);
-  return [{
-    from,
-    to,
-    severity: 'error',
-    message: err.description ?? err.message ?? 'Syntax error',
-  }];
+  const to = Math.min(from + 1, view.state.doc.length);
+  return [
+    {
+      from,
+      to,
+      severity: 'error',
+      message: err.description ?? err.message ?? 'Syntax error',
+    },
+  ];
 }
 
-const jsLinterExtension = [
-  lintGutter(),
-  linter(_jsLinterSource, { delay: 400 }),
-];
+const jsLinterExtension = [lintGutter(), linter(_jsLinterSource, { delay: 400 })];
 
 // ── Error line decoration ─────────────────────────────────────────────────────
 
@@ -93,7 +133,7 @@ const errorLineField = StateField.define({
     }
     return decos;
   },
-  provide: f => EditorView.decorations.from(f),
+  provide: (f) => EditorView.decorations.from(f),
 });
 
 // ── Execution Trail decorations ───────────────────────────────────────────────
@@ -106,7 +146,10 @@ const traceLineField = StateField.define({
     decos = decos.map(tr.changes);
     for (const e of tr.effects) {
       if (!e.is(setTraceLinesEffect)) continue;
-      if (e.value === null) { decos = Decoration.none; continue; }
+      if (e.value === null) {
+        decos = Decoration.none;
+        continue;
+      }
       const builder = new RangeSetBuilder();
       const lines = [...e.value].sort((a, b) => a - b);
       for (const ln of lines) {
@@ -118,7 +161,7 @@ const traceLineField = StateField.define({
     }
     return decos;
   },
-  provide: f => EditorView.decorations.from(f),
+  provide: (f) => EditorView.decorations.from(f),
 });
 
 // Number of lines the execute() preamble adds before user code (1-based offset).
@@ -137,21 +180,44 @@ const PREAMBLE_LINES = 10;
 const PER_EDITOR_LOCALS = [
   // ADR 040: global `draw` / getCanvas / getLayer / getDraw deleted. The sole 2D
   // surface is `new Canvas()` (window.Canvas), which owns its window + layer stack.
-  ['setInterval',   (i) => (cb, delay, ...args) => {
-    const id = i._native.setInterval(cb, delay, ...args);
-    i._intervals.set(id, { cb, delay, args });
-    return id;
-  }],
-  ['clearInterval', (i) => (id) => { i._intervals.delete(id); i._native.clearInterval(id); }],
-  ['setTimeout',    (i) => (cb, delay = 0, ...args) => {
-    let tid;
-    const wrapped = (...a) => { i._timeouts.delete(tid); cb(...a); };
-    tid = i._native.setTimeout(wrapped, delay, ...args);
-    i._timeouts.set(tid, { cb, delay, createdAt: Date.now(), args });
-    return tid;
-  }],
-  ['clearTimeout',  (i) => (tid) => { i._timeouts.delete(tid); i._native.clearTimeout(tid); }],
-  ['console',       (i) => _makeEditorConsole(i)],
+  [
+    'setInterval',
+    (i) =>
+      (cb, delay, ...args) => {
+        const id = i._native.setInterval(cb, delay, ...args);
+        i._intervals.set(id, { cb, delay, args });
+        return id;
+      },
+  ],
+  [
+    'clearInterval',
+    (i) => (id) => {
+      i._intervals.delete(id);
+      i._native.clearInterval(id);
+    },
+  ],
+  [
+    'setTimeout',
+    (i) =>
+      (cb, delay = 0, ...args) => {
+        let tid;
+        const wrapped = (...a) => {
+          i._timeouts.delete(tid);
+          cb(...a);
+        };
+        tid = i._native.setTimeout(wrapped, delay, ...args);
+        i._timeouts.set(tid, { cb, delay, createdAt: Date.now(), args });
+        return tid;
+      },
+  ],
+  [
+    'clearTimeout',
+    (i) => (tid) => {
+      i._timeouts.delete(tid);
+      i._native.clearTimeout(tid);
+    },
+  ],
+  ['console', (i) => _makeEditorConsole(i)],
 ];
 
 // Per-editor console: routes user console.* to the instance's embedded console
@@ -162,17 +228,27 @@ function _makeEditorConsole(self) {
   return {
     log: (...args) => {
       _log(...args);
-      const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)).join(' ');
+      const msg = args
+        .map((a) => (typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)))
+        .join(' ');
       if (!_isMediaPipeLog(msg)) self._appendConsole(msg);
     },
     error: (...args) => {
       _error(...args);
-      const msg = args.map(a => a instanceof Error ? a.message : (typeof a === 'object' && a !== null ? JSON.stringify(a, null, 2) : String(a))).join(' ');
+      const msg = args
+        .map((a) =>
+          a instanceof Error
+            ? a.message
+            : typeof a === 'object' && a !== null
+              ? JSON.stringify(a, null, 2)
+              : String(a),
+        )
+        .join(' ');
       if (!_isMediaPipeLog(msg)) self._appendConsole(`<span class="ar-console-err">${msg}</span>`);
     },
     warn: (...args) => {
       _log(...args);
-      const msg = args.map(a => String(a)).join(' ');
+      const msg = args.map((a) => String(a)).join(' ');
       self._appendConsole(`<span class="ar-console-warn">${msg}</span>`);
     },
     clear: () => self.clearConsole(),
@@ -194,13 +270,13 @@ export function editorPreamble(id) {
   return [...windowed, ...control].join('\n');
 }
 
-const STORAGE_PREFIX      = 'vl-ide-code-';
-const EXEC_STATE_PREFIX   = 'vl-ide-exec-';
-const TITLE_PREFIX        = 'vl-ide-title-';
+const STORAGE_PREFIX = 'vl-ide-code-';
+const EXEC_STATE_PREFIX = 'vl-ide-exec-';
+const TITLE_PREFIX = 'vl-ide-title-';
 const LEGACY_KEY = 'vl-ide-code';
 
 const ICONS = {
-  play:  '<i class="fa-solid fa-play"></i>',
+  play: '<i class="fa-solid fa-play"></i>',
   pause: '<i class="fa-solid fa-pause"></i>',
   reset: '<i class="fa-solid fa-rotate-left"></i>',
 };
@@ -231,10 +307,10 @@ export class EditorInstance {
     // trackedSetters resolves the namespaced setters at resume time so restored
     // timers re-register in this._intervals/_timeouts.
     this._pause = new PauseController({
-      intervals:     this._intervals,
-      timeouts:      this._timeouts,
+      intervals: this._intervals,
+      timeouts: this._timeouts,
       clearInterval: this._native.clearInterval,
-      clearTimeout:  this._native.clearTimeout,
+      clearTimeout: this._native.clearTimeout,
       trackedSetters: () => {
         const ns = `__ar_e${this.id}`;
         return { setInterval: window[`${ns}_setInterval`], setTimeout: window[`${ns}_setTimeout`] };
@@ -427,7 +503,14 @@ export class EditorInstance {
             ...foldKeymap,
             indentWithTab,
             { key: 'Ctrl-q', run: foldCode },
-            { key: 'Mod-f', run: () => { _openSearch?.(); return true; }, preventDefault: true },
+            {
+              key: 'Mod-f',
+              run: () => {
+                _openSearch?.();
+                return true;
+              },
+              preventDefault: true,
+            },
           ]),
         ],
       }),
@@ -448,8 +531,10 @@ export class EditorInstance {
     this.cm.dom.addEventListener('drop', (e) => {
       const code = e.dataTransfer.getData('application/x-ar-toolkit');
       if (!code) return;
-      e.preventDefault(); e.stopPropagation();
-      const offset = this.cm.posAtCoords({ x: e.clientX, y: e.clientY }) ?? this.cm.state.doc.length;
+      e.preventDefault();
+      e.stopPropagation();
+      const offset =
+        this.cm.posAtCoords({ x: e.clientX, y: e.clientY }) ?? this.cm.state.doc.length;
       const insertText = code + '\n';
       this.cm.focus();
       this.cm.dispatch({
@@ -468,7 +553,8 @@ export class EditorInstance {
     this.blocksArea.addEventListener('drop', (e) => {
       const type = e.dataTransfer.getData('application/x-ar-block-type');
       if (!type || !this.blocklyWorkspace) return;
-      e.preventDefault(); e.stopPropagation();
+      e.preventDefault();
+      e.stopPropagation();
       this._addBlockToWorkspace(type, e.clientX, e.clientY);
     });
 
@@ -498,10 +584,16 @@ export class EditorInstance {
     modeToggle.appendChild(this._blocksBtn);
 
     this._textBtn.addEventListener('click', () => {
-      if (this.blocksMode) { this._closeBlocks(); localStorage.setItem(`vl-blocks-open-${this.id}`, '0'); }
+      if (this.blocksMode) {
+        this._closeBlocks();
+        localStorage.setItem(`vl-blocks-open-${this.id}`, '0');
+      }
     });
     this._blocksBtn.addEventListener('click', () => {
-      if (!this.blocksMode) { this._openBlocks(); localStorage.setItem(`vl-blocks-open-${this.id}`, '1'); }
+      if (!this.blocksMode) {
+        this._openBlocks();
+        localStorage.setItem(`vl-blocks-open-${this.id}`, '1');
+      }
     });
 
     // Execute button
@@ -525,7 +617,6 @@ export class EditorInstance {
     this.stopBtn.addEventListener('click', () => {
       if (this.btnState === 'running' || this.btnState === 'paused') this.stopRunning();
     });
-
 
     // Console toggle
     this.consoleToggleBtn = document.createElement('button');
@@ -578,7 +669,7 @@ export class EditorInstance {
     if (!container) return;
     const cr = container.getBoundingClientRect();
     const or = opt.getBoundingClientRect();
-    this._modeThumb.style.left = (or.left - cr.left) + 'px';
+    this._modeThumb.style.left = or.left - cr.left + 'px';
     this._modeThumb.style.width = or.width + 'px';
   }
 
@@ -587,7 +678,8 @@ export class EditorInstance {
   _buildWindows() {
     // Editor window — reasonable default size for code sketching
     const desk = document.getElementById('desktop');
-    const dw = desk?.offsetWidth ?? 1280, dh = desk?.offsetHeight ?? 720;
+    const dw = desk?.offsetWidth ?? 1280,
+      dh = desk?.offsetHeight ?? 720;
     const ew = Math.round(Math.min(660, dw * 0.5));
     const eh = Math.round(Math.min(560, dh * 0.8));
     this._wm.spawn(this.title, { id: this.editorWinId, type: 'html', html: '', w: ew, h: eh });
@@ -595,7 +687,10 @@ export class EditorInstance {
     const editorBody = editorWin.querySelector('.wm-body');
     editorBody.style.overflow = 'hidden';
     editorBody.appendChild(this.editorColumn);
-    editorWin.querySelector('.wm-dup')?.addEventListener('click', e => { e.stopPropagation(); duplicateEditor(this.id); });
+    editorWin.querySelector('.wm-dup')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      duplicateEditor(this.id);
+    });
 
     // Replace full audio controls with mute-only button for Blockly sounds
     editorWin.querySelector('.wm-audio-ctrl')?.remove();
@@ -607,7 +702,7 @@ export class EditorInstance {
     muteBtn.title = 'Mute blocks sounds';
     muteBtn.innerHTML = '<i class="fa-solid fa-volume-high"></i>';
     let _blocksMuted = false;
-    muteBtn.addEventListener('click', e => {
+    muteBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       _blocksMuted = !_blocksMuted;
       muteBtn.innerHTML = _blocksMuted
@@ -630,9 +725,11 @@ export class EditorInstance {
         this.reset();
         this._setIdle();
       }
-      const hasContent = this._everHadContent ||
+      const hasContent =
+        this._everHadContent ||
         this.cm.state.doc.toString().trim().length > 0 ||
-        (this.blocksMode && this.blocklyWorkspace &&
+        (this.blocksMode &&
+          this.blocklyWorkspace &&
           this.blocklyWorkspace.getAllBlocks(false).length > 0);
       if (!hasContent && this.id !== 1) {
         // Never had content and not the primary editor → clean up completely
@@ -643,7 +740,9 @@ export class EditorInstance {
     };
     editorWin._wmOnTitleChange = (newTitle) => {
       this.title = newTitle;
-      try { localStorage.setItem(TITLE_PREFIX + this.id, newTitle); } catch (_) {}
+      try {
+        localStorage.setItem(TITLE_PREFIX + this.id, newTitle);
+      } catch (_) {}
       const ownTitle = editorWin.querySelector('.wm-title');
       if (ownTitle && ownTitle.textContent !== newTitle) ownTitle.textContent = newTitle;
       updateEditorIconLabel(this.id, newTitle);
@@ -656,7 +755,6 @@ export class EditorInstance {
       if (this.blocklyWorkspace && this.blocksArea.style.display !== 'none')
         resizeBlockly(this.blocklyWorkspace);
     }).observe(editorWin);
-
   }
 
   // ── Globals injected into IIFE ─────────────────────────────────────────────
@@ -701,7 +799,10 @@ export class EditorInstance {
   }
 
   _clearTrace() {
-    if (this._traceRAF !== null) { cancelAnimationFrame(this._traceRAF); this._traceRAF = null; }
+    if (this._traceRAF !== null) {
+      cancelAnimationFrame(this._traceRAF);
+      this._traceRAF = null;
+    }
     for (const tid of this._traceActive.values()) this._native.clearTimeout(tid);
     this._traceActive.clear();
     this._traceDirty.clear();
@@ -734,13 +835,22 @@ export class EditorInstance {
   _popoutConsole() {
     const floatId = `win-console-${this.id}`;
     // Already popped out — focus it
-    if (document.getElementById(floatId)) { this._wm.focus(floatId); return; }
+    if (document.getElementById(floatId)) {
+      this._wm.focus(floatId);
+      return;
+    }
 
     // Hide inline panel, move consoleEl into float window
     this.consolePanel.style.display = 'none';
     this.consoleToggleBtn.classList.remove('ar-btn-active');
 
-    this._wm.spawn(`${this.title} — Console`, { id: floatId, type: 'html', html: '', w: 480, h: 240 });
+    this._wm.spawn(`${this.title} — Console`, {
+      id: floatId,
+      type: 'html',
+      html: '',
+      w: 480,
+      h: 240,
+    });
     const floatWin = document.getElementById(floatId);
     const body = floatWin.querySelector('.wm-body');
     body.style.cssText += 'padding:0;overflow:hidden;';
@@ -763,13 +873,20 @@ export class EditorInstance {
     if (!this.blocklyWorkspace) return;
     const ws = this.blocklyWorkspace;
     const block = ws.newBlock(type);
-    block.initSvg(); block.render();
+    block.initSvg();
+    block.render();
     const injectDiv = ws.getInjectionDiv();
     if (clientX != null) {
       const rect = injectDiv.getBoundingClientRect();
-      block.moveTo({ x: (clientX - rect.left - ws.scrollX) / ws.scale, y: (clientY - rect.top - ws.scrollY) / ws.scale });
+      block.moveTo({
+        x: (clientX - rect.left - ws.scrollX) / ws.scale,
+        y: (clientY - rect.top - ws.scrollY) / ws.scale,
+      });
     } else {
-      block.moveTo({ x: (-ws.scrollX + injectDiv.offsetWidth / 2) / ws.scale, y: (-ws.scrollY + injectDiv.offsetHeight / 2) / ws.scale });
+      block.moveTo({
+        x: (-ws.scrollX + injectDiv.offsetWidth / 2) / ws.scale,
+        y: (-ws.scrollY + injectDiv.offsetHeight / 2) / ws.scale,
+      });
     }
   }
 
@@ -787,9 +904,11 @@ export class EditorInstance {
       this.blocklyWorkspace = initBlockly(this.blocksDiv);
       const toolkitWin = document.getElementById(this._toolkitWinId);
       if (toolkitWin) registerSidebarDeleteZone(this.blocklyWorkspace, toolkitWin);
-      this.blocklyWorkspace.getAudioManager().setMuted(
-        this._blocksMuteCtrl?.querySelector('button')?.classList.contains('muted') ?? false
-      );
+      this.blocklyWorkspace
+        .getAudioManager()
+        .setMuted(
+          this._blocksMuteCtrl?.querySelector('button')?.classList.contains('muted') ?? false,
+        );
     }
 
     if (this._blocksMuteCtrl) this._blocksMuteCtrl.style.display = '';
@@ -798,7 +917,9 @@ export class EditorInstance {
       try {
         const json = jsToBlocks(this.cm.state.doc.toString());
         if (json) loadWorkspaceJSON(this.blocklyWorkspace, json);
-      } catch (e) { console.error('[blocks] js→blocks conversion failed:', e); }
+      } catch (e) {
+        console.error('[blocks] js→blocks conversion failed:', e);
+      }
     }
     resizeBlockly(this.blocklyWorkspace);
   }
@@ -810,7 +931,9 @@ export class EditorInstance {
 
   _closeBlocks() {
     if (this.blocklyWorkspace) {
-      const code = workspaceIsEmpty(this.blocklyWorkspace) ? '' : getWorkspaceCode(this.blocklyWorkspace);
+      const code = workspaceIsEmpty(this.blocklyWorkspace)
+        ? ''
+        : getWorkspaceCode(this.blocklyWorkspace);
       this.cm.dispatch({
         changes: { from: 0, to: this.cm.state.doc.length, insert: code },
         selection: { anchor: 0 },
@@ -832,7 +955,9 @@ export class EditorInstance {
   // ── Execution state machine ────────────────────────────────────────────────
 
   _saveExecState(state) {
-    try { localStorage.setItem(EXEC_STATE_PREFIX + this.id, state); } catch (_) {}
+    try {
+      localStorage.setItem(EXEC_STATE_PREFIX + this.id, state);
+    } catch (_) {}
   }
 
   _setIdle() {
@@ -876,14 +1001,21 @@ export class EditorInstance {
           effects: setErrorLineEffect.of(userLine),
           selection: { anchor: this.cm.state.doc.line(userLine).from },
         });
-        this.cm.dispatch({ effects: EditorView.scrollIntoView(this.cm.state.doc.line(userLine).from, { y: 'center' }) });
+        this.cm.dispatch({
+          effects: EditorView.scrollIntoView(this.cm.state.doc.line(userLine).from, {
+            y: 'center',
+          }),
+        });
       }
     }
   }
 
   _setStopped() {
-    this._clearTrace();   // every stop path converges here (manual stop, error, idle auto-stop) — kill stale execution-trail glow
-    if (this.idleWatcher) { this._native.clearInterval(this.idleWatcher); this.idleWatcher = null; }
+    this._clearTrace(); // every stop path converges here (manual stop, error, idle auto-stop) — kill stale execution-trail glow
+    if (this.idleWatcher) {
+      this._native.clearInterval(this.idleWatcher);
+      this.idleWatcher = null;
+    }
     const isPopped = !!document.getElementById(`win-console-${this.id}`);
     if (!isPopped) {
       this.consolePanel.style.display = 'none';
@@ -923,8 +1055,12 @@ export class EditorInstance {
 
   _startIdleWatcher() {
     this.idleWatcher = this._native.setInterval(() => {
-      if (this.btnState !== 'running') { this._native.clearInterval(this.idleWatcher); this.idleWatcher = null; return; }
-      if (!this._isLive()) this.stopRunning();   // tear down orphaned drivers, not just the UI
+      if (this.btnState !== 'running') {
+        this._native.clearInterval(this.idleWatcher);
+        this.idleWatcher = null;
+        return;
+      }
+      if (!this._isLive()) this.stopRunning(); // tear down orphaned drivers, not just the UI
     }, 300);
   }
 
@@ -936,15 +1072,19 @@ export class EditorInstance {
     this._intervals.clear();
     this._timeouts.clear();
     this._listeners.forEach(({ target, type, handler, options }) =>
-      target?.removeEventListener(type, handler, options));
+      target?.removeEventListener(type, handler, options),
+    );
     this._listeners = [];
-    runResetHandlers(this.id, false);   // hard reset/stop — tear everything down (Canvas windows too)
+    runResetHandlers(this.id, false); // hard reset/stop — tear everything down (Canvas windows too)
     this._pause.clear();
-    this._setStopped();                 // _setStopped() clears the execution trail
+    this._setStopped(); // _setStopped() clears the execution trail
   }
 
   pauseRunning() {
-    if (this.idleWatcher) { this._native.clearInterval(this.idleWatcher); this.idleWatcher = null; }
+    if (this.idleWatcher) {
+      this._native.clearInterval(this.idleWatcher);
+      this.idleWatcher = null;
+    }
     this._pause.pause();
     window.__ar_paused = true;
     this._setPaused();
@@ -963,31 +1103,40 @@ export class EditorInstance {
     _endRun(); // restore any registerAPI() overrides made during this run
     this.cm.dispatch({ effects: setErrorLineEffect.of(null) });
     this._clearTrace();
-    window.__ar_paused    = false;
+    window.__ar_paused = false;
     window.__ar_usesAudio = undefined;
     this._pause.clear();
     this._listeners.forEach(({ target, type, handler, options }) =>
-      target?.removeEventListener(type, handler, options));
+      target?.removeEventListener(type, handler, options),
+    );
     this._listeners = [];
     for (const id of this._intervals.keys()) this._native.clearInterval(id);
     for (const id of this._timeouts.keys()) this._native.clearTimeout(id);
     this._intervals.clear();
     this._timeouts.clear();
-    runResetHandlers(this.id, soft);   // every subsystem's cleanup, registered via onReset (ADR 008) — scoped to this editor; soft → Canvas windows survive
+    runResetHandlers(this.id, soft); // every subsystem's cleanup, registered via onReset (ADR 008) — scoped to this editor; soft → Canvas windows survive
     if (!soft) {
       this._keepAlive = new Set();
       this._hadOutput = false;
       window.__ar_keepAlive = this._keepAlive;
     }
-    if (this.currentScript) { document.body.removeChild(this.currentScript); this.currentScript = null; }
-    if (this.idleWatcher) { this._native.clearInterval(this.idleWatcher); }
+    if (this.currentScript) {
+      document.body.removeChild(this.currentScript);
+      this.currentScript = null;
+    }
+    if (this.idleWatcher) {
+      this._native.clearInterval(this.idleWatcher);
+    }
     this.idleWatcher = null;
     this._setIdle();
   }
 
   execute({ soft = false } = {}) {
-    const blocksActive = this.blocksMode && this.blocklyWorkspace && !workspaceIsEmpty(this.blocklyWorkspace);
-    const raw = blocksActive ? getWorkspaceCode(this.blocklyWorkspace) : this.cm.state.doc.toString();
+    const blocksActive =
+      this.blocksMode && this.blocklyWorkspace && !workspaceIsEmpty(this.blocklyWorkspace);
+    const raw = blocksActive
+      ? getWorkspaceCode(this.blocklyWorkspace)
+      : this.cm.state.doc.toString();
 
     // Camera/mic are demand-driven (ADR 023): consumers acquire leases when called,
     // so no pre-run regex checks needed.
@@ -1002,9 +1151,9 @@ export class EditorInstance {
     // visual output comes from `new Canvas()` / `.show()`, which spawn their own.
     const _apiHints = detectAPIUsage(raw);
 
-    window.__ar_usesAudio  = _apiHints.usesAudio;
+    window.__ar_usesAudio = _apiHints.usesAudio;
     window.__ar_audioReady = _apiHints.usesAudio ? startAudio() : Promise.resolve();
-    if (_apiHints.usesAudio) this._wm.ensureAudioChip?.();   // master audio control in taskbar (ADR 040)
+    if (_apiHints.usesAudio) this._wm.ensureAudioChip?.(); // master audio control in taskbar (ADR 040)
     if (!soft) {
       this._keepAlive = new Set();
       this._hadOutput = false;
@@ -1021,7 +1170,9 @@ export class EditorInstance {
       const visitors = [makeLoopProtectionVisitor()];
       if (this._traceEnabled) visitors.push(makeTraceVisitor(this.id));
       protected_code = transformCode(raw, visitors);
-    } catch (_) { protected_code = raw; }
+    } catch (_) {
+      protected_code = raw;
+    }
 
     const ns = `__ar_e${this.id}`;
     const preamble = editorPreamble(this.id);
@@ -1035,7 +1186,11 @@ export class EditorInstance {
 
     this._setRunning();
     const script = document.createElement('script');
-    try { script.appendChild(document.createTextNode(code)); } catch (e) { script.text = code; }
+    try {
+      script.appendChild(document.createTextNode(code));
+    } catch {
+      script.text = code;
+    }
     document.body.appendChild(script);
     this.currentScript = script;
     this._startIdleWatcher();
@@ -1048,18 +1203,31 @@ export class EditorInstance {
     removeEditorIcon(this.id);
 
     EditorInstance.removeFromManifest(this.id);
-    try { localStorage.removeItem(STORAGE_PREFIX     + this.id); } catch (_) {}
-    try { localStorage.removeItem(EXEC_STATE_PREFIX  + this.id); } catch (_) {}
-    try { localStorage.removeItem(TITLE_PREFIX       + this.id); } catch (_) {}
-    try { localStorage.removeItem(`vl-autoexec-${this.id}`);     } catch (_) {}
-    try { localStorage.removeItem(`vl-blocks-open-${this.id}`);  } catch (_) {}
+    try {
+      localStorage.removeItem(STORAGE_PREFIX + this.id);
+    } catch (_) {}
+    try {
+      localStorage.removeItem(EXEC_STATE_PREFIX + this.id);
+    } catch (_) {}
+    try {
+      localStorage.removeItem(TITLE_PREFIX + this.id);
+    } catch (_) {}
+    try {
+      localStorage.removeItem(`vl-autoexec-${this.id}`);
+    } catch (_) {}
+    try {
+      localStorage.removeItem(`vl-blocks-open-${this.id}`);
+    } catch (_) {}
 
     const editorWin = document.getElementById(this.editorWinId);
-    if (editorWin) { editorWin._wmOnClose = null; editorWin.remove(); }
+    if (editorWin) {
+      editorWin._wmOnClose = null;
+      editorWin.remove();
+    }
     this._wm.saveState(); // flush WM state now so orphaned window IDs don't respawn on reload
 
     const ns = `__ar_e${this.id}`;
-    for (const key of Object.keys(window).filter(k => k.startsWith(ns + '_'))) {
+    for (const key of Object.keys(window).filter((k) => k.startsWith(ns + '_'))) {
       delete window[key];
     }
     window.__ar_instances?.delete(this.id);
@@ -1080,10 +1248,12 @@ export class EditorInstance {
   }
 
   static removeFromManifest(id) {
-    EditorInstance.saveManifest(EditorInstance.loadManifest().filter(i => i !== id));
+    EditorInstance.saveManifest(EditorInstance.loadManifest().filter((i) => i !== id));
   }
 }
 
 function _isMediaPipeLog(s) {
-  return /^[IW]\d{4}|Graph successfully|TensorFlow Lite|gl_context|inference_feedback|gesture_recognizer_graph|face_landmarker_graph|landmark_projection|hand_gesture|Custom gesture/.test(s);
+  return /^[IW]\d{4}|Graph successfully|TensorFlow Lite|gl_context|inference_feedback|gesture_recognizer_graph|face_landmarker_graph|landmark_projection|hand_gesture|Custom gesture/.test(
+    s,
+  );
 }

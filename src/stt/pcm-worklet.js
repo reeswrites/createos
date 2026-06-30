@@ -17,7 +17,7 @@ class PCMProcessor extends AudioWorkletProcessor {
   process(inputs) {
     const input = inputs[0];
     if (!input || input.length === 0) return true;
-    const ch = input[0];           // mono (channelCount forced to 1 on the node)
+    const ch = input[0]; // mono (channelCount forced to 1 on the node)
     if (!ch) return true;
 
     for (let i = 0; i < ch.length; i++) {

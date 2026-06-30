@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, test, expect, afterEach, vi } from 'vitest';
 
 // ── Tone.js mock ──────────────────────────────────────────────────────────────
 
@@ -106,7 +106,7 @@ vi.mock('tone', () => {
     }),
     Transport: { bpm: { value: 120 } },
     Time: (t) => ({ toSeconds: () => typeof t === 'number' ? t : 1 }),
-    Frequency: (n) => ({ toFrequency: () => 440, toMidi: () => 60 }),
+    Frequency: (_n) => ({ toFrequency: () => 440, toMidi: () => 60 }),
     Draw: { schedule: vi.fn() },
   };
 });

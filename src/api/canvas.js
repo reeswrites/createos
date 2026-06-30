@@ -19,8 +19,8 @@ import { onReset } from '../runtime/reset-registry.js';
 import { subscribe, notify } from '../events/index.js';
 
 const _instances = new Set();
-const _byKey = new Map();   // identity key → live Canvas (for soft-reset reuse)
-let _spawnCount = 0;        // cascade offset for windows without explicit x/y
+const _byKey = new Map(); // identity key → live Canvas (for soft-reset reuse)
+let _spawnCount = 0; // cascade offset for windows without explicit x/y
 
 class Canvas extends DrawTarget {
   constructor(opts = {}) {
@@ -31,12 +31,13 @@ class Canvas extends DrawTarget {
     const existing = _byKey.get(key);
     if (existing && existing.winId && document.getElementById(existing.winId)) {
       existing._reuse();
-      return existing;   // legal in a derived ctor: returning an object skips super()
+      return existing; // legal in a derived ctor: returning an object skips super()
     }
 
     // Cascade from a corner when no explicit position — handles 1..N surfaces
     // uniformly without overlapping or shrinking the editor (ADR 040 Q7).
-    let cx = x, cy = y;
+    let cx = x,
+      cy = y;
     if (cx === undefined && cy === undefined) {
       const i = _spawnCount++ % 8;
       cx = 60 + i * 36;
@@ -55,26 +56,28 @@ class Canvas extends DrawTarget {
     this._handlers = { down: [], move: [], up: [] };
     this._unsubs = [];
     this._disposed = false;
-    this._reclaimed = true;                                  // used by the run that creates it
+    this._reclaimed = true; // used by the run that creates it
     this._ownerEditorId = window.__ar_active_editor_id ?? null;
 
     // ── Spawn the window ──────────────────────────────────────────────────────
     const winId = window.wm?.spawn(title, {
-      w, h, html: '',
-      transient: true,                       // run artifact — don't serialize/restore
+      w,
+      h,
+      html: '',
+      transient: true, // run artifact — don't serialize/restore
       onClose: () => this._destroy(),
-      ...(noChrome    !== undefined ? { noChrome }    : {}),
+      ...(noChrome !== undefined ? { noChrome } : {}),
       ...(transparent !== undefined ? { transparent } : {}),
       ...(cx !== undefined ? { x: cx } : {}),
       ...(cy !== undefined ? { y: cy } : {}),
     });
     this.winId = winId ?? null;
     const winEl = winId ? document.getElementById(winId) : null;
-    const body  = winEl?.querySelector('.wm-body') ?? null;
+    const body = winEl?.querySelector('.wm-body') ?? null;
 
     // ── Mount the canvas (fixed logical backing store, CSS-fills the body) ─────
     canvasEl = document.createElement('canvas');
-    canvasEl.width  = w;
+    canvasEl.width = w;
     canvasEl.height = h;
     Object.assign(canvasEl.style, { width: '100%', height: '100%', display: 'block' });
     this._canvasEl = canvasEl;
@@ -103,21 +106,27 @@ class Canvas extends DrawTarget {
     if (!winId) return;
     const body = document.getElementById(winId)?.querySelector('.wm-body') ?? null;
     const map = (p) => {
-      const bw = body?.clientWidth  || this._w;
+      const bw = body?.clientWidth || this._w;
       const bh = body?.clientHeight || this._h;
-      return { x: p.x / bw * this._w, y: p.y / bh * this._h, button: p.button };
+      return { x: (p.x / bw) * this._w, y: (p.y / bh) * this._h, button: p.button };
     };
     for (const kind of ['down', 'move', 'up']) {
-      this._unsubs.push(subscribe(`wm:${winId}:mouse:${kind}`, (p) => {
-        const m = map(p);
-        this.pointer.x = m.x;
-        this.pointer.y = m.y;
-        if (kind === 'down') this.pointer.down = true;
-        if (kind === 'up')   this.pointer.down = false;
-        for (const fn of this._handlers[kind]) {
-          try { fn(m); } catch (e) { console.error('[Canvas] pointer handler failed:', e); }
-        }
-      }));
+      this._unsubs.push(
+        subscribe(`wm:${winId}:mouse:${kind}`, (p) => {
+          const m = map(p);
+          this.pointer.x = m.x;
+          this.pointer.y = m.y;
+          if (kind === 'down') this.pointer.down = true;
+          if (kind === 'up') this.pointer.down = false;
+          for (const fn of this._handlers[kind]) {
+            try {
+              fn(m);
+            } catch (e) {
+              console.error('[Canvas] pointer handler failed:', e);
+            }
+          }
+        }),
+      );
     }
   }
 
@@ -139,7 +148,9 @@ class Canvas extends DrawTarget {
   }
 
   /** Underlying <canvas> element (for snapshot/record/compositing). */
-  get el() { return this._canvasEl; }
+  get el() {
+    return this._canvasEl;
+  }
 
   /**
    * A DrawTarget over a higher z-plane of THIS canvas's window (ADR 040) —
@@ -148,7 +159,9 @@ class Canvas extends DrawTarget {
    */
   layer(z) {
     if (z === 0) return this;
-    return new DrawTarget(z, () => window.wm?.layer?.(this.winId, z, { raster: true, w: this._w, h: this._h }));
+    return new DrawTarget(z, () =>
+      window.wm?.layer?.(this.winId, z, { raster: true, w: this._w, h: this._h }),
+    );
   }
 
   /**
@@ -156,32 +169,46 @@ class Canvas extends DrawTarget {
    * THIS canvas's window — the per-window replacement for the old global getLayer(z).
    */
   fx(z = 0) {
-    const c = z === 0
-      ? this._canvasEl
-      : window.wm?.layer?.(this.winId, z, { raster: true, w: this._w, h: this._h });
+    const c =
+      z === 0
+        ? this._canvasEl
+        : window.wm?.layer?.(this.winId, z, { raster: true, w: this._w, h: this._h });
     return new Layer(c);
   }
 
   /** Tear down explicitly (also happens on hard reset / window close). */
-  remove() { this._destroy(); }
+  remove() {
+    this._destroy();
+  }
 
   _teardown() {
     if (this._disposed) return;
     this._disposed = true;
-    for (const u of this._unsubs) { try { u(); } catch { /* already gone */ } }
+    for (const u of this._unsubs) {
+      try {
+        u();
+      } catch {
+        /* already gone */
+      }
+    }
     this._unsubs = [];
     // Stop backdrops mounted on this surface so their keep-alive + raf don't
     // outlive the window (else the run never idle-stops and audio keeps firing).
     this.stopBackdrops();
     this._live?.release();
-    if (this.winId) { window.wm?.remove?.(this.winId, { animate: false }); this.winId = null; }
+    if (this.winId) {
+      window.wm?.remove?.(this.winId, { animate: false });
+      this.winId = null;
+    }
     _instances.delete(this);
     if (_byKey.get(this._key) === this) _byKey.delete(this._key);
     notify('canvas:close', {});
   }
 
   // Window-close path — destroy unconditionally.
-  _destroy() { this._teardown(); }
+  _destroy() {
+    this._teardown();
+  }
 }
 
 // ── One owner-filtered, soft-aware reset handler for all Canvases (ADR 040) ─────
@@ -196,8 +223,9 @@ onReset((editorId, soft) => {
     c._unsubs = [];
     c._handlers = { down: [], move: [], up: [] };
     if (soft) {
-      if (c._reclaimed) c._reclaimed = false;   // keep; await re-claim
-      else c._teardown();                        // orphan from a prior cycle → destroy
+      if (c._reclaimed)
+        c._reclaimed = false; // keep; await re-claim
+      else c._teardown(); // orphan from a prior cycle → destroy
     } else {
       c._teardown();
     }

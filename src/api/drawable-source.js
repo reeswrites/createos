@@ -11,16 +11,26 @@
 
 // Duck-type helpers — work in both real browsers and jsdom test mocks.
 export function _isCanvas(x) {
-  return !!(x && (typeof HTMLCanvasElement !== 'undefined' && x instanceof HTMLCanvasElement ||
-    (typeof x.getContext === 'function' && 'width' in x && 'height' in x)));
+  return !!(
+    x &&
+    ((typeof HTMLCanvasElement !== 'undefined' && x instanceof HTMLCanvasElement) ||
+      (typeof x.getContext === 'function' && 'width' in x && 'height' in x))
+  );
 }
 export function _isVideo(x) {
-  return !!(x && (typeof HTMLVideoElement !== 'undefined' && x instanceof HTMLVideoElement ||
-    (typeof x.readyState === 'number' && 'videoWidth' in x)));
+  return !!(
+    x &&
+    ((typeof HTMLVideoElement !== 'undefined' && x instanceof HTMLVideoElement) ||
+      (typeof x.readyState === 'number' && 'videoWidth' in x))
+  );
 }
 export function _isImage(x) {
-  return !!(x && (typeof HTMLImageElement !== 'undefined' && x instanceof HTMLImageElement ||
-    (x.nodeName === 'IMG') || ('naturalWidth' in x && 'src' in x && !('readyState' in x))));
+  return !!(
+    x &&
+    ((typeof HTMLImageElement !== 'undefined' && x instanceof HTMLImageElement) ||
+      x.nodeName === 'IMG' ||
+      ('naturalWidth' in x && 'src' in x && !('readyState' in x)))
+  );
 }
 
 // Resolve any object-form Drawable Source to a canvas / video / image drawable.
@@ -28,11 +38,11 @@ export function _isImage(x) {
 // video upload for ImageBitmap/VideoFrame — apply their own `?? raw` fallback).
 export function resolveDrawable(input) {
   if (!input) return null;
-  if (_isCanvas(input._canvas)) return input._canvas;  // Layer / ShaderFX / VideoLayer / ImageLayer
-  if (_isVideo(input.element))  return input.element;  // CameraStream
-  if (_isVideo(input))          return input;          // bare <video>
-  if (_isCanvas(input))         return input;          // bare <canvas>
-  if (_isImage(input))          return input;          // bare <img>
-  if (_isCanvas(input.canvas))  return input.canvas;   // GLShader / Shader instance
+  if (_isCanvas(input._canvas)) return input._canvas; // Layer / ShaderFX / VideoLayer / ImageLayer
+  if (_isVideo(input.element)) return input.element; // CameraStream
+  if (_isVideo(input)) return input; // bare <video>
+  if (_isCanvas(input)) return input; // bare <canvas>
+  if (_isImage(input)) return input; // bare <img>
+  if (_isCanvas(input.canvas)) return input.canvas; // GLShader / Shader instance
   return null;
 }

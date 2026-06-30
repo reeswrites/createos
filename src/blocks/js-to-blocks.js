@@ -7,22 +7,23 @@ import { SHADER_PRESETS, CAMERA_PRESETS } from '../api/shader.js';
 // Original source text for range-based extraction during jsToBlocks calls
 let _src = '';
 
-function normalizeWGSL(s) { return s.trim().replace(/\s+/g, ' '); }
+function normalizeWGSL(s) {
+  return s.trim().replace(/\s+/g, ' ');
+}
 
 function matchExact(body, table) {
   const norm = normalizeWGSL(body);
-  for (const [key, val] of Object.entries(table))
-    if (normalizeWGSL(val) === norm) return key;
+  for (const [key, val] of Object.entries(table)) if (normalizeWGSL(val) === norm) return key;
   return null;
 }
 
 // Fuzzy camera preset matching — tolerant of variable name differences
 function matchCameraFuzzy(body) {
-  if (/0\.299\s*,\s*0\.587/.test(body))         return 'greyscale';
-  if (/1\.0\s*-\s*\w+\.rgb/.test(body))         return 'invert';
-  if (/\.g,\s*\w+\.b,\s*\w+\.r/.test(body))     return 'channel_swap';
-  if (/floor\s*\(\s*\w+\.rgb\s*\*/.test(body))  return 'posterize';
-  if (/fract\s*\(\s*uv\.y/.test(body))           return 'scanlines';
+  if (/0\.299\s*,\s*0\.587/.test(body)) return 'greyscale';
+  if (/1\.0\s*-\s*\w+\.rgb/.test(body)) return 'invert';
+  if (/\.g,\s*\w+\.b,\s*\w+\.r/.test(body)) return 'channel_swap';
+  if (/floor\s*\(\s*\w+\.rgb\s*\*/.test(body)) return 'posterize';
+  if (/fract\s*\(\s*uv\.y/.test(body)) return 'scanlines';
   return null;
 }
 
@@ -44,15 +45,17 @@ function numLit(node) {
   if (!node) return null;
   if (node.type === 'Literal' && typeof node.value === 'number') return node.value;
   if (node.type === 'UnaryExpression' && node.operator === '-') {
-    const v = numLit(node.argument); return v != null ? -v : null;
+    const v = numLit(node.argument);
+    return v != null ? -v : null;
   }
   return null;
 }
 
 function isMember(node, obj, prop) {
   if (!node || node.type !== 'MemberExpression') return false;
-  return (obj === '*' || node.object?.name === obj) &&
-         (prop === '*' || node.property?.name === prop);
+  return (
+    (obj === '*' || node.object?.name === obj) && (prop === '*' || node.property?.name === prop)
+  );
 }
 
 function isCall(node, obj, method) {
@@ -60,12 +63,16 @@ function isCall(node, obj, method) {
 }
 
 function isArVideo(node) {
-  return node?.type === 'MemberExpression' &&
-    node.object?.name === 'window' && node.property?.name === '__ar_video';
+  return (
+    node?.type === 'MemberExpression' &&
+    node.object?.name === 'window' &&
+    node.property?.name === '__ar_video'
+  );
 }
 
 function callbackStatements(node) {
-  const fn = node?.type === 'ArrowFunctionExpression' || node?.type === 'FunctionExpression' ? node : null;
+  const fn =
+    node?.type === 'ArrowFunctionExpression' || node?.type === 'FunctionExpression' ? node : null;
   return fn?.body?.type === 'BlockStatement' ? fn.body.body : null;
 }
 
@@ -86,7 +93,10 @@ function matchShaderNew(newExpr) {
     let videoNode = null;
     if (opts?.type === 'ObjectExpression') {
       for (const p of opts.properties)
-        if (p.key?.name === 'video') { videoNode = p.value; break; }
+        if (p.key?.name === 'video') {
+          videoNode = p.value;
+          break;
+        }
     }
     if (videoNode && isArVideo(videoNode)) {
       const effect = matchCameraPreset(body) ?? 'greyscale';
@@ -118,11 +128,16 @@ function matchShaderNew(newExpr) {
 // Blockly's workspace-scoped variable system (which would break the fn body scope).
 
 const SHADER_PARAMS = {
-  'uv.x': 'shader_param_uv_x', 'uv.y': 'shader_param_uv_y',
-  'mouse.x': 'shader_param_mouse_x', 'mouse.y': 'shader_param_mouse_y',
-  'res.x': 'shader_param_res_x', 'res.y': 'shader_param_res_y',
-  'custom.x': 'shader_param_custom_x', 'custom.y': 'shader_param_custom_y',
-  'custom.z': 'shader_param_custom_z', 'custom.w': 'shader_param_custom_w',
+  'uv.x': 'shader_param_uv_x',
+  'uv.y': 'shader_param_uv_y',
+  'mouse.x': 'shader_param_mouse_x',
+  'mouse.y': 'shader_param_mouse_y',
+  'res.x': 'shader_param_res_x',
+  'res.y': 'shader_param_res_y',
+  'custom.x': 'shader_param_custom_x',
+  'custom.y': 'shader_param_custom_y',
+  'custom.z': 'shader_param_custom_z',
+  'custom.w': 'shader_param_custom_w',
 };
 // Custom trig/math ops use shader_math_trig / shader_math_fn (not Blockly's built-ins,
 // which add degree↔radian conversion we don't want).
@@ -151,10 +166,14 @@ function exprToBlock(node, locals) {
   if (node.type === 'UnaryExpression' && node.operator === '-') {
     const arg = exprToBlock(node.argument, locals);
     if (!arg) return null;
-    return { type: 'math_arithmetic', fields: { OP: 'MINUS' }, inputs: {
-      A: { block: { type: 'math_number', fields: { NUM: 0 } } },
-      B: { block: arg },
-    }};
+    return {
+      type: 'math_arithmetic',
+      fields: { OP: 'MINUS' },
+      inputs: {
+        A: { block: { type: 'math_number', fields: { NUM: 0 } } },
+        B: { block: arg },
+      },
+    };
   }
 
   if (node.type === 'BinaryExpression') {
@@ -163,7 +182,11 @@ function exprToBlock(node, locals) {
     const left = exprToBlock(node.left, locals);
     const right = exprToBlock(node.right, locals);
     if (!left || !right) return null;
-    return { type: 'math_arithmetic', fields: { OP: op }, inputs: { A: { block: left }, B: { block: right } } };
+    return {
+      type: 'math_arithmetic',
+      fields: { OP: op },
+      inputs: { A: { block: left }, B: { block: right } },
+    };
   }
 
   if (node.type === 'CallExpression') {
@@ -190,10 +213,14 @@ function exprToBlock(node, locals) {
       }
       if (fn === 'pow') {
         const arg2 = node.arguments[1] ? exprToBlock(node.arguments[1], locals) : null;
-        return { type: 'math_arithmetic', fields: { OP: 'POWER' }, inputs: {
-          A: arg ? { block: arg } : {},
-          B: arg2 ? { block: arg2 } : {},
-        }};
+        return {
+          type: 'math_arithmetic',
+          fields: { OP: 'POWER' },
+          inputs: {
+            A: arg ? { block: arg } : {},
+            B: arg2 ? { block: arg2 } : {},
+          },
+        };
       }
     }
   }
@@ -207,8 +234,7 @@ function shaderFnBodyBlock(stmts) {
   const rest = [];
   for (const s of stmts) {
     if (s.type === 'VariableDeclaration') {
-      for (const d of s.declarations)
-        if (d.id?.name && d.init) locals.set(d.id.name, d.init);
+      for (const d of s.declarations) if (d.id?.name && d.init) locals.set(d.id.name, d.init);
     } else {
       rest.push(s);
     }
@@ -219,7 +245,7 @@ function shaderFnBodyBlock(stmts) {
   const ret = rest[0].argument;
   if (ret?.type !== 'ArrayExpression' || ret.elements.length !== 4) return null;
 
-  const [r, g, b, a] = ret.elements.map(n => exprToBlock(n, locals));
+  const [r, g, b, a] = ret.elements.map((n) => exprToBlock(n, locals));
   if (!r && !g && !b && !a) return null;
 
   const retBlock = { type: 'shader_return_rgba', inputs: {} };
@@ -244,7 +270,10 @@ function matchValue(node, vars) {
   if (isCall(node, 'audio', 'reverb'))
     return { type: 'audio_reverb', fields: { DEC: numLit(node.arguments[0]) ?? 2 } };
   if (isCall(node, 'audio', 'delay'))
-    return { type: 'audio_delay', fields: { TIME: numLit(node.arguments[0]) ?? 0.25, FB: numLit(node.arguments[1]) ?? 0.5 } };
+    return {
+      type: 'audio_delay',
+      fields: { TIME: numLit(node.arguments[0]) ?? 0.25, FB: numLit(node.arguments[1]) ?? 0.5 },
+    };
   if (isCall(node, 'audio', 'distort'))
     return { type: 'audio_distort', fields: { AMT: numLit(node.arguments[0]) ?? 0.8 } };
   if (isCall(node, 'Media', 'video'))
@@ -269,37 +298,85 @@ function translateOne(node, vars) {
   if (!expr || expr.type !== 'CallExpression') return null;
 
   // ── canvas.* (implicit default canvas — ADR 040; was draw.* pre-040) ──
-  if (isCall(expr, 'canvas', 'bg'))    return { type: 'draw_bg',     fields: { COLOR: strLit(expr.arguments[0]) ?? '#000' } };
+  if (isCall(expr, 'canvas', 'bg'))
+    return { type: 'draw_bg', fields: { COLOR: strLit(expr.arguments[0]) ?? '#000' } };
   if (isCall(expr, 'canvas', 'clear')) return { type: 'canvas_clear', fields: {} };
-  if (isCall(expr, 'canvas', 'alpha')) return { type: 'draw_alpha',  fields: { ALPHA: numLit(expr.arguments[0]) ?? 1 } };
-  if (isCall(expr, 'canvas', 'reset')) return { type: 'draw_reset',  fields: {} };
+  if (isCall(expr, 'canvas', 'alpha'))
+    return { type: 'draw_alpha', fields: { ALPHA: numLit(expr.arguments[0]) ?? 1 } };
+  if (isCall(expr, 'canvas', 'reset')) return { type: 'draw_reset', fields: {} };
 
   if (isCall(expr, 'canvas', 'rect')) {
     const [x, y, w, h] = expr.arguments.slice(0, 4).map(numLit);
-    if (x != null) return { type: 'canvas_fill_rect', fields: { X: x, Y: y ?? 0, W: w ?? 100, H: h ?? 100, COLOR: strLit(expr.arguments[4]) ?? 'white' } };
+    if (x != null)
+      return {
+        type: 'canvas_fill_rect',
+        fields: {
+          X: x,
+          Y: y ?? 0,
+          W: w ?? 100,
+          H: h ?? 100,
+          COLOR: strLit(expr.arguments[4]) ?? 'white',
+        },
+      };
   }
   if (isCall(expr, 'canvas', 'circle')) {
     const [x, y, r] = expr.arguments.slice(0, 3).map(numLit);
-    if (x != null) return { type: 'canvas_fill_circle', fields: { X: x, Y: y ?? 0, R: r ?? 50, COLOR: strLit(expr.arguments[3]) ?? 'white' } };
+    if (x != null)
+      return {
+        type: 'canvas_fill_circle',
+        fields: { X: x, Y: y ?? 0, R: r ?? 50, COLOR: strLit(expr.arguments[3]) ?? 'white' },
+      };
   }
   if (isCall(expr, 'canvas', 'line')) {
     const [x1, y1, x2, y2] = expr.arguments.slice(0, 4).map(numLit);
-    if (x1 != null) return { type: 'draw_line', fields: { X1: x1, Y1: y1 ?? 0, X2: x2 ?? 400, Y2: y2 ?? 400, COLOR: strLit(expr.arguments[4]) ?? 'white', THICKNESS: numLit(expr.arguments[5]) ?? 1 } };
+    if (x1 != null)
+      return {
+        type: 'draw_line',
+        fields: {
+          X1: x1,
+          Y1: y1 ?? 0,
+          X2: x2 ?? 400,
+          Y2: y2 ?? 400,
+          COLOR: strLit(expr.arguments[4]) ?? 'white',
+          THICKNESS: numLit(expr.arguments[5]) ?? 1,
+        },
+      };
   }
   if (isCall(expr, 'canvas', 'text')) {
     const str = strLit(expr.arguments[0]);
     const [x, y, size] = expr.arguments.slice(1, 4).map(numLit);
-    return { type: 'draw_text', fields: { STR: str ?? '', X: x ?? 0, Y: y ?? 0, SIZE: size ?? 24, COLOR: strLit(expr.arguments[4]) ?? 'white' } };
+    return {
+      type: 'draw_text',
+      fields: {
+        STR: str ?? '',
+        X: x ?? 0,
+        Y: y ?? 0,
+        SIZE: size ?? 24,
+        COLOR: strLit(expr.arguments[4]) ?? 'white',
+      },
+    };
   }
 
   // ── canvas.fx(z).blur/opacity (was getLayer(z).* pre-040) ──
   const { callee } = expr;
-  const _isFx = (o) => o?.type === 'CallExpression' && o.callee?.type === 'MemberExpression'
-    && o.callee.object?.name === 'canvas' && o.callee.property?.name === 'fx';
+  const _isFx = (o) =>
+    o?.type === 'CallExpression' &&
+    o.callee?.type === 'MemberExpression' &&
+    o.callee.object?.name === 'canvas' &&
+    o.callee.property?.name === 'fx';
   if (isMember(callee, '*', 'blur') && _isFx(callee.object))
-    return { type: 'canvas_blur', fields: { Z: numLit(callee.object.arguments[0]) ?? 0, AMT: numLit(expr.arguments[0]) ?? 5 } };
+    return {
+      type: 'canvas_blur',
+      fields: { Z: numLit(callee.object.arguments[0]) ?? 0, AMT: numLit(expr.arguments[0]) ?? 5 },
+    };
   if (isMember(callee, '*', 'opacity') && _isFx(callee.object))
-    return { type: 'canvas_layer_opacity', fields: { Z: numLit(callee.object.arguments[0]) ?? 0, OPACITY: numLit(expr.arguments[0]) ?? 0.5 } };
+    return {
+      type: 'canvas_layer_opacity',
+      fields: {
+        Z: numLit(callee.object.arguments[0]) ?? 0,
+        OPACITY: numLit(expr.arguments[0]) ?? 0.5,
+      },
+    };
 
   // ── ShaderFX.* — both shorthand (camera/preset/video) and factory (cameraShader/presetShader/videoShader) ──
   // Shorthand (create+start): appear as top-level expression statements
@@ -308,7 +385,10 @@ function translateOne(node, vars) {
     return makeStartShader({ type: 'shader_camera_effect', fields: { EFFECT: effect } });
   }
   if (isCall(expr, 'ShaderFX', 'preset')) {
-    return makeStartShader({ type: 'shader_preset', fields: { PRESET: strLit(expr.arguments[0]) ?? 'gradient' } });
+    return makeStartShader({
+      type: 'shader_preset',
+      fields: { PRESET: strLit(expr.arguments[0]) ?? 'gradient' },
+    });
   }
   if (isCall(expr, 'ShaderFX', 'video')) {
     const effect = strLit(expr.arguments[1]) ?? 'greyscale';
@@ -325,9 +405,15 @@ function translateOne(node, vars) {
       return makeStartShader(matchShaderNew(obj));
     // ShaderFX factory methods called inline: (ShaderFX.cameraShader(...)).start()
     if (isCall(obj, 'ShaderFX', 'cameraShader'))
-      return makeStartShader({ type: 'shader_camera_effect', fields: { EFFECT: strLit(obj.arguments[0]) ?? 'greyscale' } });
+      return makeStartShader({
+        type: 'shader_camera_effect',
+        fields: { EFFECT: strLit(obj.arguments[0]) ?? 'greyscale' },
+      });
     if (isCall(obj, 'ShaderFX', 'presetShader'))
-      return makeStartShader({ type: 'shader_preset', fields: { PRESET: strLit(obj.arguments[0]) ?? 'gradient' } });
+      return makeStartShader({
+        type: 'shader_preset',
+        fields: { PRESET: strLit(obj.arguments[0]) ?? 'gradient' },
+      });
     if (isCall(obj, 'ShaderFX', 'videoShader')) {
       const effect = strLit(obj.arguments[1]) ?? 'greyscale';
       const vidBlock = matchValue(obj.arguments[0], vars);
@@ -346,7 +432,10 @@ function translateOne(node, vars) {
     const ms = numLit(expr.arguments[1]) ?? (fnName === 'setInterval' ? 100 : 1000);
     const body = callbackStatements(expr.arguments[0]);
     const inner = body ? translateStatements(body) : null;
-    const block = { type: fnName === 'setInterval' ? 'ctrl_interval' : 'ctrl_timeout', fields: { MS: ms } };
+    const block = {
+      type: fnName === 'setInterval' ? 'ctrl_interval' : 'ctrl_timeout',
+      fields: { MS: ms },
+    };
     if (inner) block.inputs = { DO: { block: inner } };
     return block;
   }
@@ -362,14 +451,16 @@ function translateOne(node, vars) {
   }
 
   // ── audio ──
-  if (isCall(expr, 'audio', 'bpm'))    return { type: 'audio_bpm',            fields: { BPM: numLit(expr.arguments[0]) ?? 120 } };
-  if (isCall(expr, 'audio', 'start'))  return { type: 'audio_transport_start', fields: {} };
-  if (isCall(expr, 'audio', 'volume')) return { type: 'audio_volume',          fields: { DB:  numLit(expr.arguments[0]) ?? -6 } };
+  if (isCall(expr, 'audio', 'bpm'))
+    return { type: 'audio_bpm', fields: { BPM: numLit(expr.arguments[0]) ?? 120 } };
+  if (isCall(expr, 'audio', 'start')) return { type: 'audio_transport_start', fields: {} };
+  if (isCall(expr, 'audio', 'volume'))
+    return { type: 'audio_volume', fields: { DB: numLit(expr.arguments[0]) ?? -6 } };
 
   // (synth).play(note, dur) — note+dur distinguish from vid.play()
   if (isMember(callee, '*', 'play')) {
     const note = strLit(expr.arguments[0]);
-    const dur  = strLit(expr.arguments[1]);
+    const dur = strLit(expr.arguments[1]);
     if (note && dur) {
       const synthBlock = matchValue(callee.object, vars);
       const block = { type: 'audio_play', fields: { NOTE: note, DUR: dur } };
@@ -381,22 +472,26 @@ function translateOne(node, vars) {
   // (from).connect(to)
   if (isMember(callee, '*', 'connect')) {
     const fromBlock = matchValue(callee.object, vars);
-    const toBlock   = matchValue(expr.arguments[0], vars);
-    if (fromBlock && toBlock) return { type: 'audio_connect', inputs: { FROM: { block: fromBlock }, TO: { block: toBlock } } };
+    const toBlock = matchValue(expr.arguments[0], vars);
+    if (fromBlock && toBlock)
+      return {
+        type: 'audio_connect',
+        inputs: { FROM: { block: fromBlock }, TO: { block: toBlock } },
+      };
   }
 
   // ── vision ──
   if (isCall(expr, 'vision', 'onGesture')) {
-    const gest  = strLit(expr.arguments[0]) ?? 'Thumb_Up';
-    const body  = callbackStatements(expr.arguments[1]);
+    const gest = strLit(expr.arguments[0]) ?? 'Thumb_Up';
+    const body = callbackStatements(expr.arguments[1]);
     const inner = body ? translateStatements(body) : null;
     const block = { type: 'vision_on_gesture', fields: { GESTURE: gest } };
     if (inner) block.inputs = { DO: { block: inner } };
     return block;
   }
   if (isCall(expr, 'vision', 'onExpression')) {
-    const name  = strLit(expr.arguments[0]) ?? 'smile';
-    const body  = callbackStatements(expr.arguments[1]);
+    const name = strLit(expr.arguments[0]) ?? 'smile';
+    const body = callbackStatements(expr.arguments[1]);
     const inner = body ? translateStatements(body) : null;
     const block = { type: 'vision_on_expression', fields: { EXPR: name } };
     if (inner) block.inputs = { DO: { block: inner } };
@@ -419,7 +514,7 @@ function translateOne(node, vars) {
 function translateStatements(stmts) {
   // First pass: collect variable bindings for 2-step patterns (const x = expr; x.method())
   const vars = new Map();
-  const consumed = new Set();   // VariableDeclarations stored in vars (inlined later, not emitted raw)
+  const consumed = new Set(); // VariableDeclarations stored in vars (inlined later, not emitted raw)
   for (const s of stmts) {
     if (s.type !== 'VariableDeclaration') continue;
     const before = vars.size;
@@ -430,9 +525,19 @@ function translateStatements(stmts) {
       if (init.type === 'NewExpression' && init.callee?.name === 'Shader') {
         vars.set(name, { shaderNew: init });
       } else if (isCall(init, 'ShaderFX', 'cameraShader')) {
-        vars.set(name, { shaderFXBlock: { type: 'shader_camera_effect', fields: { EFFECT: strLit(init.arguments[0]) ?? 'greyscale' } } });
+        vars.set(name, {
+          shaderFXBlock: {
+            type: 'shader_camera_effect',
+            fields: { EFFECT: strLit(init.arguments[0]) ?? 'greyscale' },
+          },
+        });
       } else if (isCall(init, 'ShaderFX', 'presetShader')) {
-        vars.set(name, { shaderFXBlock: { type: 'shader_preset', fields: { PRESET: strLit(init.arguments[0]) ?? 'gradient' } } });
+        vars.set(name, {
+          shaderFXBlock: {
+            type: 'shader_preset',
+            fields: { PRESET: strLit(init.arguments[0]) ?? 'gradient' },
+          },
+        });
       } else if (isCall(init, 'ShaderFX', 'videoShader')) {
         const effect = strLit(init.arguments[1]) ?? 'greyscale';
         const vidBlock = matchValue(init.arguments[0], vars);
@@ -455,17 +560,19 @@ function translateStatements(stmts) {
   const blocks = [];
   for (const s of stmts) {
     const b = translateOne(s, vars);
-    if (b) { blocks.push(b); continue; }
+    if (b) {
+      blocks.push(b);
+      continue;
+    }
     if (s.type === 'VariableDeclaration' && consumed.has(s)) continue;
-    const raw = (_src && s.range) ? _src.slice(s.range[0], s.range[1]).trim() : '';
+    const raw = _src && s.range ? _src.slice(s.range[0], s.range[1]).trim() : '';
     if (raw) blocks.push({ type: 'js_raw', fields: { CODE: raw } });
   }
 
   if (!blocks.length) return null;
 
   // Link statement sequence via `next`
-  for (let i = 0; i < blocks.length - 1; i++)
-    blocks[i].next = { block: blocks[i + 1] };
+  for (let i = 0; i < blocks.length - 1; i++) blocks[i].next = { block: blocks[i + 1] };
 
   return blocks[0];
 }

@@ -32,7 +32,8 @@ function _srcHeight(src) {
 
 function _makeHiddenDiv() {
   const div = document.createElement('div');
-  div.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:800px;height:600px;overflow:hidden;pointer-events:none;';
+  div.style.cssText =
+    'position:fixed;top:-9999px;left:-9999px;width:800px;height:600px;overflow:hidden;pointer-events:none;';
   document.body.appendChild(div);
   return div;
 }
@@ -42,13 +43,13 @@ function _makeHiddenDiv() {
 // without an explicit await at the call site.
 export const Source = Object.freeze({
   camera: Object.freeze({ _src: 'camera' }),
-  mic:    Object.freeze({ _src: 'mic' }),
+  mic: Object.freeze({ _src: 'mic' }),
   // Gaze scalar sub-sources for route() (ADR 034). .x/.y = head-relative
   // direction (no calibration); .vx/.vy = viewport-pixel screen point (needs
   // calibration — falls back to a held value while uncalibrated).
   gaze: Object.freeze({
-    x:  Object.freeze({ _src: 'gaze', field: 'x'  }),
-    y:  Object.freeze({ _src: 'gaze', field: 'y'  }),
+    x: Object.freeze({ _src: 'gaze', field: 'x' }),
+    y: Object.freeze({ _src: 'gaze', field: 'y' }),
     vx: Object.freeze({ _src: 'gaze', field: 'vx' }),
     vy: Object.freeze({ _src: 'gaze', field: 'vy' }),
   }),
@@ -59,7 +60,7 @@ export const Source = Object.freeze({
 // `{_src, field}` contract. Co-located with the definition so a rename here
 // can't silently desync a consumer in another module.
 export function sourceKind(x) {
-  return (x && typeof x === 'object' && typeof x._src === 'string') ? x._src : null;
+  return x && typeof x === 'object' && typeof x._src === 'string' ? x._src : null;
 }
 export function sourceField(x) {
   return x?.field;
@@ -70,23 +71,25 @@ export function sourceField(x) {
 
 class InputAdapter {
   constructor(input) {
-    this._promise  = input instanceof Promise ? input : null;
-    this._src      = this._promise ? null : resolveDrawable(input);
+    this._promise = input instanceof Promise ? input : null;
+    this._src = this._promise ? null : resolveDrawable(input);
     this._isShader = false;
     if (!this._promise && !this._src) {
       throw new Error(
         'pipe(): unsupported source — pass Source.camera, a CameraStream, ' +
-        'HTMLCanvasElement, HTMLVideoElement, GLShader, Shader, or Layer.'
+          'HTMLCanvasElement, HTMLVideoElement, GLShader, Shader, or Layer.',
       );
     }
   }
   async _resolve() {
     if (this._promise) this._src = resolveDrawable(await this._promise);
   }
-  _getSource() { return this._src; }
-  _start()     {}
-  read()       {}
-  _destroy()   {}
+  _getSource() {
+    return this._src;
+  }
+  _start() {}
+  read() {}
+  _destroy() {}
 }
 
 // ── AsciiStage ────────────────────────────────────────────────────────────────
@@ -96,30 +99,30 @@ class InputAdapter {
 class AsciiStage {
   constructor(upstream, opts = {}) {
     this._upstream = upstream;
-    this._cols    = opts.cols    ?? 80;
-    this._rows    = opts.rows    ?? Math.round((opts.cols ?? 80) / 2.5);
+    this._cols = opts.cols ?? 80;
+    this._rows = opts.rows ?? Math.round((opts.cols ?? 80) / 2.5);
     this._charset = opts.charset ?? ' .:-=+*#%@';
-    this._bg      = opts.bg     ?? '#000';
-    this._color   = opts.color  ?? '#0f0';
-    this._cellW   = opts.cellW  ?? 8;
-    this._cellH   = opts.cellH  ?? 14;
-    this._canvas    = document.createElement('canvas');
-    this._ctx       = null;
+    this._bg = opts.bg ?? '#000';
+    this._color = opts.color ?? '#0f0';
+    this._cellW = opts.cellW ?? 8;
+    this._cellH = opts.cellH ?? 14;
+    this._canvas = document.createElement('canvas');
+    this._ctx = null;
     this._offCanvas = document.createElement('canvas');
-    this._offCtx    = null;
-    this._isShader  = false;
+    this._offCtx = null;
+    this._isShader = false;
   }
 
   _start() {
     const { _cols: cols, _rows: rows, _cellW: cw, _cellH: ch } = this;
-    this._canvas.width  = cols * cw;
+    this._canvas.width = cols * cw;
     this._canvas.height = rows * ch;
     this._ctx = this._canvas.getContext('2d');
-    this._ctx.font         = `${ch}px monospace`;
-    this._ctx.textAlign    = 'left';
+    this._ctx.font = `${ch}px monospace`;
+    this._ctx.textAlign = 'left';
     this._ctx.textBaseline = 'top';
 
-    this._offCanvas.width  = cols;
+    this._offCanvas.width = cols;
     this._offCanvas.height = rows;
     this._offCtx = this._offCanvas.getContext('2d', { willReadFrequently: true });
   }
@@ -129,8 +132,15 @@ class AsciiStage {
     const src = this._upstream._getSource();
     if (_isVideo(src) && src.readyState < 2) return;
 
-    const { _cols: cols, _rows: rows, _cellW: cw, _cellH: ch,
-            _charset: charset, _bg: bg, _color: color } = this;
+    const {
+      _cols: cols,
+      _rows: rows,
+      _cellW: cw,
+      _cellH: ch,
+      _charset: charset,
+      _bg: bg,
+      _color: color,
+    } = this;
 
     this._offCtx.drawImage(src, 0, 0, cols, rows);
     const px = this._offCtx.getImageData(0, 0, cols, rows).data;
@@ -151,18 +161,22 @@ class AsciiStage {
   }
 
   set(props) {
-    if (props.color   !== undefined) this._color   = props.color;
-    if (props.bg      !== undefined) this._bg      = props.bg;
+    if (props.color !== undefined) this._color = props.color;
+    if (props.bg !== undefined) this._bg = props.bg;
     if (props.charset !== undefined) this._charset = props.charset;
   }
 
-  _getSource() { return this._canvas; }
-  get canvas()  { return this._canvas; }
+  _getSource() {
+    return this._canvas;
+  }
+  get canvas() {
+    return this._canvas;
+  }
 
   _destroy() {
     this._canvas.remove();
     this._offCanvas.remove();
-    this._ctx  = null;
+    this._ctx = null;
     this._offCtx = null;
   }
 }
@@ -172,25 +186,26 @@ class AsciiStage {
 
 class PixelateStage {
   constructor(upstream, opts = {}) {
-    this._upstream  = upstream;
+    this._upstream = upstream;
     this._blockSize = opts.blockSize ?? opts ?? 8;
     if (typeof this._blockSize !== 'number') this._blockSize = 8;
-    this._canvas    = document.createElement('canvas');
-    this._ctx       = null;
+    this._canvas = document.createElement('canvas');
+    this._ctx = null;
     this._offCanvas = document.createElement('canvas');
-    this._offCtx    = null;
-    this._isShader  = false;
+    this._offCtx = null;
+    this._isShader = false;
   }
 
   _start() {
     const src = this._upstream._getSource();
-    const w = _srcWidth(src), h = _srcHeight(src);
-    this._canvas.width  = w;
+    const w = _srcWidth(src),
+      h = _srcHeight(src);
+    this._canvas.width = w;
     this._canvas.height = h;
     this._ctx = this._canvas.getContext('2d');
     const pw = Math.max(1, Math.round(w / this._blockSize));
     const ph = Math.max(1, Math.round(h / this._blockSize));
-    this._offCanvas.width  = pw;
+    this._offCanvas.width = pw;
     this._offCanvas.height = ph;
     this._offCtx = this._offCanvas.getContext('2d');
   }
@@ -209,8 +224,12 @@ class PixelateStage {
     if (props.blockSize !== undefined) this._blockSize = props.blockSize;
   }
 
-  _getSource() { return this._canvas; }
-  get canvas()  { return this._canvas; }
+  _getSource() {
+    return this._canvas;
+  }
+  get canvas() {
+    return this._canvas;
+  }
 
   _destroy() {
     this._canvas.remove();
@@ -226,15 +245,15 @@ class PixelateStage {
 class FxStage {
   constructor(upstream, filter) {
     this._upstream = upstream;
-    this._filter   = filter;
-    this._canvas   = document.createElement('canvas');
-    this._ctx      = null;
+    this._filter = filter;
+    this._canvas = document.createElement('canvas');
+    this._ctx = null;
     this._isShader = false;
   }
 
   _start() {
     const src = this._upstream._getSource();
-    this._canvas.width  = _srcWidth(src);
+    this._canvas.width = _srcWidth(src);
     this._canvas.height = _srcHeight(src);
     this._ctx = this._canvas.getContext('2d');
   }
@@ -252,8 +271,12 @@ class FxStage {
     if (props.filter !== undefined) this._filter = props.filter;
   }
 
-  _getSource() { return this._canvas; }
-  get canvas()  { return this._canvas; }
+  _getSource() {
+    return this._canvas;
+  }
+  get canvas() {
+    return this._canvas;
+  }
 
   _destroy() {
     this._canvas.remove();
@@ -269,14 +292,14 @@ class FxStage {
 
 class GLShaderStage {
   constructor(upstream, fragBody, opts = {}) {
-    this._upstream      = upstream;
-    this._fragBody      = fragBody;
-    this._opts          = opts;
-    this._shaderInst    = null;
-    this._hiddenDiv     = null;
+    this._upstream = upstream;
+    this._fragBody = fragBody;
+    this._opts = opts;
+    this._shaderInst = null;
+    this._hiddenDiv = null;
     this._sinkContainer = null; // set by Pipeline._mountInContainer when terminal
-    this._isShader      = true;
-    this._owned         = true; // false when caller passes a pre-created instance
+    this._isShader = true;
+    this._owned = true; // false when caller passes a pre-created instance
   }
 
   _start() {
@@ -292,17 +315,21 @@ class GLShaderStage {
     if (!GLShaderCls) throw new Error('pipe().glshader(): GLShader not available on window.');
     const container = this._sinkContainer ?? (this._hiddenDiv = _makeHiddenDiv());
     this._shaderInst = new GLShaderCls(this._fragBody, {
-      z:       this._opts.z       ?? 0,
+      z: this._opts.z ?? 0,
       opacity: this._opts.opacity ?? 1,
       container,
     });
     this._shaderInst.video(upstream).start();
   }
 
-  read()  {}  // GLShader self-rafs
+  read() {} // GLShader self-rafs
 
-  _getSource() { return this._shaderInst?._canvas ?? null; }
-  get canvas()  { return this._shaderInst?._canvas ?? null; }
+  _getSource() {
+    return this._shaderInst?._canvas ?? null;
+  }
+  get canvas() {
+    return this._shaderInst?._canvas ?? null;
+  }
 
   _destroy() {
     if (this._owned) this._shaderInst?._destroy?.();
@@ -317,14 +344,14 @@ class GLShaderStage {
 
 class ShaderStage {
   constructor(upstream, fragBody, opts = {}) {
-    this._upstream      = upstream;
-    this._fragBody      = fragBody;
-    this._opts          = opts;
-    this._shaderInst    = null;
-    this._hiddenDiv     = null;
+    this._upstream = upstream;
+    this._fragBody = fragBody;
+    this._opts = opts;
+    this._shaderInst = null;
+    this._hiddenDiv = null;
     this._sinkContainer = null;
-    this._isShader      = true;
-    this._owned         = true;
+    this._isShader = true;
+    this._owned = true;
   }
 
   _start() {
@@ -340,20 +367,22 @@ class ShaderStage {
     if (!ShaderCls) throw new Error('pipe().shader(): Shader (WebGPU) not available on window.');
     const container = this._sinkContainer ?? (this._hiddenDiv = _makeHiddenDiv());
     this._shaderInst = new ShaderCls(this._fragBody, {
-      z:       this._opts.z       ?? 0,
+      z: this._opts.z ?? 0,
       opacity: this._opts.opacity ?? 1,
       container,
     });
     this._shaderInst.video(upstream).start();
   }
 
-  read()  {}  // Shader self-rafs
+  read() {} // Shader self-rafs
 
   _getSource() {
     const c = this._shaderInst?.canvas;
     return _isCanvas(c) ? c : null;
   }
-  get canvas() { return this._getSource(); }
+  get canvas() {
+    return this._getSource();
+  }
 
   _destroy() {
     if (this._owned) {
@@ -375,11 +404,11 @@ class ShaderStage {
 
 class CustomStage {
   constructor(upstream, factory) {
-    this._upstream  = upstream;
-    this._factory   = factory;
-    this._canvas    = null;
-    this._userRead  = null;
-    this._isShader  = false;
+    this._upstream = upstream;
+    this._factory = factory;
+    this._canvas = null;
+    this._userRead = null;
+    this._isShader = false;
   }
 
   _start() {
@@ -387,10 +416,10 @@ class CustomStage {
     const result = this._factory(src);
     if (!result || typeof result.read !== 'function' || !result.canvas) {
       throw new Error(
-        'pipe().use(factory): factory must return { canvas: HTMLCanvasElement, read() }'
+        'pipe().use(factory): factory must return { canvas: HTMLCanvasElement, read() }',
       );
     }
-    this._canvas   = result.canvas;
+    this._canvas = result.canvas;
     this._userRead = result.read.bind(result);
   }
 
@@ -398,12 +427,16 @@ class CustomStage {
     if (this._userRead) this._userRead();
   }
 
-  _getSource() { return this._canvas; }
-  get canvas()  { return this._canvas; }
+  _getSource() {
+    return this._canvas;
+  }
+  get canvas() {
+    return this._canvas;
+  }
 
   _destroy() {
     this._canvas?.remove?.();
-    this._canvas   = null;
+    this._canvas = null;
     this._userRead = null;
   }
 }
@@ -411,84 +444,94 @@ class CustomStage {
 // ── SRT Subtitle stage ────────────────────────────────────────────────────────
 
 function _parseSRT(srt) {
-  return srt.trim().split(/\n\n+/).map(block => {
-    const lines = block.trim().split('\n');
-    if (lines.length < 3) return null;
-    const m = lines[1].match(/(\d{2}:\d{2}:\d{2}[,.]\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2}[,.]\d{3})/);
-    if (!m) return null;
-    const toSec = s => {
-      const [h, mi, rest] = s.split(':');
-      const [sec, ms] = rest.split(/[,.]/).map(Number);
-      return Number(h) * 3600 + Number(mi) * 60 + sec + ms / 1000;
-    };
-    return {
-      start: toSec(m[1]),
-      end:   toSec(m[2]),
-      text:  lines.slice(2).join('\n').replace(/<[^>]+>/g, ''),
-    };
-  }).filter(Boolean);
+  return srt
+    .trim()
+    .split(/\n\n+/)
+    .map((block) => {
+      const lines = block.trim().split('\n');
+      if (lines.length < 3) return null;
+      const m = lines[1].match(/(\d{2}:\d{2}:\d{2}[,.]\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2}[,.]\d{3})/);
+      if (!m) return null;
+      const toSec = (s) => {
+        const [h, mi, rest] = s.split(':');
+        const [sec, ms] = rest.split(/[,.]/).map(Number);
+        return Number(h) * 3600 + Number(mi) * 60 + sec + ms / 1000;
+      };
+      return {
+        start: toSec(m[1]),
+        end: toSec(m[2]),
+        text: lines
+          .slice(2)
+          .join('\n')
+          .replace(/<[^>]+>/g, ''),
+      };
+    })
+    .filter(Boolean);
 }
 
 class SubtitleStage {
   constructor(upstream, srtText, opts = {}) {
-    this._upstream  = upstream;
-    this._cues      = _parseSRT(srtText);
-    this._opts      = opts;
-    this.canvas     = null;
-    this._ctx       = null;
-    this._isShader  = false;
+    this._upstream = upstream;
+    this._cues = _parseSRT(srtText);
+    this._opts = opts;
+    this.canvas = null;
+    this._ctx = null;
+    this._isShader = false;
   }
 
   _start() {
-    const src       = this._upstream._getSource();
-    this.canvas     = document.createElement('canvas');
-    this.canvas.width  = _srcWidth(src);
+    const src = this._upstream._getSource();
+    this.canvas = document.createElement('canvas');
+    this.canvas.width = _srcWidth(src);
     this.canvas.height = _srcHeight(src);
     this._ctx = this.canvas.getContext('2d');
   }
 
-  _getSource() { return this.canvas; }
+  _getSource() {
+    return this.canvas;
+  }
 
   read() {
     const src = this._upstream._getSource();
     if (!src) return;
-    const W = _srcWidth(src), H = _srcHeight(src);
+    const W = _srcWidth(src),
+      H = _srcHeight(src);
     if (this.canvas.width !== W || this.canvas.height !== H) {
-      this.canvas.width = W; this.canvas.height = H;
+      this.canvas.width = W;
+      this.canvas.height = H;
     }
     this._ctx.clearRect(0, 0, W, H);
     this._ctx.drawImage(src, 0, 0, W, H);
 
-    const t   = src.currentTime ?? 0;
-    const cue = this._cues.find(c => t >= c.start && t <= c.end);
+    const t = src.currentTime ?? 0;
+    const cue = this._cues.find((c) => t >= c.start && t <= c.end);
     if (!cue) return;
 
     const {
-      fontSize  = 28,
-      color     = '#fff',
-      bg        = 'rgba(0,0,0,0.65)',
-      font      = 'sans-serif',
-      weight    = 'bold',
-      stroke    = true,
+      fontSize = 28,
+      color = '#fff',
+      bg = 'rgba(0,0,0,0.65)',
+      font = 'sans-serif',
+      weight = 'bold',
+      stroke = true,
       strokeColor = '#000',
       strokeWidth = 1.5,
       marginBottom = 24,
     } = this._opts;
 
-    const ctx    = this._ctx;
-    const lines  = cue.text.split('\n');
-    const lineH  = fontSize * 1.35;
-    const totalH = lines.length * lineH;
+    const ctx = this._ctx;
+    const lines = cue.text.split('\n');
+    const lineH = fontSize * 1.35;
 
-    ctx.font        = `${weight} ${fontSize}px ${font}`;
-    ctx.textAlign   = 'center';
+    ctx.font = `${weight} ${fontSize}px ${font}`;
+    ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
 
     for (let i = 0; i < lines.length; i++) {
       const txt = lines[i];
-      const tw  = ctx.measureText(txt).width;
-      const tx  = W / 2;
-      const ty  = H - marginBottom - (lines.length - 1 - i) * lineH;
+      const tw = ctx.measureText(txt).width;
+      const tx = W / 2;
+      const ty = H - marginBottom - (lines.length - 1 - i) * lineH;
 
       if (bg) {
         ctx.fillStyle = bg;
@@ -496,7 +539,7 @@ class SubtitleStage {
       }
       if (stroke) {
         ctx.strokeStyle = strokeColor;
-        ctx.lineWidth   = strokeWidth;
+        ctx.lineWidth = strokeWidth;
         ctx.strokeText(txt, tx, ty);
       }
       ctx.fillStyle = color;
@@ -506,7 +549,7 @@ class SubtitleStage {
 
   _destroy() {
     this.canvas = null;
-    this._ctx   = null;
+    this._ctx = null;
   }
 }
 
@@ -517,25 +560,29 @@ class SubtitleStage {
 export class PixelStageBase {
   constructor(upstream) {
     this._upstream = upstream;
-    this._canvas   = document.createElement('canvas');
-    this._ctx      = null;
-    this._off      = document.createElement('canvas');
-    this._offCtx   = null;
+    this._canvas = document.createElement('canvas');
+    this._ctx = null;
+    this._off = document.createElement('canvas');
+    this._offCtx = null;
     this._isShader = false;
   }
   _start() {
     const src = this._upstream._getSource();
-    const w = _srcWidth(src), h = _srcHeight(src);
-    this._canvas.width = w; this._canvas.height = h;
-    this._off.width    = w; this._off.height    = h;
-    this._ctx    = this._canvas.getContext('2d');
+    const w = _srcWidth(src),
+      h = _srcHeight(src);
+    this._canvas.width = w;
+    this._canvas.height = h;
+    this._off.width = w;
+    this._off.height = h;
+    this._ctx = this._canvas.getContext('2d');
     this._offCtx = this._off.getContext('2d', { willReadFrequently: true });
   }
   read() {
     if (!this._ctx) return;
     const src = this._upstream._getSource();
     if (_isVideo(src) && src.readyState < 2) return;
-    const w = this._canvas.width, h = this._canvas.height;
+    const w = this._canvas.width,
+      h = this._canvas.height;
     this._offCtx.drawImage(src, 0, 0, w, h);
     const d = this._offCtx.getImageData(0, 0, w, h);
     this._processPixels(d.data);
@@ -543,11 +590,17 @@ export class PixelStageBase {
   }
   _processPixels(_data) {}
   set(_props) {}
-  _getSource() { return this._canvas; }
-  get canvas()  { return this._canvas; }
+  _getSource() {
+    return this._canvas;
+  }
+  get canvas() {
+    return this._canvas;
+  }
   _destroy() {
-    this._canvas.remove(); this._off.remove();
-    this._ctx = null; this._offCtx = null;
+    this._canvas.remove();
+    this._off.remove();
+    this._ctx = null;
+    this._offCtx = null;
   }
 }
 
@@ -558,14 +611,14 @@ export class PixelStageBase {
 class TintStage {
   constructor(upstream, color = '#ffffff') {
     this._upstream = upstream;
-    this._color    = color;
-    this._canvas   = document.createElement('canvas');
-    this._ctx      = null;
+    this._color = color;
+    this._canvas = document.createElement('canvas');
+    this._ctx = null;
     this._isShader = false;
   }
   _start() {
     const src = this._upstream._getSource();
-    this._canvas.width  = _srcWidth(src);
+    this._canvas.width = _srcWidth(src);
     this._canvas.height = _srcHeight(src);
     this._ctx = this._canvas.getContext('2d');
   }
@@ -581,47 +634,72 @@ class TintStage {
     this._ctx.fillRect(0, 0, w, h);
     this._ctx.globalCompositeOperation = 'source-over';
   }
-  set(props) { if (props.color !== undefined) this._color = props.color; }
-  _getSource() { return this._canvas; }
-  get canvas()  { return this._canvas; }
-  _destroy()    { this._canvas.remove(); this._ctx = null; }
+  set(props) {
+    if (props.color !== undefined) this._color = props.color;
+  }
+  _getSource() {
+    return this._canvas;
+  }
+  get canvas() {
+    return this._canvas;
+  }
+  _destroy() {
+    this._canvas.remove();
+    this._ctx = null;
+  }
 }
 
 // ── NegativeStage ─────────────────────────────────────────────────────────────
 
 class NegativeStage extends FxStage {
-  constructor(upstream) { super(upstream, 'invert(1)'); }
+  constructor(upstream) {
+    super(upstream, 'invert(1)');
+  }
 }
 
 // ── SolarizeStage ─────────────────────────────────────────────────────────────
 // Inverts pixels whose luminance exceeds threshold (optical-printing solarization).
 
 class SolarizeStage extends PixelStageBase {
-  constructor(upstream, threshold = 0.5) { super(upstream); this._threshold = threshold; }
+  constructor(upstream, threshold = 0.5) {
+    super(upstream);
+    this._threshold = threshold;
+  }
   _processPixels(p) {
     const t = this._threshold * 255;
     for (let i = 0; i < p.length; i += 4) {
-      const br = 0.299*p[i] + 0.587*p[i+1] + 0.114*p[i+2];
-      if (br > t) { p[i] = 255-p[i]; p[i+1] = 255-p[i+1]; p[i+2] = 255-p[i+2]; }
+      const br = 0.299 * p[i] + 0.587 * p[i + 1] + 0.114 * p[i + 2];
+      if (br > t) {
+        p[i] = 255 - p[i];
+        p[i + 1] = 255 - p[i + 1];
+        p[i + 2] = 255 - p[i + 2];
+      }
     }
   }
-  set(props) { if (props.threshold !== undefined) this._threshold = props.threshold; }
+  set(props) {
+    if (props.threshold !== undefined) this._threshold = props.threshold;
+  }
 }
 
 // ── PosterizeStage ─────────────────────────────────────────────────────────────
 // Reduces each channel to N discrete levels.
 
 class PosterizeStage extends PixelStageBase {
-  constructor(upstream, levels = 4) { super(upstream); this._levels = Math.max(2, levels); }
+  constructor(upstream, levels = 4) {
+    super(upstream);
+    this._levels = Math.max(2, levels);
+  }
   _processPixels(p) {
     const step = 255 / (this._levels - 1);
     for (let i = 0; i < p.length; i += 4) {
-      p[i]   = Math.round(Math.round(p[i]   / step) * step);
-      p[i+1] = Math.round(Math.round(p[i+1] / step) * step);
-      p[i+2] = Math.round(Math.round(p[i+2] / step) * step);
+      p[i] = Math.round(Math.round(p[i] / step) * step);
+      p[i + 1] = Math.round(Math.round(p[i + 1] / step) * step);
+      p[i + 2] = Math.round(Math.round(p[i + 2] / step) * step);
     }
   }
-  set(props) { if (props.levels !== undefined) this._levels = Math.max(2, props.levels); }
+  set(props) {
+    if (props.levels !== undefined) this._levels = Math.max(2, props.levels);
+  }
 }
 
 // ── DuotoneStage ──────────────────────────────────────────────────────────────
@@ -630,8 +708,14 @@ class PosterizeStage extends PixelStageBase {
 function _parseHex(color) {
   if (typeof color === 'string' && color.startsWith('#')) {
     const h = color.slice(1);
-    if (h.length === 3) return [parseInt(h[0]+h[0],16), parseInt(h[1]+h[1],16), parseInt(h[2]+h[2],16)];
-    if (h.length === 6) return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];
+    if (h.length === 3)
+      return [parseInt(h[0] + h[0], 16), parseInt(h[1] + h[1], 16), parseInt(h[2] + h[2], 16)];
+    if (h.length === 6)
+      return [
+        parseInt(h.slice(0, 2), 16),
+        parseInt(h.slice(2, 4), 16),
+        parseInt(h.slice(4, 6), 16),
+      ];
   }
   return [0, 0, 0];
 }
@@ -639,20 +723,21 @@ function _parseHex(color) {
 class DuotoneStage extends PixelStageBase {
   constructor(upstream, darkColor = '#000000', lightColor = '#ffffff') {
     super(upstream);
-    this._dark  = _parseHex(darkColor);
+    this._dark = _parseHex(darkColor);
     this._light = _parseHex(lightColor);
   }
   _processPixels(p) {
-    const [dr,dg,db] = this._dark, [lr,lg,lb] = this._light;
+    const [dr, dg, db] = this._dark,
+      [lr, lg, lb] = this._light;
     for (let i = 0; i < p.length; i += 4) {
-      const luma = (0.299*p[i] + 0.587*p[i+1] + 0.114*p[i+2]) / 255;
-      p[i]   = Math.round(dr + (lr-dr)*luma);
-      p[i+1] = Math.round(dg + (lg-dg)*luma);
-      p[i+2] = Math.round(db + (lb-db)*luma);
+      const luma = (0.299 * p[i] + 0.587 * p[i + 1] + 0.114 * p[i + 2]) / 255;
+      p[i] = Math.round(dr + (lr - dr) * luma);
+      p[i + 1] = Math.round(dg + (lg - dg) * luma);
+      p[i + 2] = Math.round(db + (lb - db) * luma);
     }
   }
   set(props) {
-    if (props.darkColor  !== undefined) this._dark  = _parseHex(props.darkColor);
+    if (props.darkColor !== undefined) this._dark = _parseHex(props.darkColor);
     if (props.lightColor !== undefined) this._light = _parseHex(props.lightColor);
   }
 }
@@ -661,17 +746,22 @@ class DuotoneStage extends PixelStageBase {
 // Adds per-pixel luminance noise (film grain).
 
 class GrainStage extends PixelStageBase {
-  constructor(upstream, amount = 0.15) { super(upstream); this._amount = amount; }
+  constructor(upstream, amount = 0.15) {
+    super(upstream);
+    this._amount = amount;
+  }
   _processPixels(p) {
     const n = this._amount * 255;
     for (let i = 0; i < p.length; i += 4) {
-      const noise = (Math.random()*2-1)*n;
-      p[i]   = Math.min(255, Math.max(0, p[i]   + noise));
-      p[i+1] = Math.min(255, Math.max(0, p[i+1] + noise));
-      p[i+2] = Math.min(255, Math.max(0, p[i+2] + noise));
+      const noise = (Math.random() * 2 - 1) * n;
+      p[i] = Math.min(255, Math.max(0, p[i] + noise));
+      p[i + 1] = Math.min(255, Math.max(0, p[i + 1] + noise));
+      p[i + 2] = Math.min(255, Math.max(0, p[i + 2] + noise));
     }
   }
-  set(props) { if (props.amount !== undefined) this._amount = props.amount; }
+  set(props) {
+    if (props.amount !== undefined) this._amount = props.amount;
+  }
 }
 
 // ── StrobeStage ───────────────────────────────────────────────────────────────
@@ -680,16 +770,16 @@ class GrainStage extends PixelStageBase {
 class StrobeStage {
   constructor(upstream, fps = 4) {
     this._upstream = upstream;
-    this._fps      = fps;
-    this._canvas   = document.createElement('canvas');
-    this._ctx      = null;
-    this._last     = 0;
-    this._on       = true;
+    this._fps = fps;
+    this._canvas = document.createElement('canvas');
+    this._ctx = null;
+    this._last = 0;
+    this._on = true;
     this._isShader = false;
   }
   _start() {
     const src = this._upstream._getSource();
-    this._canvas.width  = _srcWidth(src);
+    this._canvas.width = _srcWidth(src);
     this._canvas.height = _srcHeight(src);
     this._ctx = this._canvas.getContext('2d');
   }
@@ -699,7 +789,10 @@ class StrobeStage {
     if (_isVideo(src) && src.readyState < 2) return;
     const now = performance.now();
     const halfPeriod = 500 / this._fps;
-    if (now - this._last >= halfPeriod) { this._on = !this._on; this._last = now; }
+    if (now - this._last >= halfPeriod) {
+      this._on = !this._on;
+      this._last = now;
+    }
     const { width: w, height: h } = this._canvas;
     if (this._on) {
       this._ctx.drawImage(src, 0, 0, w, h);
@@ -708,24 +801,33 @@ class StrobeStage {
       this._ctx.fillRect(0, 0, w, h);
     }
   }
-  set(props) { if (props.fps !== undefined) this._fps = props.fps; }
-  _getSource() { return this._canvas; }
-  get canvas()  { return this._canvas; }
-  _destroy()    { this._canvas.remove(); this._ctx = null; }
+  set(props) {
+    if (props.fps !== undefined) this._fps = props.fps;
+  }
+  _getSource() {
+    return this._canvas;
+  }
+  get canvas() {
+    return this._canvas;
+  }
+  _destroy() {
+    this._canvas.remove();
+    this._ctx = null;
+  }
 }
 
 // ── Pipeline ──────────────────────────────────────────────────────────────────
 
 export class Pipeline {
   constructor(head) {
-    this._head          = head;      // InputAdapter
-    this._stages        = [];        // stages added by chain methods
-    this._rafId         = null;
-    this._sentinel      = { label: 'pipe' };  // keep-alive token (carries a label
-                                              // so the Signal Graph reads token.label,
-                                              // not 'Object' — ADR 041)
-    this._displayCanvas = null;      // canvas shown to user (for canvas-terminal sinks)
-    this._displayCtx    = null;
+    this._head = head; // InputAdapter
+    this._stages = []; // stages added by chain methods
+    this._rafId = null;
+    this._sentinel = { label: 'pipe' }; // keep-alive token (carries a label
+    // so the Signal Graph reads token.label,
+    // not 'Object' — ADR 041)
+    this._displayCanvas = null; // canvas shown to user (for canvas-terminal sinks)
+    this._displayCtx = null;
     // Owner editor — set when constructed during a run. Lets cleanup tear down
     // only this editor's pipelines so running one editor doesn't kill another's
     // live output (routes delegate to pipe internally — same scoping applies).
@@ -741,7 +843,7 @@ export class Pipeline {
   // All route through _pushStage to eliminate 4-line boilerplate repetition.
 
   _pushStage(stage, type, id) {
-    stage._id        = id ?? `${this._id}-${type}-${this._stages.length}`;
+    stage._id = id ?? `${this._id}-${type}-${this._stages.length}`;
     stage._stageName = type;
     _stageRegistry.set(stage._id, stage);
     this._stages.push(stage);
@@ -749,54 +851,84 @@ export class Pipeline {
     return this;
   }
 
-  ascii(opts = {}, id)          { return this._pushStage(new AsciiStage(this._last(), opts), 'ascii', id); }
-  pixelate(opts = {}, id)       { return this._pushStage(new PixelateStage(this._last(), opts), 'pixelate', id); }
-  fx(filter, id)                { return this._pushStage(new FxStage(this._last(), filter), 'fx', id); }
-  glshader(body, opts = {}, id) { return this._pushStage(new GLShaderStage(this._last(), body, opts), 'glshader', id); }
-  shader(body, opts = {}, id)   { return this._pushStage(new ShaderStage(this._last(), body, opts), 'shader', id); }
+  ascii(opts = {}, id) {
+    return this._pushStage(new AsciiStage(this._last(), opts), 'ascii', id);
+  }
+  pixelate(opts = {}, id) {
+    return this._pushStage(new PixelateStage(this._last(), opts), 'pixelate', id);
+  }
+  fx(filter, id) {
+    return this._pushStage(new FxStage(this._last(), filter), 'fx', id);
+  }
+  glshader(body, opts = {}, id) {
+    return this._pushStage(new GLShaderStage(this._last(), body, opts), 'glshader', id);
+  }
+  shader(body, opts = {}, id) {
+    return this._pushStage(new ShaderStage(this._last(), body, opts), 'shader', id);
+  }
 
   /** Custom stage — escape hatch. factory(upstream) must return { canvas, read() }. */
-  use(factory, id)                  { return this._pushStage(new CustomStage(this._last(), factory), 'custom', id); }
+  use(factory, id) {
+    return this._pushStage(new CustomStage(this._last(), factory), 'custom', id);
+  }
   /** Overlay SRT subtitles on the upstream source (video or canvas with .currentTime). */
-  subtitle(srtText, opts = {}, id)  { return this._pushStage(new SubtitleStage(this._last(), srtText, opts), 'subtitle', id); }
+  subtitle(srtText, opts = {}, id) {
+    return this._pushStage(new SubtitleStage(this._last(), srtText, opts), 'subtitle', id);
+  }
   /** Tint the frame by compositing a solid color with 'multiply' blending. */
-  tint(color = '#ffffff', id)       { return this._pushStage(new TintStage(this._last(), color), 'tint', id); }
+  tint(color = '#ffffff', id) {
+    return this._pushStage(new TintStage(this._last(), color), 'tint', id);
+  }
   /** Invert all pixel values (photographic negative). */
-  negative(id)                      { return this._pushStage(new NegativeStage(this._last()), 'negative', id); }
+  negative(id) {
+    return this._pushStage(new NegativeStage(this._last()), 'negative', id);
+  }
   /** Solarize: invert pixels whose luminance exceeds threshold (0–1). */
-  solarize(threshold = 0.5, id)     { return this._pushStage(new SolarizeStage(this._last(), threshold), 'solarize', id); }
+  solarize(threshold = 0.5, id) {
+    return this._pushStage(new SolarizeStage(this._last(), threshold), 'solarize', id);
+  }
   /** Posterize: reduce each channel to n discrete levels. */
-  posterize(levels = 4, id)         { return this._pushStage(new PosterizeStage(this._last(), levels), 'posterize', id); }
+  posterize(levels = 4, id) {
+    return this._pushStage(new PosterizeStage(this._last(), levels), 'posterize', id);
+  }
   /** Duotone: map luminance between two colors (darkColor → lightColor). */
   duotone(darkColor = '#000000', lightColor = '#ffffff', id) {
     return this._pushStage(new DuotoneStage(this._last(), darkColor, lightColor), 'duotone', id);
   }
   /** Add film grain (luminance noise). amount: 0–1. */
-  grain(amount = 0.15, id)          { return this._pushStage(new GrainStage(this._last(), amount), 'grain', id); }
+  grain(amount = 0.15, id) {
+    return this._pushStage(new GrainStage(this._last(), amount), 'grain', id);
+  }
   /** Strobe: alternate between source frame and black at fps rate. */
-  strobe(fps = 4, id)               { return this._pushStage(new StrobeStage(this._last(), fps), 'strobe', id); }
+  strobe(fps = 4, id) {
+    return this._pushStage(new StrobeStage(this._last(), fps), 'strobe', id);
+  }
   /** CSS blur filter. r: radius in px. */
-  blur(r = 4, id)                   { return this.fx(`blur(${r}px)`, id); }
+  blur(r = 4, id) {
+    return this.fx(`blur(${r}px)`, id);
+  }
   /** CSS hue-rotate filter. deg: degrees. */
-  hue(deg = 0, id)                  { return this.fx(`hue-rotate(${deg}deg)`, id); }
+  hue(deg = 0, id) {
+    return this.fx(`hue-rotate(${deg}deg)`, id);
+  }
 
   // ── Live stage mutation (used by route() for temporal control) ────────────
 
   // Named stage constructors — single source of truth for _createNamedStage and tests.
   static get STAGE_CTORS() {
     return {
-      tint:      (up, ...a) => new TintStage(up, ...a),
-      negative:  (up)       => new NegativeStage(up),
-      solarize:  (up, ...a) => new SolarizeStage(up, ...a),
+      tint: (up, ...a) => new TintStage(up, ...a),
+      negative: (up) => new NegativeStage(up),
+      solarize: (up, ...a) => new SolarizeStage(up, ...a),
       posterize: (up, ...a) => new PosterizeStage(up, ...a),
-      duotone:   (up, ...a) => new DuotoneStage(up, ...a),
-      grain:     (up, ...a) => new GrainStage(up, ...a),
-      strobe:    (up, ...a) => new StrobeStage(up, ...a),
-      blur:      (up, r = 4)  => new FxStage(up, `blur(${r}px)`),
-      hue:       (up, d = 0)  => new FxStage(up, `hue-rotate(${d}deg)`),
-      ascii:     (up, o = {}) => new AsciiStage(up, o),
-      pixelate:  (up, o = {}) => new PixelateStage(up, o),
-      fx:        (up, f)      => new FxStage(up, f),
+      duotone: (up, ...a) => new DuotoneStage(up, ...a),
+      grain: (up, ...a) => new GrainStage(up, ...a),
+      strobe: (up, ...a) => new StrobeStage(up, ...a),
+      blur: (up, r = 4) => new FxStage(up, `blur(${r}px)`),
+      hue: (up, d = 0) => new FxStage(up, `hue-rotate(${d}deg)`),
+      ascii: (up, o = {}) => new AsciiStage(up, o),
+      pixelate: (up, o = {}) => new PixelateStage(up, o),
+      fx: (up, f) => new FxStage(up, f),
     };
   }
 
@@ -819,9 +951,9 @@ export class Pipeline {
     this._stageArgCache.set(type, args); // cache for toggle re-add
     const stage = this._createNamedStage(type, args);
     const stageId = `${this._id}-${type}-live-${this._stages.length}`;
-    stage._id        = stageId;
+    stage._id = stageId;
     stage._stageName = type;
-    stage._isShader  = stage._isShader ?? false;
+    stage._isShader = stage._isShader ?? false;
     _stageRegistry.set(stageId, stage);
     this._stages.push(stage);
     if (this._rafId) stage._start(); // pipeline running — init the stage immediately
@@ -831,17 +963,24 @@ export class Pipeline {
 
   /** Remove the most-recently-added stage with the given name. */
   _removeNamedStage(name) {
-    const idx = this._stages.findLastIndex?.(s => s._stageName === name) ??
-      (() => { let i = this._stages.length - 1; while (i >= 0 && this._stages[i]._stageName !== name) i--; return i; })();
+    const idx =
+      this._stages.findLastIndex?.((s) => s._stageName === name) ??
+      (() => {
+        let i = this._stages.length - 1;
+        while (i >= 0 && this._stages[i]._stageName !== name) i--;
+        return i;
+      })();
     if (idx === -1) return;
     const stage = this._stages.splice(idx, 1)[0];
     if (stage._id) _stageRegistry.delete(stage._id);
-    try { stage._destroy(); } catch (_) {}
+    try {
+      stage._destroy();
+    } catch (_) {}
   }
 
   /** Toggle: add if absent, remove if present (using cached args from last _addNamedStage). */
   _toggleNamedStage(name) {
-    const exists = this._stages.some(s => s._stageName === name);
+    const exists = this._stages.some((s) => s._stageName === name);
     if (exists) {
       this._removeNamedStage(name);
     } else {
@@ -852,11 +991,13 @@ export class Pipeline {
 
   /** Remove ALL stages that were added via _addNamedStage (have _stageName set). */
   _clearNamedStages() {
-    const named = this._stages.filter(s => s._stageName);
+    const named = this._stages.filter((s) => s._stageName);
     for (const stage of named) {
       this._stages.splice(this._stages.indexOf(stage), 1);
       if (stage._id) _stageRegistry.delete(stage._id);
-      try { stage._destroy(); } catch (_) {}
+      try {
+        stage._destroy();
+      } catch (_) {}
     }
   }
 
@@ -873,18 +1014,21 @@ export class Pipeline {
       w: opts.w ?? 700,
       h: opts.h ?? 500,
       html: '',
-      transient: true,   // run artifact — don't serialize/restore (empties orphan on refresh)
+      transient: true, // run artifact — don't serialize/restore (empties orphan on refresh)
       // Chain caller's onClose (e.g. route._destroy to release its keep-alive) before stop().
-      onClose: () => { opts.onClose?.(); this.stop(); },
-      ...(opts.noChrome    !== undefined ? { noChrome:    opts.noChrome    } : {}),
+      onClose: () => {
+        opts.onClose?.();
+        this.stop();
+      },
+      ...(opts.noChrome !== undefined ? { noChrome: opts.noChrome } : {}),
       ...(opts.transparent !== undefined ? { transparent: opts.transparent } : {}),
     });
 
     if (winId) {
       this.winId = winId;
-      this._ownWinId = winId;   // window we spawned — close it on _destroy (reset), else it orphans
+      this._ownWinId = winId; // window we spawned — close it on _destroy (reset), else it orphans
       const winEl = document.getElementById(winId);
-      const body  = winEl?.querySelector('.wm-body');
+      const body = winEl?.querySelector('.wm-body');
       if (body) {
         body.style.cssText += ';overflow:hidden;padding:0;margin:0;';
         this._mountInContainer(body);
@@ -907,9 +1051,11 @@ export class Pipeline {
     const layerCanvas = winId ? window.wm?.layer?.(winId, z, { raster: true }) : null;
     if (layerCanvas) {
       this._displayCanvas = layerCanvas;
-      this._displayCtx    = layerCanvas.getContext('2d');
+      this._displayCtx = layerCanvas.getContext('2d');
     } else {
-      console.warn('pipe.layer(target, z): pass a Canvas or window id (ADR 040). Use .show() for a standalone window.');
+      console.warn(
+        'pipe.layer(target, z): pass a Canvas or window id (ADR 040). Use .show() for a standalone window.',
+      );
     }
     this.start();
     return this;
@@ -952,7 +1098,7 @@ export class Pipeline {
     if (this._displayCanvas && this._ownsDisplayCanvas) {
       const src = this._last()._getSource() ?? this._head._getSource();
       if (src) {
-        this._displayCanvas.width  = _srcWidth(src);
+        this._displayCanvas.width = _srcWidth(src);
         this._displayCanvas.height = _srcHeight(src);
       }
     }
@@ -971,7 +1117,11 @@ export class Pipeline {
           const src = this._last()._getSource() ?? this._head._getSource();
           if (src) {
             this._displayCtx.drawImage(
-              src, 0, 0, this._displayCanvas.width, this._displayCanvas.height
+              src,
+              0,
+              0,
+              this._displayCanvas.width,
+              this._displayCanvas.height,
             );
           }
         }
@@ -985,7 +1135,10 @@ export class Pipeline {
 
   stop() {
     this._stopped = true;
-    if (this._rafId) { cancelAnimationFrame(this._rafId); this._rafId = null; }
+    if (this._rafId) {
+      cancelAnimationFrame(this._rafId);
+      this._rafId = null;
+    }
     this._live?.release();
     notify(`${this._id}:stopped`, { id: this._id });
     return this;
@@ -1011,13 +1164,13 @@ export class Pipeline {
       dc.style.cssText = 'width:100%;height:100%;display:block;';
       container.appendChild(dc);
       this._displayCanvas = dc;
-      this._displayCtx    = dc.getContext('2d');
-      this._ownsDisplayCanvas = true;   // we created it → safe to size/remove (ADR 040)
+      this._displayCtx = dc.getContext('2d');
+      this._ownsDisplayCanvas = true; // we created it → safe to size/remove (ADR 040)
     }
   }
 
   _destroy() {
-    if (this._destroyed) return;   // idempotent; stops dispose()→onStop re-entry
+    if (this._destroyed) return; // idempotent; stops dispose()→onStop re-entry
     this._destroyed = true;
     notify('pipe:destroy', { id: this._id });
     this.stop();
@@ -1031,7 +1184,7 @@ export class Pipeline {
       this._displayCanvas.remove();
     }
     this._displayCanvas = null;
-    this._displayCtx    = null;
+    this._displayCtx = null;
     this._ownsDisplayCanvas = false;
     // Close the window we spawned so it doesn't orphan across reset/re-run.
     if (this._ownWinId) {
@@ -1040,7 +1193,7 @@ export class Pipeline {
       window.wm?.remove?.(id, { animate: false });
     }
     _pipelines.delete(this);
-    this._scoped?.dispose();   // removes from run-scoped set
+    this._scoped?.dispose(); // removes from run-scoped set
   }
 }
 
@@ -1103,10 +1256,12 @@ export function pipe(source) {
 //   pipe(cam).glowAscii({ cols: 120, color: '#00ff41' }).show('Glow', { w: 700, h: 500 });
 
 function _pipeBlockFieldDef(f) {
-  if (f.type === 'number')             return { type: 'field_number', name: f.name, value: f.default ?? 0 };
-  if (f.type === 'color' || f.type === 'colour') return { type: 'field_colour', name: f.name, colour: f.default ?? '#ffffff' };
-  if (f.type === 'boolean')            return { type: 'field_checkbox', name: f.name, checked: f.default ?? false };
-  return                                      { type: 'field_input',  name: f.name, text: String(f.default ?? '') };
+  if (f.type === 'number') return { type: 'field_number', name: f.name, value: f.default ?? 0 };
+  if (f.type === 'color' || f.type === 'colour')
+    return { type: 'field_colour', name: f.name, colour: f.default ?? '#ffffff' };
+  if (f.type === 'boolean')
+    return { type: 'field_checkbox', name: f.name, checked: f.default ?? false };
+  return { type: 'field_input', name: f.name, text: String(f.default ?? '') };
 }
 
 function _generatePipeBlock(name, label, colour, fields) {
@@ -1120,7 +1275,7 @@ function _generatePipeBlock(name, label, colour, fields) {
     args0: [
       { type: 'field_number', name: 'INDEX', value: 0, min: 0, precision: 1 },
       ...fields.map(_pipeBlockFieldDef),
-      { type: 'field_input',  name: 'TITLE', text: label },
+      { type: 'field_input', name: 'TITLE', text: label },
       { type: 'field_number', name: 'W', value: 700, min: 100 },
       { type: 'field_number', name: 'H', value: 500, min: 100 },
     ],
@@ -1135,7 +1290,7 @@ function _generatePipeBlock(name, label, colour, fields) {
     const opts = {};
     for (const f of fields) {
       const v = b.getFieldValue(f.name);
-      opts[f.name] = (f.type === 'number') ? Number(v) : v;
+      opts[f.name] = f.type === 'number' ? Number(v) : v;
     }
     const title = JSON.stringify(b.getFieldValue('TITLE'));
     const w = b.getFieldValue('W');
@@ -1149,30 +1304,31 @@ function _generatePipeBlock(name, label, colour, fields) {
   return { definition, generator };
 }
 
-pipe.register = function(name, factory, descriptor = {}) {
-  const label   = descriptor.label  ?? name;
-  const hint    = descriptor.hint   ?? `pipe().${name}() — custom pipeline stage`;
-  const colour  = descriptor.colour ?? 80;
-  const fields  = descriptor.fields ?? [];
+pipe.register = function (name, factory, descriptor = {}) {
+  const label = descriptor.label ?? name;
+  const hint = descriptor.hint ?? `pipe().${name}() — custom pipeline stage`;
+  const colour = descriptor.colour ?? 80;
+  const fields = descriptor.fields ?? [];
   const blockType = `pipe_custom_${name}`;
 
   // 1. Add stage method to all Pipeline instances (persists across resets)
-  Pipeline.prototype[name] = function(opts = {}) {
+  Pipeline.prototype[name] = function (opts = {}) {
     this._stages.push(new CustomStage(this._last(), (src) => factory(src, opts)));
     return this;
   };
 
   // 2. Build toolkit snippet
   const optsStr = fields.length
-    ? `{ ${fields.map(f => `${f.name}: ${JSON.stringify(f.default ?? '')}`).join(', ')} }`
+    ? `{ ${fields.map((f) => `${f.name}: ${JSON.stringify(f.default ?? '')}`).join(', ')} }`
     : '';
-  const code = descriptor.code ??
+  const code =
+    descriptor.code ??
     `const cam = await Camera.open();\npipe(cam)\n  .${name}(${optsStr})\n  .show('${label}', { w: 700, h: 500 });`;
   const cmd = {
     label,
     code,
     hint,
-    blockType,  // enables drag-into-blocks-mode from text toolkit
+    blockType, // enables drag-into-blocks-mode from text toolkit
     tags: ['pipe', name, 'pipeline', 'custom'],
   };
 
@@ -1187,7 +1343,7 @@ pipe.register = function(name, factory, descriptor = {}) {
   // 5. Register block via API registry; skip toolkit if already injected live above
   window.registerAPI?.(`_pipe_${name}`, null, {
     category: 'Pipeline',
-    toolkit: window.__ar_addToolkitEntry ? [] : [cmd],  // avoid double-add
+    toolkit: window.__ar_addToolkitEntry ? [] : [cmd], // avoid double-add
     blocks: [blockDef],
   });
 };
@@ -1210,14 +1366,14 @@ export function cleanupPipelines(editorId) {
 
 // ── Event bus command handlers ────────────────────────────────────────────────
 registerCommand('pipe:destroy', ({ id }) => {
-  const p = [..._pipelines].find(p => p._id === id);
+  const p = [..._pipelines].find((p) => p._id === id);
   if (p) p._destroy();
 });
 registerCommand('pipe:stop', ({ id }) => {
-  [..._pipelines].find(p => p._id === id)?.stop();
+  [..._pipelines].find((p) => p._id === id)?.stop();
 });
 registerCommand('pipe:start', ({ id }) => {
-  [..._pipelines].find(p => p._id === id)?.start();
+  [..._pipelines].find((p) => p._id === id)?.start();
 });
 registerCommand('pipe:stage:set', ({ stageId, ...props }) => {
   _stageRegistry.get(stageId)?.set?.(props);
@@ -1231,4 +1387,6 @@ registerCommand('pipe:stage:set-uniform', ({ stageId, name, value }) => {
 // 041) — each pipeline registers a runScoped handle in its ctor. This residual
 // onReset only clears the GLOBAL stage registry on a full (editorId == null)
 // reset; cleanupPipelines() remains a manual destroy-all helper for tests.
-onReset((editorId) => { if (editorId == null) _stageRegistry.clear(); });
+onReset((editorId) => {
+  if (editorId == null) _stageRegistry.clear();
+});

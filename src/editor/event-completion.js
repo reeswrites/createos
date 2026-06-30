@@ -24,11 +24,7 @@ function findEventArgAtCursor(ast, cursor) {
       const path = calleePath(node.callee);
       if (EVENT_CALLEE_SET.has(path) && node.arguments.length >= 1) {
         const firstArg = node.arguments[0];
-        if (
-          firstArg.type === 'Literal' &&
-          typeof firstArg.value === 'string' &&
-          firstArg.range
-        ) {
+        if (firstArg.type === 'Literal' && typeof firstArg.value === 'string' && firstArg.range) {
           const [argStart, argEnd] = firstArg.range;
           // cursor inside the string (between the quotes)
           if (cursor > argStart && cursor <= argEnd - 1) {
@@ -77,16 +73,19 @@ function collectUserEvents(ast) {
 
 // ── Completion source ─────────────────────────────────────────────────────────
 
-const SYSTEM_NAMES = new Set(SYSTEM_EVENTS.map(e => e.name));
+const SYSTEM_NAMES = new Set(SYSTEM_EVENTS.map((e) => e.name));
 
 /** CodeMirror completion source. Register via javascriptLanguage.data.of({ autocomplete: eventCompletionSource }). */
 export function eventCompletionSource(context) {
   const cursor = context.pos;
-  const code   = context.state.doc.toString();
+  const code = context.state.doc.toString();
 
   let ast;
-  try { ast = esprima.parseScript(code, { range: true, tolerant: true }); }
-  catch (_) { return null; }
+  try {
+    ast = esprima.parseScript(code, { range: true, tolerant: true });
+  } catch (_) {
+    return null;
+  }
 
   const match = findEventArgAtCursor(ast, cursor);
   if (!match) return null;
@@ -94,32 +93,32 @@ export function eventCompletionSource(context) {
   const userEvents = collectUserEvents(ast);
 
   // System events as keyword completions (higher boost)
-  const systemOptions = SYSTEM_EVENTS.map(e => ({
-    label:  e.name,
-    type:   'keyword',
+  const systemOptions = SYSTEM_EVENTS.map((e) => ({
+    label: e.name,
+    type: 'keyword',
     detail: e.detail ?? '',
-    info:   e.payload ? `Payload: ${e.payload}` : undefined,
-    boost:  1,
+    info: e.payload ? `Payload: ${e.payload}` : undefined,
+    boost: 1,
   }));
 
   // User-defined events not already in the catalog
   const userOptions = [...userEvents]
-    .filter(name => !SYSTEM_NAMES.has(name) && name.length > 0)
-    .map(name => ({
-      label:  name,
-      type:   'variable',
+    .filter((name) => !SYSTEM_NAMES.has(name) && name.length > 0)
+    .map((name) => ({
+      label: name,
+      type: 'variable',
       detail: 'user-defined event',
-      boost:  0,
+      boost: 0,
     }));
 
   // Dynamic per-window scoped patterns — offered when prefix starts with 'wm:'
   const dynamicOptions = match.prefix.startsWith('wm:')
-    ? DYNAMIC_EVENT_PATTERNS.map(p => ({
-        label:  p.pattern,
-        type:   'keyword',
+    ? DYNAMIC_EVENT_PATTERNS.map((p) => ({
+        label: p.pattern,
+        type: 'keyword',
         detail: p.detail ?? '',
-        info:   p.payload ? `Payload: ${p.payload}` : undefined,
-        boost:  0,
+        info: p.payload ? `Payload: ${p.payload}` : undefined,
+        boost: 0,
       }))
     : [];
 

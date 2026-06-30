@@ -10,17 +10,17 @@
 // run). Their registrations are captured in the snapshot and survive across runs.
 // User code calling registerAPI() during a run is rolled back on reset().
 
-const _registry    = new Map();   // name → impl (live)
-const _descriptors = new Map();   // name → descriptor (params / detect / …) — see CONTEXT.md "API Descriptor"
-let   _runBaseline  = null;       // impl snapshot taken at _beginRun(); restored at _endRun()
-let   _descBaseline = null;       // descriptor snapshot, rolled back the same way
+const _registry = new Map(); // name → impl (live)
+const _descriptors = new Map(); // name → descriptor (params / detect / …) — see CONTEXT.md "API Descriptor"
+let _runBaseline = null; // impl snapshot taken at _beginRun(); restored at _endRun()
+let _descBaseline = null; // descriptor snapshot, rolled back the same way
 
 // ── Blocks / toolkit extensibility hooks ─────────────────────────────────────
 // Set by blocks.js and completions.js respectively after they initialise.
 
-let _blocksApplier  = null;
+let _blocksApplier = null;
 let _toolkitApplier = null;
-const _pendingBlocks  = [];
+const _pendingBlocks = [];
 const _pendingToolkit = [];
 
 function _applyBlocks(name, blocksDefs) {
@@ -78,7 +78,7 @@ export function registerAPI(name, impl, ext = null) {
 // ── Run lifecycle ─────────────────────────────────────────────────────────────
 
 export function _beginRun() {
-  _runBaseline  = new Map(_registry);
+  _runBaseline = new Map(_registry);
   _descBaseline = new Map(_descriptors);
 }
 

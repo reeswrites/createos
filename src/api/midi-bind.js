@@ -24,14 +24,18 @@ import { midi } from './midi.js';
 const _instruments = new Set();
 let _target = null;
 
-export function registerMidiInstrument(widget) { _instruments.add(widget); }
+export function registerMidiInstrument(widget) {
+  _instruments.add(widget);
+}
 
 export function unregisterMidiInstrument(widget) {
   _instruments.delete(widget);
   if (_target === widget) _target = null;
 }
 
-export function getMidiTarget() { return _target; }
+export function getMidiTarget() {
+  return _target;
+}
 
 // ── Chip wiring (shared by every instrument widget) ─────────────────────────────
 // The 🎹 chip appearance per target/idle/dormant state was duplicated byte-for-byte
@@ -39,8 +43,13 @@ export function getMidiTarget() { return _target; }
 // supplies the chip element (its own button factory) and the per-instrument tooltips.
 
 const CHIP_STYLES = {
-  target:  { color: '#a6e3a1', borderColor: '#a6e3a1', opacity: '1',    boxShadow: '0 0 6px #a6e3a155' },
-  idle:    { color: '#6c7086', borderColor: '#313244', opacity: '0.7',  boxShadow: '' },
+  target: {
+    color: '#a6e3a1',
+    borderColor: '#a6e3a1',
+    opacity: '1',
+    boxShadow: '0 0 6px #a6e3a155',
+  },
+  idle: { color: '#6c7086', borderColor: '#313244', opacity: '0.7', boxShadow: '' },
   dormant: { color: '#45475a', borderColor: '#313244', opacity: '0.55', boxShadow: '' },
 };
 
@@ -67,14 +76,17 @@ export function wireMidiInstrument(widget, { chip, tooltips }) {
   chip.addEventListener('click', () => enableMidiFor(widget));
 }
 
-function _midiOpen() { return !!midi._access; }
+function _midiOpen() {
+  return !!midi._access;
+}
 
 /** Re-paint every registered instrument's chip from current open/target state. */
 function _refreshChips() {
   const open = _midiOpen();
   for (const w of _instruments) {
-    try { w._setMidiChip?.(open ? (w === _target ? 'target' : 'idle') : 'dormant'); }
-    catch (_) {}
+    try {
+      w._setMidiChip?.(open ? (w === _target ? 'target' : 'idle') : 'dormant');
+    } catch (_) {}
   }
 }
 
@@ -85,15 +97,22 @@ function _refreshChips() {
 export async function notifyMidiFocus(widget) {
   if (!_instruments.has(widget)) return;
   _target = widget;
-  if (_midiOpen()) { _refreshChips(); return; }
+  if (_midiOpen()) {
+    _refreshChips();
+    return;
+  }
   // Silent permission check — does NOT prompt.
   let state = 'prompt';
   try {
     const status = await navigator.permissions?.query?.({ name: 'midi' });
     state = status?.state ?? 'prompt';
-  } catch (_) { state = 'prompt'; }
+  } catch (_) {
+    state = 'prompt';
+  }
   if (state === 'granted') {
-    try { await midi.open(); } catch (_) {}
+    try {
+      await midi.open();
+    } catch (_) {}
   }
   _refreshChips();
 }
@@ -105,7 +124,9 @@ export async function notifyMidiFocus(widget) {
 export async function enableMidiFor(widget) {
   if (!_instruments.has(widget)) return;
   _target = widget;
-  try { await midi.open(); } catch (_) {}
+  try {
+    await midi.open();
+  } catch (_) {}
   _refreshChips();
 }
 
@@ -115,12 +136,12 @@ export async function enableMidiFor(widget) {
 
 addBusTap((event, data) => {
   if (event === 'midi:note:on') {
-    _target?._midiNoteOn?.(data.note, ((data.velocity ?? 0) / 127) || 0);
+    _target?._midiNoteOn?.(data.note, (data.velocity ?? 0) / 127 || 0);
   } else if (event === 'midi:note:off') {
     _target?._midiNoteOff?.(data.note);
   } else if (event === 'wm:focus') {
     // Sticky: only react when a registered instrument is focused; ignore everything else.
-    const w = [..._instruments].find(i => i._winId === data.id);
+    const w = [..._instruments].find((i) => i._winId === data.id);
     if (w) notifyMidiFocus(w);
   }
 });

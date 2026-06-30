@@ -5,13 +5,10 @@
 
 const _isElectron = !!(
   typeof window !== 'undefined' &&
-  (window.__ELECTRON__ ||
-    (typeof process !== 'undefined' && process.versions?.electron))
+  (window.__ELECTRON__ || (typeof process !== 'undefined' && process.versions?.electron))
 );
 
-const _isTauri = !!(
-  typeof window !== 'undefined' && window.__TAURI__
-);
+const _isTauri = !!(typeof window !== 'undefined' && window.__TAURI__);
 
 const _isDesktop = _isElectron || _isTauri;
 
@@ -98,22 +95,42 @@ function _fullscreen(on = true) {
 
 export const shell = {
   // Environment detection
-  get isDesktop() { return _isDesktop; },
-  get isElectron() { return _isElectron; },
-  get isTauri() { return _isTauri; },
-  get isBrowser() { return !_isDesktop; },
+  get isDesktop() {
+    return _isDesktop;
+  },
+  get isElectron() {
+    return _isElectron;
+  },
+  get isTauri() {
+    return _isTauri;
+  },
+  get isBrowser() {
+    return !_isDesktop;
+  },
 
   // Status bar (visible in desktop shell titlebar area; no-op in browser)
-  status(text)  { _setStatusBar(String(text)); return shell; },
-  clearStatus() { _clearStatusBar(); return shell; },
+  status(text) {
+    _setStatusBar(String(text));
+    return shell;
+  },
+  clearStatus() {
+    _clearStatusBar();
+    return shell;
+  },
 
   // File system
   openFile: _openFile,
-  saveFile:  _saveFile,
+  saveFile: _saveFile,
 
   // Native window
-  setTitle(text) { _setTitle(String(text)); return shell; },
-  fullscreen(on = true) { _fullscreen(on); return shell; },
+  setTitle(text) {
+    _setTitle(String(text));
+    return shell;
+  },
+  fullscreen(on = true) {
+    _fullscreen(on);
+    return shell;
+  },
 
   // Low-level native invoke (Tauri only; no-op elsewhere)
   invoke(cmd, args = {}) {

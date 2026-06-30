@@ -8,14 +8,14 @@ const _midi = {
   _access: null,
   _noteHandlers: [],
   _ccHandlers: [],
-  _signals: new Map(),   // `ch:cc` → { _val, value getter }
+  _signals: new Map(), // `ch:cc` → { _val, value getter }
   _cleanupFns: [],
 
   async open() {
     if (_midi._access) return _midi;
     if (!navigator.requestMIDIAccess) throw new Error('Web MIDI not supported in this browser');
     _midi._access = await navigator.requestMIDIAccess({ sysex: false });
-    _midi._access.inputs.forEach(input => _midi._setupInput(input));
+    _midi._access.inputs.forEach((input) => _midi._setupInput(input));
     _midi._access.onstatechange = (e) => {
       if (e.port.type === 'input' && e.port.state === 'connected') {
         _midi._setupInput(e.port);
@@ -31,10 +31,10 @@ const _midi = {
 
   _dispatch(e) {
     const [status, data1, data2 = 0] = e.data;
-    const type    = status & 0xF0;
-    const channel = status & 0x0F;
+    const type = status & 0xf0;
+    const channel = status & 0x0f;
 
-    if (status === 0xF8) {
+    if (status === 0xf8) {
       // MIDI clock (24 PPQ)
       notify('midi:clock', {});
     } else if (type === 0x90 && data2 > 0) {
@@ -45,9 +45,9 @@ const _midi = {
       const ev = { note: data1, velocity: data2, channel };
       notify('midi:note:off', ev);
       for (const fn of _midi._noteHandlers) fn({ type: 'noteoff', ...ev });
-    } else if (type === 0xB0) {
+    } else if (type === 0xb0) {
       const value = data2 / 127;
-      const key   = `${channel}:${data1}`;
+      const key = `${channel}:${data1}`;
       if (_midi._signals.has(key)) _midi._signals.get(key)._val = value;
       const ev = { cc: data1, value, channel, raw: data2 };
       notify('midi:cc', { channel, cc: data1, value });
@@ -59,8 +59,11 @@ const _midi = {
 
   inputs() {
     if (!_midi._access) return [];
-    return Array.from(_midi._access.inputs.values()).map(i => ({
-      id: i.id, name: i.name, manufacturer: i.manufacturer, state: i.state,
+    return Array.from(_midi._access.inputs.values()).map((i) => ({
+      id: i.id,
+      name: i.name,
+      manufacturer: i.manufacturer,
+      state: i.state,
     }));
   },
 
@@ -69,17 +72,19 @@ const _midi = {
   onNote(fn) {
     _midi._noteHandlers.push(fn);
     _midi._cleanupFns.push(() => {
-      _midi._noteHandlers = _midi._noteHandlers.filter(h => h !== fn);
+      _midi._noteHandlers = _midi._noteHandlers.filter((h) => h !== fn);
     });
     return _midi;
   },
 
   // fn(value 0–1) fires when CC matches channel+cc
   onCC(channel, cc, fn) {
-    const wrapper = (e) => { if (e.channel === channel && e.cc === cc) fn(e.value); };
+    const wrapper = (e) => {
+      if (e.channel === channel && e.cc === cc) fn(e.value);
+    };
     _midi._ccHandlers.push(wrapper);
     _midi._cleanupFns.push(() => {
-      _midi._ccHandlers = _midi._ccHandlers.filter(h => h !== wrapper);
+      _midi._ccHandlers = _midi._ccHandlers.filter((h) => h !== wrapper);
     });
     return _midi;
   },
@@ -90,7 +95,12 @@ const _midi = {
   signal(channel, cc) {
     const key = `${channel}:${cc}`;
     if (!_midi._signals.has(key)) {
-      const s = { _val: 0, get value() { return s._val; } };
+      const s = {
+        _val: 0,
+        get value() {
+          return s._val;
+        },
+      };
       _midi._signals.set(key, s);
     }
     return _midi._signals.get(key);
@@ -111,10 +121,16 @@ const _midi = {
           logEl.scrollTop = logEl.scrollHeight;
           if (logEl.children.length > 120) logEl.removeChild(logEl.firstChild);
         };
-        _midi.onNote(ev => append(`${ev.type.toUpperCase().padEnd(8)} ch:${ev.channel} note:${ev.note} vel:${ev.velocity}`));
+        _midi.onNote((ev) =>
+          append(
+            `${ev.type.toUpperCase().padEnd(8)} ch:${ev.channel} note:${ev.note} vel:${ev.velocity}`,
+          ),
+        );
         const ccWatcher = (e) => append(`CC       ch:${e.channel} cc:${e.cc} val:${e.raw}`);
         _midi._ccHandlers.push(ccWatcher);
-        _midi._cleanupFns.push(() => { _midi._ccHandlers = _midi._ccHandlers.filter(h => h !== ccWatcher); });
+        _midi._cleanupFns.push(() => {
+          _midi._ccHandlers = _midi._ccHandlers.filter((h) => h !== ccWatcher);
+        });
       }
     }
     return _midi;

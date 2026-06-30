@@ -14,22 +14,22 @@
 import { WordDiffer } from './word-differ.js';
 
 const SAMPLE_RATE = 16000;
-const CHUNK = 8192;            // ~0.5 s at 16 kHz
-const SILENCE_RMS = 0.008;     // below this = silence
-const SILENCE_CHUNKS = 3;      // consecutive silent chunks → flush
+const CHUNK = 8192; // ~0.5 s at 16 kHz
+const SILENCE_RMS = 0.008; // below this = silence
+const SILENCE_CHUNKS = 3; // consecutive silent chunks → flush
 
 export class AudioTap extends EventTarget {
   constructor(mediaStream, backend, opts = {}) {
     super();
-    this._stream  = mediaStream;
+    this._stream = mediaStream;
     this._backend = backend;
-    this._chunk   = opts.chunkSize ?? CHUNK;
-    this._differ  = new WordDiffer(opts.stableAfter ?? 3);
+    this._chunk = opts.chunkSize ?? CHUNK;
+    this._differ = new WordDiffer(opts.stableAfter ?? 3);
 
     this._ctx = null;
     this._srcNode = null;
-    this._node = null;       // AudioWorkletNode | ScriptProcessorNode
-    this._scriptBuf = [];    // fallback main-thread accumulation
+    this._node = null; // AudioWorkletNode | ScriptProcessorNode
+    this._scriptBuf = []; // fallback main-thread accumulation
     this._scriptFill = 0;
     this._started = false;
     this._stopped = false;
@@ -46,7 +46,10 @@ export class AudioTap extends EventTarget {
     this._started = true;
 
     await this._backend.init();
-    if (this._stopped) { this._backend.destroy(); return; }
+    if (this._stopped) {
+      this._backend.destroy();
+      return;
+    }
 
     this._ctx = new AudioContext({ sampleRate: SAMPLE_RATE });
     this._srcNode = this._ctx.createMediaStreamSource(this._stream);
@@ -56,14 +59,19 @@ export class AudioTap extends EventTarget {
       try {
         await this._ctx.audioWorklet.addModule(new URL('./pcm-worklet.js', import.meta.url));
         this._node = new AudioWorkletNode(this._ctx, 'pcm-processor', {
-          numberOfInputs: 1, numberOfOutputs: 1, channelCount: 1,
+          numberOfInputs: 1,
+          numberOfOutputs: 1,
+          channelCount: 1,
           processorOptions: { chunkSize: this._chunk },
         });
         this._node.port.onmessage = (e) => this._onChunk(e.data);
         this._srcNode.connect(this._node);
         this._node.connect(this._ctx.destination); // keep graph pulling (muted by ctx)
       } catch (e) {
-        console.warn('[AudioTap] AudioWorklet failed, falling back to ScriptProcessor:', e?.message ?? e);
+        console.warn(
+          '[AudioTap] AudioWorklet failed, falling back to ScriptProcessor:',
+          e?.message ?? e,
+        );
         this._startScriptProcessor();
       }
     } else {
@@ -98,8 +106,12 @@ export class AudioTap extends EventTarget {
     // VAD: energy on this chunk.
     const rms = this._rms(chunk);
     const speaking = rms >= SILENCE_RMS;
-    if (speaking) { this._hadSpeech = true; this._silentRun = 0; }
-    else          { this._silentRun++; }
+    if (speaking) {
+      this._hadSpeech = true;
+      this._silentRun = 0;
+    } else {
+      this._silentRun++;
+    }
 
     // Speech→silence transition: flush trailing words as final.
     if (!speaking && this._hadSpeech && this._silentRun === SILENCE_CHUNKS) {
@@ -142,17 +154,31 @@ export class AudioTap extends EventTarget {
   stop() {
     if (this._stopped) return;
     this._stopped = true;
-    try { this._node?.disconnect(); } catch {}
-    try { this._srcNode?.disconnect(); } catch {}
+    try {
+      this._node?.disconnect();
+    } catch {}
+    try {
+      this._srcNode?.disconnect();
+    } catch {}
     if (this._node && this._node.port) this._node.port.onmessage = null;
     if (this._node && 'onaudioprocess' in this._node) this._node.onaudioprocess = null;
-    try { this._backend?.destroy(); } catch {}
-    try { this._ctx?.close(); } catch {}
-    this._node = null; this._srcNode = null; this._ctx = null;
+    try {
+      this._backend?.destroy();
+    } catch {}
+    try {
+      this._ctx?.close();
+    } catch {}
+    this._node = null;
+    this._srcNode = null;
+    this._ctx = null;
   }
 
-  _fireWord(detail)  { this.dispatchEvent(new CustomEvent('word', { detail })); }
-  _fireTranscript(text, isFinal) { this.dispatchEvent(new CustomEvent('transcript', { detail: { text, isFinal } })); }
+  _fireWord(detail) {
+    this.dispatchEvent(new CustomEvent('word', { detail }));
+  }
+  _fireTranscript(text, isFinal) {
+    this.dispatchEvent(new CustomEvent('transcript', { detail: { text, isFinal } }));
+  }
 
   _rms(buf) {
     let s = 0;

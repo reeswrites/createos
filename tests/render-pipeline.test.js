@@ -145,12 +145,6 @@ describe('pipe() source resolution', () => {
 // ── AsciiStage ────────────────────────────────────────────────────────────────
 
 describe('AsciiStage', () => {
-  function makeOffscreenCanvas(cols, rows) {
-    // Create an offscreen canvas mock that returns specific pixel data on getImageData
-    const { canvas, ctx } = makeCanvas(cols, rows);
-    return { canvas, ctx };
-  }
-
   it('creates a canvas on _start()', () => {
     const src = makeCanvas(800, 600).canvas;
     const p = pipe(src).ascii({ cols: 10, rows: 4 });
@@ -171,7 +165,7 @@ describe('AsciiStage', () => {
   });
 
   it('luma→glyph mapping: bright pixel → dense glyph', () => {
-    const { canvas, ctx } = makeCanvas(800, 600);
+    const { canvas } = makeCanvas(800, 600);
     const p = pipe(canvas).ascii({ cols: 2, rows: 1, charset: ' .#', cellW: 8, cellH: 14 });
     const stage = p._stages[0];
     stage._start();
@@ -280,7 +274,7 @@ describe('Pipeline.start() / keepAlive', () => {
 
   it('start() is idempotent (double-call does not double-register)', () => {
     const { canvas } = makeCanvas();
-    const p = pipe(canvas).start().start();
+    pipe(canvas).start().start();
     expect(window.__ar_keepAlive.size).toBe(1);
   });
 });
@@ -291,8 +285,8 @@ describe('cleanupPipelines()', () => {
   it('stops all pipelines and clears keepAlive sentinels', () => {
     const { canvas: c1 } = makeCanvas();
     const { canvas: c2 } = makeCanvas();
-    const p1 = pipe(c1).start();
-    const p2 = pipe(c2).start();
+    pipe(c1).start();
+    pipe(c2).start();
 
     expect(window.__ar_keepAlive.size).toBe(2);
     cleanupPipelines();
@@ -538,7 +532,7 @@ describe('pipe.register()', () => {
 
   it('adds a chainable method on Pipeline.prototype', () => {
     const userRead = vi.fn();
-    pipe.register('testStage', (src, opts) => {
+    pipe.register('testStage', (_src, _opts) => {
       const { canvas } = makeCanvas();
       return { canvas, read: userRead };
     });
@@ -551,7 +545,7 @@ describe('pipe.register()', () => {
 
   it('stage method passes opts to factory', () => {
     let capturedOpts = null;
-    pipe.register('testStage', (src, opts) => {
+    pipe.register('testStage', (_src, opts) => {
       capturedOpts = opts;
       const { canvas } = makeCanvas();
       return { canvas, read: vi.fn() };
@@ -563,8 +557,8 @@ describe('pipe.register()', () => {
   });
 
   it('multiple registrations produce independent methods', () => {
-    pipe.register('testStage', (src) => ({ canvas: makeCanvas().canvas, read: vi.fn() }));
-    pipe.register('colorStage', (src) => ({ canvas: makeCanvas().canvas, read: vi.fn() }));
+    pipe.register('testStage', (_src) => ({ canvas: makeCanvas().canvas, read: vi.fn() }));
+    pipe.register('colorStage', (_src) => ({ canvas: makeCanvas().canvas, read: vi.fn() }));
     const { canvas: src } = makeCanvas();
     const p = pipe(src).testStage().colorStage();
     expect(p._stages.length).toBe(2);
@@ -573,7 +567,7 @@ describe('pipe.register()', () => {
   it('calls window.__ar_addToolkitEntry with Pipeline category', () => {
     const addEntry = vi.fn();
     global.window.__ar_addToolkitEntry = addEntry;
-    pipe.register('testStage', (src) => ({ canvas: makeCanvas().canvas, read: vi.fn() }), {
+    pipe.register('testStage', (_src) => ({ canvas: makeCanvas().canvas, read: vi.fn() }), {
       label: 'Test Stage',
       hint: 'A test stage',
     });
@@ -588,7 +582,7 @@ describe('pipe.register()', () => {
   it('toolkit entry code contains the stage name', () => {
     let capturedCmd = null;
     global.window.__ar_addToolkitEntry = (_cat, cmd) => { capturedCmd = cmd; };
-    pipe.register('noFieldStage', (src) => ({ canvas: makeCanvas().canvas, read: vi.fn() }), {
+    pipe.register('noFieldStage', (_src) => ({ canvas: makeCanvas().canvas, read: vi.fn() }), {
       label: 'No Fields',
     });
     expect(capturedCmd.code).toContain('.noFieldStage(');
@@ -598,7 +592,7 @@ describe('pipe.register()', () => {
   it('toolkit entry code includes default field values', () => {
     let capturedCmd = null;
     global.window.__ar_addToolkitEntry = (_cat, cmd) => { capturedCmd = cmd; };
-    pipe.register('colorStage', (src) => ({ canvas: makeCanvas().canvas, read: vi.fn() }), {
+    pipe.register('colorStage', (_src) => ({ canvas: makeCanvas().canvas, read: vi.fn() }), {
       label: 'Color Stage',
       fields: [
         { name: 'cols', type: 'number', default: 120 },
@@ -611,7 +605,7 @@ describe('pipe.register()', () => {
   });
 
   it('chained after built-in stages', () => {
-    pipe.register('testStage', (src) => ({ canvas: makeCanvas().canvas, read: vi.fn() }));
+    pipe.register('testStage', (_src) => ({ canvas: makeCanvas().canvas, read: vi.fn() }));
     const { canvas: src } = makeCanvas();
     const p = pipe(src).ascii({ cols: 10 }).testStage().pixelate({ blockSize: 4 });
     expect(p._stages.length).toBe(3);

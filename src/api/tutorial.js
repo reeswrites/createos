@@ -17,8 +17,8 @@ const WIN_ID = 'win-tutorial';
 const LS_KEY = 'vl_tutorial_lesson';
 const DATA_URL = '/createos/tutorial.json';
 
-let _data = null;      // parsed tutorial.json
-let _idx = 0;          // current lesson index
+let _data = null; // parsed tutorial.json
+let _idx = 0; // current lesson index
 let _keysWired = false;
 
 // ── Tiny markdown renderer ─────────────────────────────────────────────────
@@ -99,7 +99,7 @@ function render(body) {
           <button class="ar-tut-run" data-ex="${escAttr(ex.id)}">▶ Run in Editor</button>
         </div>
         <pre class="ar-tut-pre">${escAttr(ex.code)}</pre>
-      </div>`
+      </div>`,
     )
     .join('');
 
@@ -158,7 +158,9 @@ function go(delta, body) {
   const next = Math.max(0, Math.min(_idx + delta, n - 1));
   if (next === _idx) return;
   _idx = next;
-  try { localStorage.setItem(LS_KEY, String(_idx)); } catch {}
+  try {
+    localStorage.setItem(LS_KEY, String(_idx));
+  } catch {}
   render(body);
   body.querySelector('.ar-tut-scroll')?.scrollTo(0, 0);
 }
@@ -176,11 +178,21 @@ function wireKeys() {
     // renaming its title). Editors/inputs elsewhere keep DOM focus but live in a
     // different WM window, so the getFocusedWinId() gate already excludes them.
     const ae = document.activeElement;
-    if (ae && win.contains(ae) &&
-        (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' ||
-         ae.getAttribute('contenteditable') === 'true')) return;
-    if (e.key === 'ArrowRight') { go(1, body); e.preventDefault(); }
-    else if (e.key === 'ArrowLeft') { go(-1, body); e.preventDefault(); }
+    if (
+      ae &&
+      win.contains(ae) &&
+      (ae.tagName === 'INPUT' ||
+        ae.tagName === 'TEXTAREA' ||
+        ae.getAttribute('contenteditable') === 'true')
+    )
+      return;
+    if (e.key === 'ArrowRight') {
+      go(1, body);
+      e.preventDefault();
+    } else if (e.key === 'ArrowLeft') {
+      go(-1, body);
+      e.preventDefault();
+    }
   });
 }
 

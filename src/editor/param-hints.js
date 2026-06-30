@@ -14,102 +14,106 @@ export function resolveParamHint(path) {
   // PARAM_HINTS (manual) → API Descriptor (registered globals) → Canvas instance
   // method. The last covers `c.circle(...)` / `canvas.rect(...)` etc., which can't
   // be keyed by a fixed path because the object is a per-sketch variable (ADR 040).
-  return PARAM_HINTS[path] ?? deriveParamHints()[path]
-    ?? CANVAS_METHOD_HINTS[path.includes('.') ? path.slice(path.lastIndexOf('.') + 1) : ''] ?? null;
+  return (
+    PARAM_HINTS[path] ??
+    deriveParamHints()[path] ??
+    CANVAS_METHOD_HINTS[path.includes('.') ? path.slice(path.lastIndexOf('.') + 1) : ''] ??
+    null
+  );
 }
 
 // 2D draw methods live on a `Canvas` instance (the var name varies), so they are
 // matched by method name as a last resort. Names are draw-distinctive to limit
 // false matches on unrelated objects.
 const CANVAS_METHOD_HINTS = {
-  rect:       ['x', 'y', 'w', 'h', 'color'],
+  rect: ['x', 'y', 'w', 'h', 'color'],
   rectStroke: ['x', 'y', 'w', 'h', 'color', 'thickness'],
-  circle:     ['x', 'y', 'r', 'color'],
-  ring:       ['x', 'y', 'r', 'color', 'thickness'],
-  arc:        ['x', 'y', 'r', 'start', 'end', 'color'],
-  arcStroke:  ['x', 'y', 'r', 'start', 'end', 'color', 'thickness'],
-  line:       ['x1', 'y1', 'x2', 'y2', 'color', 'thickness'],
-  poly:       ['points', 'color'],
-  bg:         ['color'],
-  backdrop:   ['source', 'opts?'],
-  pixelate:   ['source', 'blockSize', 'x?', 'y?', 'w?', 'h?'],
+  circle: ['x', 'y', 'r', 'color'],
+  ring: ['x', 'y', 'r', 'color', 'thickness'],
+  arc: ['x', 'y', 'r', 'start', 'end', 'color'],
+  arcStroke: ['x', 'y', 'r', 'start', 'end', 'color', 'thickness'],
+  line: ['x1', 'y1', 'x2', 'y2', 'color', 'thickness'],
+  poly: ['points', 'color'],
+  bg: ['color'],
+  backdrop: ['source', 'opts?'],
+  pixelate: ['source', 'blockSize', 'x?', 'y?', 'w?', 'h?'],
 };
 
 // ── Param tables ──────────────────────────────────────────────────────────────
 
 export const PARAM_HINTS = {
   // Draw — 2D methods are on a Canvas instance; see CANVAS_METHOD_HINTS (ADR 040).
-  'Canvas':             ['opts?'],
+  Canvas: ['opts?'],
   // Shader / GLShader
-  'Shader':             ['fragmentBody', 'opts?'],
-  'GLShader':           ['fragmentBody', 'opts?'],
-  'ShaderFX':           ['fragmentBody', 'opts?'],
+  Shader: ['fragmentBody', 'opts?'],
+  GLShader: ['fragmentBody', 'opts?'],
+  ShaderFX: ['fragmentBody', 'opts?'],
   // PIXI — 'pixi.tick' migrated to pixi's API Descriptor (app.js); resolves via deriveParamHints()
   // Input / Events (ADR 014 — sensors replaced by bus)
-  'on':                 ['event'],
-  'tick':               ['ms'],
-  'hold':               ['event'],
-  'on.when':            ['patternOrFn', 'map?'],
-  'on.every':           ['n'],
-  'on.after':           ['event'],
-  'on.within':          ['ms'],
+  on: ['event'],
+  tick: ['ms'],
+  hold: ['event'],
+  'on.when': ['patternOrFn', 'map?'],
+  'on.every': ['n'],
+  'on.after': ['event'],
+  'on.within': ['ms'],
   // Audio
-  'audio.onLevel':      ['threshold', 'onEnter', 'onExit?'],
-  'audio.onWord':       ['word', 'fn'],
-  'audio.onSpeech':     ['fn'],
-  'audio.say':          ['text', 'opts?'],
+  'audio.onLevel': ['threshold', 'onEnter', 'onExit?'],
+  'audio.onWord': ['word', 'fn'],
+  'audio.onSpeech': ['fn'],
+  'audio.say': ['text', 'opts?'],
   // Strudel pattern engine (ADR 035)
-  'note':               ['pattern'],
-  's':                  ['pattern'],
-  'n':                  ['pattern'],
-  'sound':              ['pattern'],
-  'stack':              ['...patterns'],
-  'seq':                ['...patterns'],
-  'cat':                ['...patterns'],
-  'setcps':             ['cps'],
-  'samples':            ['urlOrMap'],
+  note: ['pattern'],
+  s: ['pattern'],
+  n: ['pattern'],
+  sound: ['pattern'],
+  stack: ['...patterns'],
+  seq: ['...patterns'],
+  cat: ['...patterns'],
+  setcps: ['cps'],
+  samples: ['urlOrMap'],
   // Video signal
-  'video.signal':       ['source', 'opts?'],
-  'video.onMotion':     ['source', 'threshold', 'onEnter', 'onExit?'],
+  'video.signal': ['source', 'opts?'],
+  'video.onMotion': ['source', 'threshold', 'onEnter', 'onExit?'],
   'video.onBrightness': ['source', 'threshold', 'onEnter', 'onExit?'],
   // WM
-  'wm.spawn':           ['title', 'opts?'],
-  'wm.move':            ['id', 'x', 'y'],
-  'wm.resize':          ['id', 'w', 'h'],
-  'wm.show':            ['id'],
-  'wm.hide':            ['id'],
-  'wm.close':           ['id'],
-  'wm.setZ':            ['id', 'z'],
-  'wm.setOpacity':      ['id', 'opacity'],
+  'wm.spawn': ['title', 'opts?'],
+  'wm.move': ['id', 'x', 'y'],
+  'wm.resize': ['id', 'w', 'h'],
+  'wm.show': ['id'],
+  'wm.hide': ['id'],
+  'wm.close': ['id'],
+  'wm.setZ': ['id', 'z'],
+  'wm.setOpacity': ['id', 'opacity'],
   // Camera
-  'Camera':             ['opts?'],
+  Camera: ['opts?'],
   // Desktop
-  'desktop.add':        ['url', 'opts?'],
-  'desktop.remove':     ['id'],
+  'desktop.add': ['url', 'opts?'],
+  'desktop.remove': ['id'],
   // Vision
-  'vision.onGesture':   ['name', 'fn'],
-  'vision.onExpression':['name', 'fn'],
+  'vision.onGesture': ['name', 'fn'],
+  'vision.onExpression': ['name', 'fn'],
   // captureWindow
-  'captureWindow':      ['target', 'fps?'],
+  captureWindow: ['target', 'fps?'],
   // AudioFile
-  'audio.load':         ['url'],
-  'file.seek':          ['seconds'],
-  'file.play':          ['offsetSeconds?'],
-  'file.filter':        ['type', 'freq?', 'Q?'],
-  'file.reverb':        ['decay?'],
-  'file.eq':            ['low?', 'mid?', 'high?'],
-  'file.delay':         ['time?', 'feedback?'],
-  'file.pitchShift':    ['semitones'],
-  'file.volume':        ['dB'],
-  'file.onTime':        ['seconds', 'fn'],
-  'file.loop':          ['enabled?'],
-  'file.waveform':      ['opts?'],
+  'audio.load': ['url'],
+  'file.seek': ['seconds'],
+  'file.play': ['offsetSeconds?'],
+  'file.filter': ['type', 'freq?', 'Q?'],
+  'file.reverb': ['decay?'],
+  'file.eq': ['low?', 'mid?', 'high?'],
+  'file.delay': ['time?', 'feedback?'],
+  'file.pitchShift': ['semitones'],
+  'file.volume': ['dB'],
+  'file.onTime': ['seconds', 'fn'],
+  'file.loop': ['enabled?'],
+  'file.waveform': ['opts?'],
   // Audio Viz Suite
-  'audio.spectrogram':  ['source', 'opts?'],
-  'audio.pianoRoll':    ['opts?'],
+  'audio.spectrogram': ['source', 'opts?'],
+  'audio.pianoRoll': ['opts?'],
   // Mixer (ADR 032)
-  'mixer.strip':        ['name'],
-  'mixer.add':          ['node', 'opts?'],
+  'mixer.strip': ['name'],
+  'mixer.add': ['node', 'opts?'],
 };
 
 // ── AST helpers ───────────────────────────────────────────────────────────────
@@ -142,8 +146,11 @@ function findCallAtCursor(ast, cursor) {
             // Determine which arg index cursor falls in
             let argIdx = 0;
             for (let i = 0; i < args.length; i++) {
-              const aEnd = args[i + 1] ? args[i + 1].range[0] : (end - 1);
-              if (cursor < aEnd) { argIdx = i; break; }
+              const aEnd = args[i + 1] ? args[i + 1].range[0] : end - 1;
+              if (cursor < aEnd) {
+                argIdx = i;
+                break;
+              }
               argIdx = i;
             }
 
@@ -167,11 +174,14 @@ function findCallAtCursor(ast, cursor) {
 
 function computeTooltip(state) {
   const cursor = state.selection.main.head;
-  const code   = state.doc.toString();
+  const code = state.doc.toString();
 
   let ast;
-  try { ast = esprima.parseScript(code, { range: true, tolerant: true }); }
-  catch (_) { return null; }
+  try {
+    ast = esprima.parseScript(code, { range: true, tolerant: true });
+  } catch (_) {
+    return null;
+  }
 
   const match = findCallAtCursor(ast, cursor);
   if (!match) return null;
@@ -219,7 +229,7 @@ export const paramHintsField = StateField.define({
     if (!tr.docChanged && !tr.selection) return tooltip;
     return computeTooltip(tr.state);
   },
-  provide: f => showTooltip.from(f),
+  provide: (f) => showTooltip.from(f),
 });
 
 export function paramHintsExtension() {

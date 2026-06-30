@@ -6,19 +6,16 @@ const _sprites = [];
 
 export function cleanupSprites() {
   for (const s of _sprites) {
-    if (s._iid != null) { clearInterval(s._iid); s._iid = null; }
+    if (s._iid != null) {
+      clearInterval(s._iid);
+      s._iid = null;
+    }
   }
   _sprites.length = 0;
 }
 
 export class Sprite {
-  constructor({
-    width = 16,
-    height = 16,
-    scale = 8,
-    frames = 1,
-    bg = 'transparent',
-  } = {}) {
+  constructor({ width = 16, height = 16, scale = 8, frames = 1, bg = 'transparent' } = {}) {
     this._w = width;
     this._h = height;
     this._scale = scale;
@@ -33,7 +30,7 @@ export class Sprite {
 
     // Display canvas (scaled up, pixel-crisp)
     this.canvas = document.createElement('canvas');
-    this.canvas.width  = width * scale;
+    this.canvas.width = width * scale;
     this.canvas.height = height * scale;
     this._dctx = this.canvas.getContext('2d');
     this._dctx.imageSmoothingEnabled = false;
@@ -46,7 +43,7 @@ export class Sprite {
 
   _addFrameCanvas() {
     const c = document.createElement('canvas');
-    c.width  = this._w;
+    c.width = this._w;
     c.height = this._h;
     if (this._bg && this._bg !== 'transparent') {
       const ctx = c.getContext('2d');
@@ -57,9 +54,13 @@ export class Sprite {
     return this._frames.length - 1;
   }
 
-  addFrame() { return this._addFrameCanvas(); }
+  addFrame() {
+    return this._addFrameCanvas();
+  }
 
-  get frameCount() { return this._frames.length; }
+  get frameCount() {
+    return this._frames.length;
+  }
 
   // Clone the current frame into a new appended frame and select it.
   duplicateFrame() {
@@ -80,7 +81,8 @@ export class Sprite {
 
   // Reorder the current frame by `dir` (±1); follows it to the new slot.
   moveFrame(dir) {
-    const fi = this._fi, to = fi + dir;
+    const fi = this._fi,
+      to = fi + dir;
     if (to < 0 || to >= this._frames.length) return this;
     [this._frames[fi], this._frames[to]] = [this._frames[to], this._frames[fi]];
     this._fi = to;
@@ -174,7 +176,8 @@ export class Sprite {
 
   _render() {
     const ctx = this._dctx;
-    const cw = this.canvas.width, ch = this.canvas.height;
+    const cw = this.canvas.width,
+      ch = this.canvas.height;
     ctx.clearRect(0, 0, cw, ch);
     if (this._bg && this._bg !== 'transparent') {
       ctx.fillStyle = this._bg;
@@ -202,7 +205,10 @@ export class Sprite {
   }
 
   stop() {
-    if (this._iid != null) { clearInterval(this._iid); this._iid = null; }
+    if (this._iid != null) {
+      clearInterval(this._iid);
+      this._iid = null;
+    }
     return this;
   }
 
@@ -221,7 +227,9 @@ export class Sprite {
 
   // Open the visual Aseprite-style editor on this sprite
   edit(opts = {}) {
-    import('./sprite-editor.js').then(({ SpriteEditor }) => new SpriteEditor({ sprite: this, ...opts }));
+    import('./sprite-editor.js').then(
+      ({ SpriteEditor }) => new SpriteEditor({ sprite: this, ...opts }),
+    );
     return this;
   }
 

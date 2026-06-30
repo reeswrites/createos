@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 // ── Minimal stubs needed before audio.js loads ──────────────────────────────
 
@@ -61,7 +61,7 @@ function tokenize(str) {
         tokens.push('%' + str.slice(i, j)); i = j;
       }
     } else {
-      let j = i; while (j < str.length && !/[\s\[\]<>{},]/.test(str[j])) j++;
+      let j = i; while (j < str.length && !/[\s[\]<>{},]/.test(str[j])) j++;
       tokens.push(str.slice(i, j)); i = j;
     }
   }
@@ -325,7 +325,7 @@ describe('Pattern transforms', () => {
     p.slow    = (n)    => p.fast(1/n);
     p.rev     = ()     => wrap(c => p._q(c).map(e => ({...e, time:1-e.time-e.dur})).sort((a,b)=>a.time-b.time));
     p.gain    = (v)    => wrap(c => p._q(c).map(e => ({...e, gain:(e.gain??1)*v})));
-    p.add     = (n)    => wrap(c => p._q(c).map(e => ({...e, value: e.value})));
+    p.add     = (_n)    => wrap(c => p._q(c).map(e => ({...e, value: e.value})));
     p.pan     = (v)    => wrap(c => p._q(c).map(e => ({...e, pan:v})));
     p.degrade = ()     => wrap(c => p._q(c).filter(() => Math.random() > 0.5));
     p.degradeBy = (pp) => wrap(c => p._q(c).filter(() => Math.random() > pp));

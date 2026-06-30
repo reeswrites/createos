@@ -19,26 +19,35 @@ export function cleanupShaders() {
 // maps it against ITS OWN canvas rect when writing uniforms (ADR 040 — there is no
 // shared editor wrapper anymore, so mouse is per-shader-window). See
 // ShaderLayerBase._mouseXY().
-document.addEventListener("mousemove", (e) => {
+document.addEventListener('mousemove', (e) => {
   window.__ar_shaderMouseRaw = { clientX: e.clientX, clientY: e.clientY };
 });
 
 // ── Named preset bodies ──────────────────────────────────────────────────────
 
 export const SHADER_PRESETS = {
-  gradient: "  let col = vec3f(uv.x, uv.y, sin(time) * 0.5 + 0.5);\n  return vec4f(col, 1.0);",
-  plasma:   "  let r = sin(uv.x * 6.28 + time) * 0.5 + 0.5;\n  let g = sin(uv.y * 6.28 + time * 1.3) * 0.5 + 0.5;\n  let b = sin((uv.x + uv.y) * 6.28 + time * 0.7) * 0.5 + 0.5;\n  return vec4f(r, g, b, 1.0);",
-  waves:    "  let wave = sin(uv.x * 20.0 + time * 3.0) * 0.15;\n  let mask = smoothstep(0.02, 0.0, abs(uv.y - 0.5 - wave));\n  return vec4f(0.2, 0.6, 1.0, mask);",
-  circles:  "  let d = length(uv - vec2f(0.5));\n  let r = sin(d * 30.0 - time * 4.0) * 0.5 + 0.5;\n  return vec4f(r, r * 0.5, 1.0 - r, 1.0);",
-  noise:    "  let p = uv * 8.0 + time;\n  let n = fract(sin(p.x * 127.1 + p.y * 311.7) * 43758.5);\n  return vec4f(n, n * 0.8, n * 0.6, 1.0);",
+  gradient: '  let col = vec3f(uv.x, uv.y, sin(time) * 0.5 + 0.5);\n  return vec4f(col, 1.0);',
+  plasma:
+    '  let r = sin(uv.x * 6.28 + time) * 0.5 + 0.5;\n  let g = sin(uv.y * 6.28 + time * 1.3) * 0.5 + 0.5;\n  let b = sin((uv.x + uv.y) * 6.28 + time * 0.7) * 0.5 + 0.5;\n  return vec4f(r, g, b, 1.0);',
+  waves:
+    '  let wave = sin(uv.x * 20.0 + time * 3.0) * 0.15;\n  let mask = smoothstep(0.02, 0.0, abs(uv.y - 0.5 - wave));\n  return vec4f(0.2, 0.6, 1.0, mask);',
+  circles:
+    '  let d = length(uv - vec2f(0.5));\n  let r = sin(d * 30.0 - time * 4.0) * 0.5 + 0.5;\n  return vec4f(r, r * 0.5, 1.0 - r, 1.0);',
+  noise:
+    '  let p = uv * 8.0 + time;\n  let n = fract(sin(p.x * 127.1 + p.y * 311.7) * 43758.5);\n  return vec4f(n, n * 0.8, n * 0.6, 1.0);',
 };
 
 export const CAMERA_PRESETS = {
-  greyscale:    "  let col = textureSample(video, videoSampler, uv);\n  let g = dot(col.rgb, vec3f(0.299, 0.587, 0.114));\n  return vec4f(vec3f(g), 1.0);",
-  invert:       "  let col = textureSample(video, videoSampler, uv);\n  return vec4f(1.0 - col.rgb, 1.0);",
-  channel_swap: "  let col = textureSample(video, videoSampler, uv);\n  return vec4f(col.g, col.b, col.r, 1.0);",
-  posterize:    "  let col = textureSample(video, videoSampler, uv);\n  let steps = 4.0;\n  return vec4f(floor(col.rgb * steps) / steps, 1.0);",
-  scanlines:    "  let col = textureSample(video, videoSampler, uv);\n  let scan = step(0.5, fract(uv.y * 180.0));\n  return vec4f(col.rgb * scan, 1.0);",
+  greyscale:
+    '  let col = textureSample(video, videoSampler, uv);\n  let g = dot(col.rgb, vec3f(0.299, 0.587, 0.114));\n  return vec4f(vec3f(g), 1.0);',
+  invert:
+    '  let col = textureSample(video, videoSampler, uv);\n  return vec4f(1.0 - col.rgb, 1.0);',
+  channel_swap:
+    '  let col = textureSample(video, videoSampler, uv);\n  return vec4f(col.g, col.b, col.r, 1.0);',
+  posterize:
+    '  let col = textureSample(video, videoSampler, uv);\n  let steps = 4.0;\n  return vec4f(floor(col.rgb * steps) / steps, 1.0);',
+  scanlines:
+    '  let col = textureSample(video, videoSampler, uv);\n  let scan = step(0.5, fract(uv.y * 180.0));\n  return vec4f(col.rgb * scan, 1.0);',
 };
 
 // ── WGSL templates ──────────────────────────────────────────────────────────
@@ -77,10 +86,11 @@ const VIDEO_WGSL = /* wgsl */ `
 function wrapFragBody(body, hasVideo = false, helpers = []) {
   const helperWGSL = helpers.length ? '\n' + helpers.join('\n\n') + '\n' : '';
   const bodyDeclaresCol = /\blet\s+col\b/.test(body);
-  const colLine = hasVideo && !bodyDeclaresCol ? '\n  let col    = textureSample(video, videoSampler, uv);' : '';
+  const colLine =
+    hasVideo && !bodyDeclaresCol ? '\n  let col    = textureSample(video, videoSampler, uv);' : '';
   return (
     UNIFORM_WGSL +
-    (hasVideo ? VIDEO_WGSL : "") +
+    (hasVideo ? VIDEO_WGSL : '') +
     helperWGSL +
     /* wgsl */ `
 @fragment
@@ -101,15 +111,18 @@ fn fs(@builtin(position) fragCoord: vec4f) -> @location(0) vec4f {
 let _shaderIdCounter = 0;
 
 export class Shader extends ShaderLayerBase {
-  constructor(fragmentBodyOrWGSL, { z = 30, opacity = 1.0, video = null, container = null, bind = null } = {}) {
+  constructor(
+    fragmentBodyOrWGSL,
+    { z = 30, opacity = 1.0, video = null, container = null, bind = null } = {},
+  ) {
     super();
     this._initBase({ z, opacity, container, videoSrc: video });
     this._id = `shader-${++_shaderIdCounter}`;
     // Accept a JS function — transpiled to WGSL at start() time (after video src is known)
-    this._fn      = typeof fragmentBodyOrWGSL === 'function' ? fragmentBodyOrWGSL : null;
+    this._fn = typeof fragmentBodyOrWGSL === 'function' ? fragmentBodyOrWGSL : null;
     this._fragSrc = this._fn ? null : resolveWGSL(fragmentBodyOrWGSL);
-    this._bind    = bind;   // param-alias map forwarded to jsToWGSL (internal; e.g. viz {v:'col.r'})
-    this._helpers = [];   // WGSL helper fn strings from jsToWGSL
+    this._bind = bind; // param-alias map forwarded to jsToWGSL (internal; e.g. viz {v:'col.r'})
+    this._helpers = []; // WGSL helper fn strings from jsToWGSL
     this._ctx = null;
     this._device = null;
     this._pipeline = null;
@@ -140,37 +153,47 @@ export class Shader extends ShaderLayerBase {
   // ── Init ─────────────────────────────────────────────────────────────────
 
   async _init() {
-    if (!navigator.gpu) throw new Error("WebGPU not supported — use Chrome 113+ or Safari 18+");
+    if (!navigator.gpu) throw new Error('WebGPU not supported — use Chrome 113+ or Safari 18+');
     const adapter = await navigator.gpu.requestAdapter();
-    if (!adapter) throw new Error("No WebGPU adapter available");
+    if (!adapter) throw new Error('No WebGPU adapter available');
     this._device = await adapter.requestDevice();
 
     const { canvas, parent, resizeObserver } = mountLayerCanvas({
-      z: this._z, opacity: this._opacity, container: this._container, webgpu: true,
-      onResize: (w, h) => { if (this._readable) { this._readable.width = w; this._readable.height = h; } },
+      z: this._z,
+      opacity: this._opacity,
+      container: this._container,
+      webgpu: true,
+      onResize: (w, h) => {
+        if (this._readable) {
+          this._readable.width = w;
+          this._readable.height = h;
+        }
+      },
     });
     this._canvas = canvas;
     this._resizeObserver = resizeObserver;
 
     // 2D readable shadow canvas — updated each frame within shader RAF so drawImage works.
     // Mirror windows read from this instead of the WebGPU canvas (which is unreadable outside its own RAF).
-    this._readable = document.createElement("canvas");
+    this._readable = document.createElement('canvas');
     this._readable._ar_shaderReadable = true; // mirror pings this flag to request blits
-    this._readable.width  = canvas.width;
+    this._readable.width = canvas.width;
     this._readable.height = canvas.height;
     Object.assign(this._readable.style, {
-      position: "absolute",
-      top: "0", left: "0",
-      width: "100%", height: "100%",
+      position: 'absolute',
+      top: '0',
+      left: '0',
+      width: '100%',
+      height: '100%',
       zIndex: String(this._z),
-      opacity: "0",
-      pointerEvents: "none",
+      opacity: '0',
+      pointerEvents: 'none',
     });
     parent?.appendChild(this._readable);
 
     const format = navigator.gpu.getPreferredCanvasFormat();
-    this._ctx = this._canvas.getContext("webgpu");
-    this._ctx.configure({ device: this._device, format, alphaMode: "premultiplied" });
+    this._ctx = this._canvas.getContext('webgpu');
+    this._ctx.configure({ device: this._device, format, alphaMode: 'premultiplied' });
     this._format = format;
 
     this._uniformBuf = this._device.createBuffer({
@@ -181,8 +204,8 @@ export class Shader extends ShaderLayerBase {
     // Create sampler if a video source is provided
     if (this._videoSrc) {
       this._videoSampler = this._device.createSampler({
-        magFilter: "linear",
-        minFilter: "linear",
+        magFilter: 'linear',
+        minFilter: 'linear',
       });
     }
 
@@ -207,10 +230,12 @@ export class Shader extends ShaderLayerBase {
     }
     const isFullShader = /@(fragment|vertex|compute)/.test(this._fragSrc ?? '');
     const hasVideo = !!this._videoSrc && !isFullShader;
-    const fragWGSL = isFullShader ? this._fragSrc : wrapFragBody(this._fragSrc, hasVideo, this._helpers);
-    const wgsl = isFullShader ? fragWGSL : VERT_WGSL + "\n" + fragWGSL;
+    const fragWGSL = isFullShader
+      ? this._fragSrc
+      : wrapFragBody(this._fragSrc, hasVideo, this._helpers);
+    const wgsl = isFullShader ? fragWGSL : VERT_WGSL + '\n' + fragWGSL;
 
-    this._device.pushErrorScope("validation");
+    this._device.pushErrorScope('validation');
     const shaderModule = this._device.createShaderModule({ code: wgsl });
     const shaderErr = await this._device.popErrorScope();
     if (shaderErr) {
@@ -219,24 +244,24 @@ export class Shader extends ShaderLayerBase {
     }
     notify('shader:compile', { id: this._id, type: 'wgsl' });
 
-    this._device.pushErrorScope("validation");
+    this._device.pushErrorScope('validation');
     this._pipeline = this._device.createRenderPipeline({
-      layout: "auto",
-      vertex: { module: shaderModule, entryPoint: "vs" },
+      layout: 'auto',
+      vertex: { module: shaderModule, entryPoint: 'vs' },
       fragment: {
         module: shaderModule,
-        entryPoint: "fs",
+        entryPoint: 'fs',
         targets: [
           {
             format: this._format,
             blend: {
-              color: { srcFactor: "src-alpha", dstFactor: "one-minus-src-alpha", operation: "add" },
-              alpha: { srcFactor: "one", dstFactor: "one-minus-src-alpha", operation: "add" },
+              color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
+              alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' },
             },
           },
         ],
       },
-      primitive: { topology: "triangle-list" },
+      primitive: { topology: 'triangle-list' },
     });
     const pipeErr = await this._device.popErrorScope();
     if (pipeErr) throw new Error(`Shader pipeline error: ${pipeErr.message}`);
@@ -263,15 +288,13 @@ export class Shader extends ShaderLayerBase {
     if (w < 1 || h < 1) return;
 
     const sizeChanged =
-      !this._videoTexSize ||
-      this._videoTexSize[0] !== w ||
-      this._videoTexSize[1] !== h;
+      !this._videoTexSize || this._videoTexSize[0] !== w || this._videoTexSize[1] !== h;
 
     if (sizeChanged) {
       this._videoTex?.destroy();
       this._videoTex = this._device.createTexture({
         size: [w, h],
-        format: "rgba8unorm",
+        format: 'rgba8unorm',
         usage:
           GPUTextureUsage.TEXTURE_BINDING |
           GPUTextureUsage.COPY_DST |
@@ -295,7 +318,7 @@ export class Shader extends ShaderLayerBase {
     try {
       this._device.queue.copyExternalImageToTexture(
         { source: src, flipY: false },
-        { texture: this._videoTex, colorSpace: "srgb" },
+        { texture: this._videoTex, colorSpace: 'srgb' },
         [this._videoTexSize[0], this._videoTexSize[1]],
       );
     } catch (_) {
@@ -316,8 +339,8 @@ export class Shader extends ShaderLayerBase {
     data[2] = mo.x / c.width;
     data[3] = mo.y / c.height;
     data[4] = time;
-    data[8]  = this._custom[0];
-    data[9]  = this._custom[1];
+    data[8] = this._custom[0];
+    data[9] = this._custom[1];
     data[10] = this._custom[2];
     data[11] = this._custom[3];
     this._device.queue.writeBuffer(this._uniformBuf, 0, data);
@@ -337,8 +360,8 @@ export class Shader extends ShaderLayerBase {
         {
           view: this._ctx.getCurrentTexture().createView(),
           clearValue: { r: 0, g: 0, b: 0, a: 0 },
-          loadOp: "clear",
-          storeOp: "store",
+          loadOp: 'clear',
+          storeOp: 'store',
         },
       ],
     });
@@ -351,11 +374,16 @@ export class Shader extends ShaderLayerBase {
     // Blit to 2D readable canvas only when a mirror is watching (flag set by mirror RAF, auto-expires)
     if (this._readable?._ar_watched) {
       this._readable._ar_watched = false;
-      if (this._readable.width !== this._canvas.width || this._readable.height !== this._canvas.height) {
+      if (
+        this._readable.width !== this._canvas.width ||
+        this._readable.height !== this._canvas.height
+      ) {
         this._readable.width = this._canvas.width;
         this._readable.height = this._canvas.height;
       }
-      try { this._readable.getContext('2d').drawImage(this._canvas, 0, 0); } catch (_) {}
+      try {
+        this._readable.getContext('2d').drawImage(this._canvas, 0, 0);
+      } catch (_) {}
     }
   }
 
@@ -376,7 +404,7 @@ export class Shader extends ShaderLayerBase {
       this._rafId = requestAnimationFrame(loop);
       notify('shader:start', { id: this._id });
     })().catch((e) => {
-      console.error("Shader error:", e.message);
+      console.error('Shader error:', e.message);
       this._releaseLive();
     });
     return this;
@@ -457,20 +485,38 @@ export class ShaderFX {
   // ── Shorthand (create + start in one call) ──
 
   // camOrEffect: CameraStream or effect string
-  static camera(camOrEffect = 'greyscale', effect = 'greyscale') { return ShaderFX.cameraShader(camOrEffect, effect).start(); }
-  static video(src, effect = 'greyscale') { return ShaderFX.videoShader(src, effect).start(); }
-  static preset(name = 'plasma') { return ShaderFX.presetShader(name).start(); }
-  static window(name = 'editor', effect = 'greyscale') { return ShaderFX.windowShader(name, effect).start(); }
-  static micViz(effect = 'greyscale') { return ShaderFX.micVizShader(effect).start(); }
+  static camera(camOrEffect = 'greyscale', effect = 'greyscale') {
+    return ShaderFX.cameraShader(camOrEffect, effect).start();
+  }
+  static video(src, effect = 'greyscale') {
+    return ShaderFX.videoShader(src, effect).start();
+  }
+  static preset(name = 'plasma') {
+    return ShaderFX.presetShader(name).start();
+  }
+  static window(name = 'editor', effect = 'greyscale') {
+    return ShaderFX.windowShader(name, effect).start();
+  }
+  static micViz(effect = 'greyscale') {
+    return ShaderFX.micVizShader(effect).start();
+  }
 }
 
 // ── Event bus command handlers ─────────────────────────────────────────────────
 // _shaderRegistry stores both Shader (WGSL) and GLShader (WebGL) instances so one
 // set of handlers covers both. GLShader registers via registerShaderInstance() below.
-export function registerShaderInstance(id, instance) { _shaderRegistry.set(id, instance); }
-registerCommand('shader:start',   ({ id }) => { _shaderRegistry.get(id)?.start(); });
-registerCommand('shader:stop',    ({ id }) => { _shaderRegistry.get(id)?.stop(); });
-registerCommand('shader:uniform', ({ id, key, value }) => { _shaderRegistry.get(id)?.set(key, value); });
+export function registerShaderInstance(id, instance) {
+  _shaderRegistry.set(id, instance);
+}
+registerCommand('shader:start', ({ id }) => {
+  _shaderRegistry.get(id)?.start();
+});
+registerCommand('shader:stop', ({ id }) => {
+  _shaderRegistry.get(id)?.stop();
+});
+registerCommand('shader:uniform', ({ id, key, value }) => {
+  _shaderRegistry.get(id)?.set(key, value);
+});
 
 // Register teardown with the reset registry (ADR 008).
 onReset(cleanupShaders);

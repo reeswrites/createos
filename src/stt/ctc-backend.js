@@ -20,11 +20,13 @@ export class CTCBackend extends STTBackend {
     super();
     this._pipeline = null;
     this._windowChunks = opts.windowChunks ?? 4;
-    this._buf = [];          // Float32Array chunks, most recent last
-    this._busy = false;      // single-flight: drop chunks while the model runs
+    this._buf = []; // Float32Array chunks, most recent last
+    this._busy = false; // single-flight: drop chunks while the model runs
   }
 
-  get interim() { return true; }
+  get interim() {
+    return true;
+  }
 
   async init() {
     this._pipeline = await modelManager.load('ctc-en');
@@ -51,7 +53,10 @@ export class CTCBackend extends STTBackend {
   }
 
   async flush() {
-    if (!this._pipeline || this._buf.length === 0) { this._buf = []; return ''; }
+    if (!this._pipeline || this._buf.length === 0) {
+      this._buf = [];
+      return '';
+    }
     try {
       const audio = this._concat();
       const out = await this._pipeline(audio, { sampling_rate: SAMPLE_RATE });
@@ -72,7 +77,10 @@ export class CTCBackend extends STTBackend {
     const total = this._buf.reduce((n, c) => n + c.length, 0);
     const out = new Float32Array(total);
     let off = 0;
-    for (const c of this._buf) { out.set(c, off); off += c.length; }
+    for (const c of this._buf) {
+      out.set(c, off);
+      off += c.length;
+    }
     return out;
   }
 }

@@ -22,34 +22,34 @@ export function cleanupGLShaders() {
 // GLSL fragment-body presets (analogous to SHADER_PRESETS in shader.js)
 export const GLSL_PRESETS = {
   gradient: `  gl_FragColor = vec4(uv.x, uv.y, sin(uTime)*0.5+0.5, 1.0);`,
-  plasma:   `  float r = sin(uv.x*6.28+uTime)*0.5+0.5;
+  plasma: `  float r = sin(uv.x*6.28+uTime)*0.5+0.5;
   float g = sin(uv.y*6.28+uTime*1.3)*0.5+0.5;
   float b = sin((uv.x+uv.y)*6.28+uTime*0.7)*0.5+0.5;
   gl_FragColor = vec4(r, g, b, 1.0);`,
-  waves:    `  float wave = sin(uv.x*20.0+uTime*3.0)*0.15;
+  waves: `  float wave = sin(uv.x*20.0+uTime*3.0)*0.15;
   float mask = smoothstep(0.02,0.0,abs(uv.y-0.5-wave));
   gl_FragColor = vec4(0.2,0.6,1.0,mask);`,
-  circles:  `  float d = length(uv-vec2(0.5));
+  circles: `  float d = length(uv-vec2(0.5));
   float r = sin(d*30.0-uTime*4.0)*0.5+0.5;
   gl_FragColor = vec4(r, r*0.5, 1.0-r, 1.0);`,
-  noise:    `  vec2 p = uv*8.0+uTime;
+  noise: `  vec2 p = uv*8.0+uTime;
   float n = fract(sin(p.x*127.1+p.y*311.7)*43758.5);
   gl_FragColor = vec4(n, n*0.8, n*0.6, 1.0);`,
 };
 
 // GLSL camera/video effect presets (same effects as CAMERA_PRESETS in shader.js)
 export const GLSL_CAMERA_PRESETS = {
-  greyscale:    `  vec4 c = texture2D(uVideo,uv); float g=dot(c.rgb,vec3(0.299,0.587,0.114)); gl_FragColor=vec4(vec3(g),1.0);`,
-  invert:       `  vec4 c = texture2D(uVideo,uv); gl_FragColor=vec4(1.0-c.rgb,1.0);`,
+  greyscale: `  vec4 c = texture2D(uVideo,uv); float g=dot(c.rgb,vec3(0.299,0.587,0.114)); gl_FragColor=vec4(vec3(g),1.0);`,
+  invert: `  vec4 c = texture2D(uVideo,uv); gl_FragColor=vec4(1.0-c.rgb,1.0);`,
   channel_swap: `  vec4 c = texture2D(uVideo,uv); gl_FragColor=vec4(c.g,c.b,c.r,1.0);`,
-  posterize:    `  vec4 c = texture2D(uVideo,uv); float s=4.0; gl_FragColor=vec4(floor(c.rgb*s)/s,1.0);`,
-  scanlines:    `  vec4 c = texture2D(uVideo,uv); float sc=step(0.5,fract(uv.y*180.0)); gl_FragColor=vec4(c.rgb*sc,1.0);`,
+  posterize: `  vec4 c = texture2D(uVideo,uv); float s=4.0; gl_FragColor=vec4(floor(c.rgb*s)/s,1.0);`,
+  scanlines: `  vec4 c = texture2D(uVideo,uv); float sc=step(0.5,fract(uv.y*180.0)); gl_FragColor=vec4(c.rgb*sc,1.0);`,
 };
 
 // ── GLSL source classification ───────────────────────────────────────────────
 
 function _isFullGLSL(src) {
-  return /void\s+main\s*\(/.test(src) || /^#version/.test(src.trimStart());
+  return /void\s+main\s*\(/.test(src) || src.trimStart().startsWith('#version');
 }
 
 function _isShaderToy(src) {
@@ -75,7 +75,7 @@ uniform vec4 uCustom;
 
 function _wrapFragBody(body, hasVideo = false) {
   const videoLine = hasVideo ? 'uniform sampler2D uVideo;\n' : '';
-  const colLine   = hasVideo ? '  vec4 col = texture2D(uVideo, uv);\n' : '';
+  const colLine = hasVideo ? '  vec4 col = texture2D(uVideo, uv);\n' : '';
   return `${UNIFORM_HEADER}${videoLine}void main() {
   vec2 uv   = gl_FragCoord.xy / uResolution;
   float time  = uTime;
@@ -99,13 +99,13 @@ export class GLShader extends ShaderLayerBase {
   constructor(fragBody, { z = 30, opacity = 1.0, video = null, container = null } = {}) {
     super();
     this._initBase({ z, opacity, container, videoSrc: video });
-    this._id      = `glsl-${++_glShaderIdCounter}`;
+    this._id = `glsl-${++_glShaderIdCounter}`;
     this._fragSrc = resolveGLSL(fragBody);
 
     // WebGL-specific state
-    this._gl      = null;
+    this._gl = null;
     this._program = null;
-    this._rafId   = null;
+    this._rafId = null;
     this._startTime = null;
     this._videoTex = null;
 
@@ -120,7 +120,9 @@ export class GLShader extends ShaderLayerBase {
 
   _init() {
     const { canvas, resizeObserver } = mountLayerCanvas({
-      z: this._z, opacity: this._opacity, container: this._container,
+      z: this._z,
+      opacity: this._opacity,
+      container: this._container,
       onResize: (w, h) => this._gl?.viewport(0, 0, w, h),
     });
     this._canvas = canvas;
@@ -180,7 +182,7 @@ export class GLShader extends ShaderLayerBase {
     // Full-screen triangle (same topology as WGSL Shader)
     const buf = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
     const posLoc = gl.getAttribLocation(this._program, 'position');
     gl.enableVertexAttribArray(posLoc);
     gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
@@ -188,10 +190,10 @@ export class GLShader extends ShaderLayerBase {
     // Cache uniform locations
     gl.useProgram(this._program);
     this._uResolution = gl.getUniformLocation(this._program, 'uResolution');
-    this._uMouse      = gl.getUniformLocation(this._program, 'uMouse');
-    this._uTime       = gl.getUniformLocation(this._program, 'uTime');
-    this._uCustom     = gl.getUniformLocation(this._program, 'uCustom');
-    this._uVideo      = gl.getUniformLocation(this._program, 'uVideo');
+    this._uMouse = gl.getUniformLocation(this._program, 'uMouse');
+    this._uTime = gl.getUniformLocation(this._program, 'uTime');
+    this._uCustom = gl.getUniformLocation(this._program, 'uCustom');
+    this._uVideo = gl.getUniformLocation(this._program, 'uVideo');
 
     // Video texture
     if (hasVideo) {
@@ -226,12 +228,12 @@ export class GLShader extends ShaderLayerBase {
     this._packAudioCustom(); // auto-fill _custom[0..3] from bound signal/analyser (base)
 
     const gl = this._gl;
-    const c  = this._canvas;
+    const c = this._canvas;
     const mo = this._mouseXY();
     if (this._uResolution) gl.uniform2f(this._uResolution, c.width, c.height);
-    if (this._uMouse)      gl.uniform2f(this._uMouse, mo.x / c.width, mo.y / c.height);
-    if (this._uTime)       gl.uniform1f(this._uTime, time);
-    if (this._uCustom)     gl.uniform4fv(this._uCustom, this._custom);
+    if (this._uMouse) gl.uniform2f(this._uMouse, mo.x / c.width, mo.y / c.height);
+    if (this._uTime) gl.uniform1f(this._uTime, time);
+    if (this._uCustom) gl.uniform4fv(this._uCustom, this._custom);
     if (this._videoTex && this._uVideo) {
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, this._videoTex);
@@ -261,7 +263,9 @@ export class GLShader extends ShaderLayerBase {
     if (!this._container && !this._ownWinId) return this.show();
     this._registerLive();
     if (!this._gl) {
-      try { this._init(); } catch (e) {
+      try {
+        this._init();
+      } catch (e) {
         console.error('GLShader error:', e.message);
         this._releaseLive();
         return this;
@@ -302,11 +306,11 @@ export class GLShader extends ShaderLayerBase {
     this._resizeObserver = null;
     if (this._gl) {
       if (this._videoTex) this._gl.deleteTexture(this._videoTex);
-      if (this._program)  this._gl.deleteProgram(this._program);
+      if (this._program) this._gl.deleteProgram(this._program);
     }
     this._canvas?.remove();
     this._canvas = null;
-    this._gl     = null;
+    this._gl = null;
     this._program = null;
     this._videoTex = null;
   }

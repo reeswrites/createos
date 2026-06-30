@@ -1,4 +1,4 @@
-import esprima from "esprima";
+import esprima from 'esprima';
 
 // ── Transform pipeline ────────────────────────────────────────────────────────
 // transformCode(code, visitors): one Esprima parse, N visitors each contribute
@@ -18,7 +18,9 @@ export function transformCode(code, visitors) {
   for (const v of visitors) v.finalize?.(patches);
   patches
     .sort((a, b) => b.pos - a.pos)
-    .forEach((p) => { code = code.slice(0, p.pos) + p.str + code.slice(p.pos); });
+    .forEach((p) => {
+      code = code.slice(0, p.pos) + p.str + code.slice(p.pos);
+    });
   return code;
 }
 
@@ -26,42 +28,56 @@ export function transformCode(code, visitors) {
 
 export function makeLoopProtectionVisitor(timeout = 2000) {
   let loopId = 1;
-  const varPrefix = "_wmloopvar";
-  const varStr = "var %d = Date.now();\n";
+  const varPrefix = '_wmloopvar';
+  const varStr = 'var %d = Date.now();\n';
   const checkStr = `\nif (Date.now() - %d > ${timeout}) { window.stopRunning(); throw new Error("Infinite loop detected. Please make changes and press Run when you are ready to try again."); break;}\n`;
   return (node, patches) => {
     switch (node.type) {
-      case "DoWhileStatement":
-      case "ForStatement":
-      case "ForInStatement":
-      case "ForOfStatement":
-      case "WhileStatement": {
+      case 'DoWhileStatement':
+      case 'ForStatement':
+      case 'ForInStatement':
+      case 'ForOfStatement':
+      case 'WhileStatement': {
         let start = 1 + node.body.range[0];
         let end = node.body.range[1];
-        let prolog = checkStr.replace("%d", varPrefix + loopId);
-        let epilog = "";
-        if (node.body.type !== "BlockStatement") {
-          prolog = "{" + prolog;
-          epilog = "}";
+        let prolog = checkStr.replace('%d', varPrefix + loopId);
+        let epilog = '';
+        if (node.body.type !== 'BlockStatement') {
+          prolog = '{' + prolog;
+          epilog = '}';
           --start;
         }
         patches.push({ pos: start, str: prolog });
         patches.push({ pos: end, str: epilog });
-        patches.push({ pos: node.range[0], str: varStr.replace("%d", varPrefix + loopId) });
+        patches.push({ pos: node.range[0], str: varStr.replace('%d', varPrefix + loopId) });
         ++loopId;
         break;
       }
-      default: break;
+      default:
+        break;
     }
   };
 }
 
 const _TRACE_TYPES = new Set([
-  'ExpressionStatement', 'VariableDeclaration', 'FunctionDeclaration', 'ClassDeclaration',
-  'ReturnStatement', 'ThrowStatement', 'BreakStatement', 'ContinueStatement',
-  'IfStatement', 'SwitchStatement', 'TryStatement',
-  'WhileStatement', 'DoWhileStatement', 'ForStatement', 'ForInStatement', 'ForOfStatement',
-  'LabeledStatement', 'DebuggerStatement',
+  'ExpressionStatement',
+  'VariableDeclaration',
+  'FunctionDeclaration',
+  'ClassDeclaration',
+  'ReturnStatement',
+  'ThrowStatement',
+  'BreakStatement',
+  'ContinueStatement',
+  'IfStatement',
+  'SwitchStatement',
+  'TryStatement',
+  'WhileStatement',
+  'DoWhileStatement',
+  'ForStatement',
+  'ForInStatement',
+  'ForOfStatement',
+  'LabeledStatement',
+  'DebuggerStatement',
 ]);
 
 export function makeTraceVisitor(editorId) {
@@ -69,26 +85,37 @@ export function makeTraceVisitor(editorId) {
   // ranges before children are visited. Instead we collect candidates + forbidden
   // ranges during the walk, then filter in finalize() after the full walk.
   const _candidates = []; // { pos, line }
-  const _forbidden  = new Set(); // char positions inside for-loop header parts
+  const _forbidden = new Set(); // char positions inside for-loop header parts
 
   const visitor = (node, _patches) => {
     // Collect for-loop header ranges as forbidden (VariableDeclarations here are
     // NOT standalone statements — injecting trace calls there produces invalid JS).
     if (node.type === 'ForStatement') {
-      if (node.init)   for (let p = node.init.range[0];   p < node.init.range[1];   p++) _forbidden.add(p);
-      if (node.update) for (let p = node.update.range[0]; p < node.update.range[1]; p++) _forbidden.add(p);
+      if (node.init)
+        for (let p = node.init.range[0]; p < node.init.range[1]; p++) _forbidden.add(p);
+      if (node.update)
+        for (let p = node.update.range[0]; p < node.update.range[1]; p++) _forbidden.add(p);
     } else if (node.type === 'ForInStatement' || node.type === 'ForOfStatement') {
-      if (node.left) for (let p = node.left.range[0]; p < node.left.range[1]; p++) _forbidden.add(p);
+      if (node.left)
+        for (let p = node.left.range[0]; p < node.left.range[1]; p++) _forbidden.add(p);
     }
     // Forbid injecting into non-block single-statement bodies — a trace injected
     // before `return` in `if (x) return;` produces `if (x) trace(); return;` which
     // makes the return unconditional, silently breaking control flow.
     if (node.type === 'IfStatement') {
-      const forbidBody = (b) => { if (b && b.type !== 'BlockStatement') for (let p = b.range[0]; p < b.range[1]; p++) _forbidden.add(p); };
+      const forbidBody = (b) => {
+        if (b && b.type !== 'BlockStatement')
+          for (let p = b.range[0]; p < b.range[1]; p++) _forbidden.add(p);
+      };
       forbidBody(node.consequent);
       forbidBody(node.alternate);
-    } else if (node.type === 'WhileStatement' || node.type === 'DoWhileStatement' ||
-               node.type === 'ForStatement' || node.type === 'ForInStatement' || node.type === 'ForOfStatement') {
+    } else if (
+      node.type === 'WhileStatement' ||
+      node.type === 'DoWhileStatement' ||
+      node.type === 'ForStatement' ||
+      node.type === 'ForInStatement' ||
+      node.type === 'ForOfStatement'
+    ) {
       if (node.body && node.body.type !== 'BlockStatement')
         for (let p = node.body.range[0]; p < node.body.range[1]; p++) _forbidden.add(p);
     }
@@ -135,15 +162,15 @@ export function friendlyError(raw) {
       ? `Tried to use .${prop[2]} on something that doesn't exist yet.`
       : `Tried to use a property on something that doesn't exist yet.`;
 
-  if (m.includes("Unexpected token") || m.includes("Unexpected end of"))
+  if (m.includes('Unexpected token') || m.includes('Unexpected end of'))
     return `Syntax error — check for missing or extra brackets, quotes, or commas.`;
 
-  if (m.includes("Unexpected identifier"))
+  if (m.includes('Unexpected identifier'))
     return `Syntax error — unexpected word. Check for missing punctuation on the line above.`;
 
-  if (m.includes("Infinite loop detected")) return m;
+  if (m.includes('Infinite loop detected')) return m;
 
-  return m.replace(/^(TypeError|SyntaxError|ReferenceError|RangeError|EvalError): /, "");
+  return m.replace(/^(TypeError|SyntaxError|ReferenceError|RangeError|EvalError): /, '');
 }
 
 // Returns 1-based script line from an error's stack trace, or null if unparseable.

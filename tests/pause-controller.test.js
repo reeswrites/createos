@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, test, expect, vi } from 'vitest';
 import { PauseController } from '../src/runtime/pause-controller.js';
 
 // The orchestration these tests cover used to sit inline in the untested

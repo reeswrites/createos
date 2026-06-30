@@ -1,8 +1,8 @@
-import * as Tone from "tone";
-import { AudioViz, SpectrogramCanvas, PianoRollViz, _noteHooks } from "./viz.js";
-import { acquireStrip, renameStrip } from "./mixer.js";
-import { Drumpad } from "./drumpad.js";
-import { Piano } from "./piano.js";
+import * as Tone from 'tone';
+import { AudioViz, SpectrogramCanvas, PianoRollViz, _noteHooks } from './viz.js';
+import { acquireStrip } from './mixer.js';
+import { Drumpad } from './drumpad.js';
+import { Piano } from './piano.js';
 import { onReset } from '../runtime/reset-registry.js';
 import { notify, registerCommand, registerSource, addBusTap } from '../events/index.js';
 import { acquireMicRunScoped } from './media-lease.js';
@@ -21,14 +21,14 @@ let _recognition = null;
 const _wordHandlers = new Map();
 const _speechHandlers = [];
 const _wordStreamHandlers = [];
-let _speechWordIndex = 0;          // global running word position (ADR 039 payload index)
+let _speechWordIndex = 0; // global running word position (ADR 039 payload index)
 
 // Speech engine selection (ADR 039): 'auto' = Web Speech if present, else ML;
 // 'ml' = force the in-browser ML model (works on Brave/Firefox + Chrome opt-in);
 // 'webspeech' = browser API only (no ML fallback).
 let _speechEngine = 'auto';
-let _mlSpeechHandle = null;        // run-scoped STT-engine handle when on the ML path
-let _wordDispatchReady = false;    // one-time bus-tap fan-out to onWord/onSpeech handlers
+let _mlSpeechHandle = null; // run-scoped STT-engine handle when on the ML path
+let _wordDispatchReady = false; // one-time bus-tap fan-out to onWord/onSpeech handlers
 
 // ── Beat ticker ───────────────────────────────────────────────────────────────
 // Fires beat:tick / beat:bar / beat:phrase whenever the Tone.js transport runs.
@@ -40,13 +40,14 @@ function _setupBeatSchedule() {
   // scheduleRepeat may not exist in test environments (Tone mock doesn't implement it)
   if (typeof Tone.getTransport?.().scheduleRepeat !== 'function') return;
   _beatScheduleId = Tone.getTransport().scheduleRepeat(() => {
-    const bpm  = Tone.getTransport().bpm.value;
-    const bar  = Math.floor(_beatCounter / 4);
+    const bpm = Tone.getTransport().bpm.value;
+    const bar = Math.floor(_beatCounter / 4);
     const beat = _beatCounter % 4;
     const time = Tone.now();
     notify('beat:tick', { bpm, bar, beat, time });
-    if (beat === 0)                notify('beat:bar',    { bpm, bar, time });
-    if (_beatCounter % 16 === 0)   notify('beat:phrase', { bpm, phrase: Math.floor(_beatCounter / 16), time });
+    if (beat === 0) notify('beat:bar', { bpm, bar, time });
+    if (_beatCounter % 16 === 0)
+      notify('beat:phrase', { bpm, phrase: Math.floor(_beatCounter / 16), time });
     _beatCounter++;
   }, '4n');
 }
@@ -66,11 +67,13 @@ function _makeAnalyser(source, bins) {
     return source;
   }
   if (typeof source.getValue === 'function') return source; // Tone.Analyser
-  if (source.frequencyBinCount) return source;              // Web Audio AnalyserNode
+  if (source.frequencyBinCount) return source; // Web Audio AnalyserNode
   // Tone instrument/effect — connect a new Analyser
   const a = new Tone.Analyser('fft', bins);
   track(a);
-  try { (source._ ?? source).connect(a); } catch (_) {}
+  try {
+    (source._ ?? source).connect(a);
+  } catch (_) {}
   return a;
 }
 
@@ -83,14 +86,17 @@ function _ensureWordDispatch() {
   _wordDispatchReady = true;
   addBusTap((event, p) => {
     if (event === 'audio:word:final') {
-      _wordStreamHandlers.forEach(fn => fn(p));
+      _wordStreamHandlers.forEach((fn) => fn(p));
       const handlers = _wordHandlers.get(p.word);
-      if (handlers) { notify('audio:word', { word: p.word }); handlers.forEach(fn => fn()); }
+      if (handlers) {
+        notify('audio:word', { word: p.word });
+        handlers.forEach((fn) => fn());
+      }
     } else if (event === 'audio:word:interim') {
-      _wordStreamHandlers.forEach(fn => fn(p));
+      _wordStreamHandlers.forEach((fn) => fn(p));
     } else if (event === 'audio:transcript' && p.isFinal) {
       notify('audio:speech', { text: p.text });
-      _speechHandlers.forEach(fn => fn(p.text));
+      _speechHandlers.forEach((fn) => fn(p.text));
     }
   });
 }
@@ -101,18 +107,31 @@ function _startSpeechSource() {
   _ensureWordDispatch();
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   const useML = _speechEngine === 'ml' || (!SR && _speechEngine !== 'webspeech');
-  if (useML) { _ensureMlSpeech(); return; }
-  if (!SR) { console.warn('Web Speech API not supported; set audio.speechEngine = "ml" for the ML model.'); return; }
+  if (useML) {
+    _ensureMlSpeech();
+    return;
+  }
+  if (!SR) {
+    console.warn('Web Speech API not supported; set audio.speechEngine = "ml" for the ML model.');
+    return;
+  }
   _ensureRecognition();
 }
 
 function _stopSpeechSource() {
   if (_recognition) {
     _recognition.onend = null;
-    try { _recognition.stop(); } catch (_) {}
+    try {
+      _recognition.stop();
+    } catch (_) {}
     _recognition = null;
   }
-  if (_mlSpeechHandle) { try { _mlSpeechHandle.dispose?.(); } catch (_) {} _mlSpeechHandle = null; }
+  if (_mlSpeechHandle) {
+    try {
+      _mlSpeechHandle.dispose?.();
+    } catch (_) {}
+    _mlSpeechHandle = null;
+  }
   _speechWordIndex = 0;
 }
 
@@ -127,13 +146,19 @@ function _ensureMlSpeech() {
       if (_mlSpeechHandle == null) return; // stopped before load resolved
       _mlSpeechHandle = acquireStt('mic', { backend: 'ctc' });
     })
-    .catch(e => { _mlSpeechHandle = null; console.warn('[audio] ML speech start failed:', e?.message ?? e); });
+    .catch((e) => {
+      _mlSpeechHandle = null;
+      console.warn('[audio] ML speech start failed:', e?.message ?? e);
+    });
 }
 
 function _ensureRecognition() {
   if (_recognition) return _recognition;
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) { console.warn('Web Speech API not supported in this browser'); return null; }
+  if (!SR) {
+    console.warn('Web Speech API not supported in this browser');
+    return null;
+  }
   const r = new SR();
   r.continuous = true;
   r.interimResults = true;
@@ -146,13 +171,28 @@ function _ensureRecognition() {
     // Canonical payload { word, final, index } — index is the global running-transcript
     // position (ADR 039). Handler fan-out happens centrally in _ensureWordDispatch.
     const eventName = isFinal ? 'audio:word:final' : 'audio:word:interim';
-    words.forEach((word, i) => notify(eventName, { word, final: isFinal, index: _speechWordIndex + i }));
+    words.forEach((word, i) =>
+      notify(eventName, { word, final: isFinal, index: _speechWordIndex + i }),
+    );
     notify('audio:transcript', { text, isFinal });
     if (isFinal) _speechWordIndex += words.length;
   };
-  r.onerror = (e) => { if (e.error !== 'no-speech') console.warn('Speech recognition error:', e.error); };
-  r.onend = () => { if (_recognition === r) { try { r.start(); } catch (_) {} } };
-  try { r.start(); } catch (e) { console.warn('Speech recognition failed to start:', e.message); return null; }
+  r.onerror = (e) => {
+    if (e.error !== 'no-speech') console.warn('Speech recognition error:', e.error);
+  };
+  r.onend = () => {
+    if (_recognition === r) {
+      try {
+        r.start();
+      } catch (_) {}
+    }
+  };
+  try {
+    r.start();
+  } catch (e) {
+    console.warn('Speech recognition failed to start:', e.message);
+    return null;
+  }
   _recognition = r;
   return r;
 }
@@ -172,15 +212,27 @@ export function cleanupAudio() {
 
   // _cleanupFns: RAF/interval cancels and AudioFile state teardown — immediate.
   const toCleanup = _cleanupFns.splice(0);
-  toCleanup.forEach(f => { try { f(); } catch (_) {} });
+  toCleanup.forEach((f) => {
+    try {
+      f();
+    } catch (_) {}
+  });
 
   // Tone nodes: fade first to prevent click/pop on oscillator disconnect,
   // then dispose. Splice atomically so a new run doesn't get caught in this.
   const toDispose = _tracked.splice(0);
-  try { Tone.getDestination().volume.rampTo(-80, 0.08); } catch (_) {}
+  try {
+    Tone.getDestination().volume.rampTo(-80, 0.08);
+  } catch (_) {}
   _nativeSetTimeout(() => {
-    toDispose.forEach(d => { try { d.dispose(); } catch (_) {} });
-    try { Tone.getDestination().volume.rampTo(0, 0.05); } catch (_) {}
+    toDispose.forEach((d) => {
+      try {
+        d.dispose();
+      } catch (_) {}
+    });
+    try {
+      Tone.getDestination().volume.rampTo(0, 0.05);
+    } catch (_) {}
   }, 100);
 
   _masterFftSignal = null;
@@ -190,30 +242,35 @@ export function cleanupAudio() {
   _wordHandlers.clear();
   _speechHandlers.length = 0;
   _wordStreamHandlers.length = 0;
-  try { speechSynthesis.cancel(); } catch (_) {}
+  try {
+    speechSynthesis.cancel();
+  } catch (_) {}
 }
 
 export function startAudio() {
   const handle = liveOutput({ _audioStarting: true });
-  return Tone.start().then(r => { handle.release(); return r; });
+  return Tone.start().then((r) => {
+    handle.release();
+    return r;
+  });
 }
 
 // ── Scale helpers ─────────────────────────────────────────────────────────
 
 const _SCALES = {
-  major:      [0, 2, 4, 5, 7, 9, 11],
-  minor:      [0, 2, 3, 5, 7, 8, 10],
-  dorian:     [0, 2, 3, 5, 7, 9, 10],
-  phrygian:   [0, 1, 3, 5, 7, 8, 10],
-  lydian:     [0, 2, 4, 6, 7, 9, 11],
+  major: [0, 2, 4, 5, 7, 9, 11],
+  minor: [0, 2, 3, 5, 7, 8, 10],
+  dorian: [0, 2, 3, 5, 7, 9, 10],
+  phrygian: [0, 1, 3, 5, 7, 8, 10],
+  lydian: [0, 2, 4, 6, 7, 9, 11],
   mixolydian: [0, 2, 4, 5, 7, 9, 10],
-  locrian:    [0, 1, 3, 5, 6, 8, 10],
+  locrian: [0, 1, 3, 5, 6, 8, 10],
   pentatonic: [0, 2, 4, 7, 9],
-  blues:      [0, 3, 5, 6, 7, 10],
-  chromatic:  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+  blues: [0, 3, 5, 6, 7, 10],
+  chromatic: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
 };
 
-const _NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+const _NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
 function _midiToNote(midi) {
   const oct = Math.floor(midi / 12) - 1;
@@ -230,18 +287,24 @@ class Instrument {
     this._ = track(inner);
     this._strip = acquireStrip(null, {
       type: 'instrument',
-      nameHint: kind,                          // → 'synth 1', 'fm 2', … (counter resets each run)
+      nameHint: kind, // → 'synth 1', 'fm 2', … (counter resets each run)
       owner: window.__ar_active_editor_id ?? null,
       lifecycle: 'run',
     });
-    try { this._.connect(this._strip.input); } catch (_) {}
+    try {
+      this._.connect(this._strip.input);
+    } catch (_) {}
     notify('instrument:created', { name: this._strip.name, kind });
   }
   play(...args) {
     this._.triggerAttackRelease(...args);
     if (_noteHooks.length > 0) {
       const [note, dur] = args;
-      for (const h of _noteHooks) { try { h({ note, dur, type: 'play' }); } catch (_) {} }
+      for (const h of _noteHooks) {
+        try {
+          h({ note, dur, type: 'play' });
+        } catch (_) {}
+      }
     }
     return this;
   }
@@ -260,7 +323,9 @@ class Instrument {
   // Manual routing override — disconnects from the strip and connects straight
   // to the given node (user takes control; bypasses the mixer; ADR 032).
   connect(node) {
-    try { this._.disconnect(); } catch (_) {}
+    try {
+      this._.disconnect();
+    } catch (_) {}
     this._.connect(node);
     return this;
   }
@@ -273,7 +338,8 @@ class Instrument {
 }
 
 function _makeSignal(analyser, bins) {
-  let _cached = null, _cacheTime = -1;
+  let _cached = null,
+    _cacheTime = -1;
   const getFft = () => {
     const now = performance.now();
     if (now - _cacheTime > 8) {
@@ -282,16 +348,33 @@ function _makeSignal(analyser, bins) {
     }
     return _cached ?? new Float32Array(bins);
   };
-  const avg = (f, s, e) => { let sum = 0; for (let i = s; i < e; i++) sum += f[i]; return sum / (e - s) || 0; };
+  const avg = (f, s, e) => {
+    let sum = 0;
+    for (let i = s; i < e; i++) sum += f[i];
+    return sum / (e - s) || 0;
+  };
   const sig = {
-    get fft()   { return getFft(); },
-    get value() { return avg(getFft(), 0, bins); },
-    get bass()  { return avg(getFft(), 0, Math.floor(bins * 0.1)); },
-    get mid()   { return avg(getFft(), Math.floor(bins * 0.1), Math.floor(bins * 0.5)); },
-    get high()  { return avg(getFft(), Math.floor(bins * 0.5), bins); },
+    get fft() {
+      return getFft();
+    },
+    get value() {
+      return avg(getFft(), 0, bins);
+    },
+    get bass() {
+      return avg(getFft(), 0, Math.floor(bins * 0.1));
+    },
+    get mid() {
+      return avg(getFft(), Math.floor(bins * 0.1), Math.floor(bins * 0.5));
+    },
+    get high() {
+      return avg(getFft(), Math.floor(bins * 0.5), bins);
+    },
     stream(fn) {
       let rafId;
-      const frame = () => { fn(sig); rafId = requestAnimationFrame(frame); };
+      const frame = () => {
+        fn(sig);
+        rafId = requestAnimationFrame(frame);
+      };
       rafId = requestAnimationFrame(frame);
       _cleanupFns.push(() => cancelAnimationFrame(rafId));
       return sig;
@@ -320,7 +403,9 @@ class AudioFile {
   }
 
   _reconnect() {
-    try { this._player.disconnect(); } catch (_) {}
+    try {
+      this._player.disconnect();
+    } catch (_) {}
     if (this._fxChain.length) {
       this._player.chain(...this._fxChain, Tone.getDestination());
     } else {
@@ -330,14 +415,18 @@ class AudioFile {
 
   play(offset) {
     if (this._playing) {
-      try { this._player.stop(); } catch (_) {}
+      try {
+        this._player.stop();
+      } catch (_) {}
     }
-    this._playOffset = offset !== undefined ? offset : (this._paused ? this._playOffset : 0);
+    this._playOffset = offset !== undefined ? offset : this._paused ? this._playOffset : 0;
     this._startedAt = Tone.now();
     this._playing = true;
     this._paused = false;
     this._reconnect();
-    try { this._player.start(Tone.now(), this._playOffset); } catch (_) {}
+    try {
+      this._player.start(Tone.now(), this._playOffset);
+    } catch (_) {}
     this._startPoll();
     return this;
   }
@@ -345,7 +434,9 @@ class AudioFile {
   pause() {
     if (!this._playing) return this;
     this._playOffset = this.currentTime;
-    try { this._player.stop(); } catch (_) {}
+    try {
+      this._player.stop();
+    } catch (_) {}
     this._playing = false;
     this._paused = true;
     this._stopPoll();
@@ -353,7 +444,9 @@ class AudioFile {
   }
 
   stop() {
-    try { this._player.stop(); } catch (_) {}
+    try {
+      this._player.stop();
+    } catch (_) {}
     this._playing = false;
     this._paused = false;
     this._playOffset = 0;
@@ -365,11 +458,16 @@ class AudioFile {
 
   seek(t) {
     const wasPlaying = this._playing;
-    if (wasPlaying) try { this._player.stop(); } catch (_) {}
+    if (wasPlaying)
+      try {
+        this._player.stop();
+      } catch (_) {}
     this._playOffset = t;
     if (wasPlaying) {
       this._startedAt = Tone.now();
-      try { this._player.start(Tone.now(), this._playOffset); } catch (_) {}
+      try {
+        this._player.start(Tone.now(), this._playOffset);
+      } catch (_) {}
     }
     return this;
   }
@@ -459,7 +557,7 @@ class AudioFile {
   // Returns an HTMLCanvasElement; append to DOM or pass to wm.spawn as html content.
   waveform({ width = 512, height = 64, color = '#4ade80', bg = '#111' } = {}) {
     const canvas = document.createElement('canvas');
-    canvas.width  = width;
+    canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = bg;
@@ -467,37 +565,43 @@ class AudioFile {
 
     let offscreen = null;
 
-    this.ready.then(() => {
-      const buffer = this._player.buffer;
-      if (!buffer || typeof buffer.getChannelData !== 'function') return;
-      const data = buffer.getChannelData(0);
-      offscreen = document.createElement('canvas');
-      offscreen.width = width; offscreen.height = height;
-      const oc = offscreen.getContext('2d');
-      oc.fillStyle = bg;
-      oc.fillRect(0, 0, width, height);
-      oc.strokeStyle = color;
-      oc.lineWidth = 1;
-      oc.beginPath();
-      const step = Math.ceil(data.length / width);
-      for (let x = 0; x < width; x++) {
-        let max = 0;
-        for (let i = 0; i < step; i++) {
-          const v = Math.abs(data[x * step + i] ?? 0);
-          if (v > max) max = v;
+    this.ready
+      .then(() => {
+        const buffer = this._player.buffer;
+        if (!buffer || typeof buffer.getChannelData !== 'function') return;
+        const data = buffer.getChannelData(0);
+        offscreen = document.createElement('canvas');
+        offscreen.width = width;
+        offscreen.height = height;
+        const oc = offscreen.getContext('2d');
+        oc.fillStyle = bg;
+        oc.fillRect(0, 0, width, height);
+        oc.strokeStyle = color;
+        oc.lineWidth = 1;
+        oc.beginPath();
+        const step = Math.ceil(data.length / width);
+        for (let x = 0; x < width; x++) {
+          let max = 0;
+          for (let i = 0; i < step; i++) {
+            const v = Math.abs(data[x * step + i] ?? 0);
+            if (v > max) max = v;
+          }
+          const h = max * height * 0.9;
+          const mid = height / 2;
+          oc.moveTo(x + 0.5, mid - h / 2);
+          oc.lineTo(x + 0.5, mid + h / 2);
         }
-        const h = max * height * 0.9;
-        const mid = height / 2;
-        oc.moveTo(x + 0.5, mid - h / 2);
-        oc.lineTo(x + 0.5, mid + h / 2);
-      }
-      oc.stroke();
-    }).catch(() => {});
+        oc.stroke();
+      })
+      .catch(() => {});
 
     let rafId;
     const draw = () => {
       if (offscreen) ctx.drawImage(offscreen, 0, 0);
-      else { ctx.fillStyle = bg; ctx.fillRect(0, 0, width, height); }
+      else {
+        ctx.fillStyle = bg;
+        ctx.fillRect(0, 0, width, height);
+      }
       if (this.duration > 0) {
         const x = Math.floor((this.currentTime / this.duration) * width);
         ctx.fillStyle = 'rgba(255,255,255,0.85)';
@@ -533,7 +637,10 @@ class AudioFile {
   }
 
   _stopPoll() {
-    if (this._pollId) { _nativeClearInterval(this._pollId); this._pollId = null; }
+    if (this._pollId) {
+      _nativeClearInterval(this._pollId);
+      this._pollId = null;
+    }
   }
 
   // Called per-poll-tick; also callable directly in tests.
@@ -541,16 +648,21 @@ class AudioFile {
     if (!this._playing) return;
     const ct = this.currentTime;
     for (const cb of this._onTimeCallbacks) {
-      if (!cb.fired && ct >= cb.t) { cb.fired = true; cb.fn(ct); }
+      if (!cb.fired && ct >= cb.t) {
+        cb.fired = true;
+        cb.fn(ct);
+      }
     }
   }
 
   _dispose() {
     this._stopPoll();
     this._playing = false;
-    this._paused  = false;
+    this._paused = false;
     this._onTimeCallbacks = [];
-    try { this._player.dispose(); } catch (_) {}
+    try {
+      this._player.dispose();
+    } catch (_) {}
   }
 }
 
@@ -575,14 +687,30 @@ class AudioAPI {
   }
 
   // ── Synths ───────────────────────────────────────────────────────────────
-  synth(opts = {}) { return new Instrument(new Tone.Synth(opts), 'synth'); }
-  poly(opts = {})  { return new Instrument(new Tone.PolySynth(Tone.Synth, opts), 'poly'); }
-  fm(opts = {})    { return new Instrument(new Tone.FMSynth(opts), 'fm'); }
-  am(opts = {})    { return new Instrument(new Tone.AMSynth(opts), 'am'); }
-  pluck(opts = {}) { return new Instrument(new Tone.PluckSynth(opts), 'pluck'); }
-  metal(opts = {}) { return new Instrument(new Tone.MetalSynth(opts), 'metal'); }
-  noise(opts = {}) { return new Instrument(new Tone.NoiseSynth(opts), 'noise'); }
-  kick(opts = {})  { return new Instrument(new Tone.MembraneSynth(opts), 'kick'); }
+  synth(opts = {}) {
+    return new Instrument(new Tone.Synth(opts), 'synth');
+  }
+  poly(opts = {}) {
+    return new Instrument(new Tone.PolySynth(Tone.Synth, opts), 'poly');
+  }
+  fm(opts = {}) {
+    return new Instrument(new Tone.FMSynth(opts), 'fm');
+  }
+  am(opts = {}) {
+    return new Instrument(new Tone.AMSynth(opts), 'am');
+  }
+  pluck(opts = {}) {
+    return new Instrument(new Tone.PluckSynth(opts), 'pluck');
+  }
+  metal(opts = {}) {
+    return new Instrument(new Tone.MetalSynth(opts), 'metal');
+  }
+  noise(opts = {}) {
+    return new Instrument(new Tone.NoiseSynth(opts), 'noise');
+  }
+  kick(opts = {}) {
+    return new Instrument(new Tone.MembraneSynth(opts), 'kick');
+  }
 
   // ── Effects ──────────────────────────────────────────────────────────────
   reverb(decay = 1.5) {
@@ -599,7 +727,7 @@ class AudioAPI {
     c.start();
     return c;
   }
-  filter(type = "lowpass", freq = 1000, Q = 1) {
+  filter(type = 'lowpass', freq = 1000, Q = 1) {
     return track(new Tone.Filter({ type, frequency: freq, Q }).toDestination());
   }
   autoFilter(rate = 1) {
@@ -646,7 +774,11 @@ class AudioAPI {
     await m.open();
     // Route through a 'mic' strip so live input is mixable (ADR 032).
     try {
-      const strip = acquireStrip('mic', { type: 'mic', owner: window.__ar_active_editor_id ?? null, lifecycle: 'run' });
+      const strip = acquireStrip('mic', {
+        type: 'mic',
+        owner: window.__ar_active_editor_id ?? null,
+        lifecycle: 'run',
+      });
       m.connect(strip.input);
     } catch (_) {}
     return m;
@@ -689,9 +821,14 @@ class AudioAPI {
   // ── Speech ───────────────────────────────────────────────────────────────
   // Engine selection: 'auto' (Web Speech if present, else ML) | 'ml' (force the
   // in-browser model — works on Brave/Firefox, Chrome opt-in) | 'webspeech'. ADR 039.
-  get speechEngine() { return _speechEngine; }
+  get speechEngine() {
+    return _speechEngine;
+  }
   set speechEngine(mode) {
-    if (mode !== _speechEngine) { _speechEngine = mode; _stopSpeechSource(); } // re-pick on next subscribe
+    if (mode !== _speechEngine) {
+      _speechEngine = mode;
+      _stopSpeechSource();
+    } // re-pick on next subscribe
   }
 
   // Fires fn when the spoken word matches. Auto-uses Web Speech or the ML engine.
@@ -723,12 +860,12 @@ class AudioAPI {
   // Speak text via browser TTS. opts: { voice, rate (0.1–10), pitch (0–2), volume (0–1), lang }
   say(text, opts = {}) {
     const utt = new SpeechSynthesisUtterance(text);
-    if (opts.rate   !== undefined) utt.rate   = opts.rate;
-    if (opts.pitch  !== undefined) utt.pitch  = opts.pitch;
+    if (opts.rate !== undefined) utt.rate = opts.rate;
+    if (opts.pitch !== undefined) utt.pitch = opts.pitch;
     if (opts.volume !== undefined) utt.volume = opts.volume;
-    if (opts.lang   !== undefined) utt.lang   = opts.lang;
-    if (opts.voice  !== undefined) {
-      const v = speechSynthesis.getVoices().find(v => v.name === opts.voice);
+    if (opts.lang !== undefined) utt.lang = opts.lang;
+    if (opts.voice !== undefined) {
+      const v = speechSynthesis.getVoices().find((v) => v.name === opts.voice);
       if (v) utt.voice = v;
     }
     speechSynthesis.speak(utt);
@@ -738,14 +875,18 @@ class AudioAPI {
 
   // Returns list of available TTS voice names for use with audio.say({ voice: '...' }).
   voices() {
-    return speechSynthesis.getVoices().map(v => v.name);
+    return speechSynthesis.getVoices().map((v) => v.name);
   }
 
   // ── Analysis ─────────────────────────────────────────────────────────────
   // Usage: const m = audio.meter(); synth.chain(m); — meter sits in the signal chain
-  get micCanvas() { return window.__ar_mic_viz ?? null; }
+  get micCanvas() {
+    return window.__ar_mic_viz ?? null;
+  }
 
-  viz(source, opts = {}) { return new AudioViz(source, opts); }
+  viz(source, opts = {}) {
+    return new AudioViz(source, opts);
+  }
 
   // Master-output FFT signal (lazy, auto-connected to Tone.Destination).
   // Signal contract: { value, fft, bass, mid, high, stream(fn) }
@@ -753,10 +894,14 @@ class AudioAPI {
     if (!_masterFftSignal) {
       const analyser = new Tone.Analyser('fft', 256);
       track(analyser);
-      try { Tone.getDestination().connect(analyser); } catch (_) {}
+      try {
+        Tone.getDestination().connect(analyser);
+      } catch (_) {}
       _masterFftSignal = _makeSignal(analyser, 256);
       _cleanupFns.push(() => {
-        try { Tone.getDestination().disconnect(analyser); } catch (_) {}
+        try {
+          Tone.getDestination().disconnect(analyser);
+        } catch (_) {}
         _masterFftSignal = null;
       });
     }
@@ -764,7 +909,9 @@ class AudioAPI {
   }
 
   // Scrolling spectrogram canvas. source: Tone node | 'mic' | signal object.
-  spectrogram(source, opts = {}) { return new SpectrogramCanvas(source, opts); }
+  spectrogram(source, opts = {}) {
+    return new SpectrogramCanvas(source, opts);
+  }
 
   // Piano roll overlay — shows falling note blocks for all Instrument.play() calls.
   pianoRoll(opts = {}) {
@@ -774,15 +921,19 @@ class AudioAPI {
   }
 
   // 8-pad drum machine with step sequencer.
-  drumpad(opts = {}) { return new Drumpad(opts); }
+  drumpad(opts = {}) {
+    return new Drumpad(opts);
+  }
   // Polyphonic piano widget with chord sequencer and synth presets.
-  piano(opts = {})   { return new Piano(opts); }
+  piano(opts = {}) {
+    return new Piano(opts);
+  }
 
   meter() {
     return track(new Tone.Meter());
   }
   analyser(bins = 32) {
-    return track(new Tone.Analyser("fft", bins));
+    return track(new Tone.Analyser('fft', bins));
   }
 
   // Live signal object from any audio source (Tone node, Tone.Analyser, 'mic', or Web Audio AnalyserNode).
@@ -805,7 +956,7 @@ class AudioAPI {
       const fft = readAnalyser(analyser ?? source, bins);
       for (let i = 0; i < bins; i++) {
         const v = Math.round(Math.min(1, fft[i]) * 255);
-        img.data[i * 4]     = v;
+        img.data[i * 4] = v;
         img.data[i * 4 + 1] = v;
         img.data[i * 4 + 2] = v;
         img.data[i * 4 + 3] = 255;
@@ -819,8 +970,12 @@ class AudioAPI {
   }
 
   // ── Players ──────────────────────────────────────────────────────────────
-  player(url) { return track(new Tone.Player(url).toDestination()); }
-  sampler(urls, onload) { return track(new Tone.Sampler({ urls, onload }).toDestination()); }
+  player(url) {
+    return track(new Tone.Player(url).toDestination());
+  }
+  sampler(urls, onload) {
+    return track(new Tone.Sampler({ urls, onload }).toDestination());
+  }
 
   // Returns an AudioFile: full playback API with FX chaining.
   // await file.ready before calling play() to ensure the buffer is loaded.
@@ -830,19 +985,26 @@ class AudioAPI {
 
   // Opens a file picker. Resolves to an AudioFile, or null if cancelled.
   async upload() {
-    const url = await new Promise(resolve => {
+    const url = await new Promise((resolve) => {
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = 'audio/*';
       input.style.display = 'none';
       document.body.appendChild(input);
-      const cleanup = () => { try { document.body.removeChild(input); } catch (_) {} };
+      const cleanup = () => {
+        try {
+          document.body.removeChild(input);
+        } catch (_) {}
+      };
       input.addEventListener('change', () => {
         cleanup();
         const file = input.files[0];
         resolve(file ? URL.createObjectURL(file) : null);
       });
-      input.addEventListener('cancel', () => { cleanup(); resolve(null); });
+      input.addEventListener('cancel', () => {
+        cleanup();
+        resolve(null);
+      });
       input.click();
     });
     return url ? this.load(url) : null;
@@ -871,9 +1033,15 @@ class AudioAPI {
     Tone.getDestination().volume.value = db;
     return this;
   }
-  now() { return Tone.now(); }
-  freq(note) { return Tone.Frequency(note).toFrequency(); }
-  get Tone() { return Tone; }
+  now() {
+    return Tone.now();
+  }
+  freq(note) {
+    return Tone.Frequency(note).toFrequency();
+  }
+  get Tone() {
+    return Tone;
+  }
 }
 
 export const audio = new AudioAPI();
@@ -883,12 +1051,22 @@ onReset(cleanupAudio);
 
 // Lazy speech source — starts when anything subscribes to audio:word:* / audio:speech /
 // audio:transcript. Picks Web Speech or the ML engine per audio.speechEngine (ADR 039).
-registerSource(e => e.startsWith('audio:word') || e === 'audio:speech' || e === 'audio:transcript', {
-  start: _startSpeechSource,
-  stop:  _stopSpeechSource,
-});
+registerSource(
+  (e) => e.startsWith('audio:word') || e === 'audio:speech' || e === 'audio:transcript',
+  {
+    start: _startSpeechSource,
+    stop: _stopSpeechSource,
+  },
+);
 
 // ── Event bus command handlers ─────────────────────────────────────────────
-registerCommand('audio:start',      ({ bpm } = {}) => { if (bpm !== undefined) audio.bpm(bpm); audio.start(); });
-registerCommand('audio:stop',       ()              => { audio.stop(); });
-registerCommand('audio:bpm-change', ({ bpm })       => { if (bpm !== undefined) audio.bpm(bpm); });
+registerCommand('audio:start', ({ bpm } = {}) => {
+  if (bpm !== undefined) audio.bpm(bpm);
+  audio.start();
+});
+registerCommand('audio:stop', () => {
+  audio.stop();
+});
+registerCommand('audio:bpm-change', ({ bpm }) => {
+  if (bpm !== undefined) audio.bpm(bpm);
+});

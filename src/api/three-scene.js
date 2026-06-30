@@ -16,13 +16,7 @@ export function cleanupThree() {
 
 export class ThreeScene {
   constructor(opts = {}) {
-    const {
-      z = 30,
-      width,
-      height,
-      alpha = true,
-      antialias = true,
-    } = opts;
+    const { z = 30, width, height, alpha = true, antialias = true } = opts;
 
     this._z = z;
     this._tickFns = [];
@@ -51,9 +45,13 @@ export class ThreeScene {
 
     this.canvas = this.renderer.domElement;
     this.canvas.style.cssText = [
-      'position:absolute', 'top:0', 'left:0',
-      'width:100%', 'height:100%',
-      `z-index:${z}`, 'pointer-events:none',
+      'position:absolute',
+      'top:0',
+      'left:0',
+      'width:100%',
+      'height:100%',
+      `z-index:${z}`,
+      'pointer-events:none',
     ].join(';');
 
     _scenes.add(this);
@@ -63,8 +61,12 @@ export class ThreeScene {
   // mount(target[, z]) — render into a window's layer stack. target: a Canvas
   //   (has .winId), a window id, or a DOM element. show(opts) — spawn own window.
   mount(target, z) {
-    if (z !== undefined) { this._z = z; this.canvas.style.zIndex = String(z); }
-    let body = null, winId = null;
+    if (z !== undefined) {
+      this._z = z;
+      this.canvas.style.zIndex = String(z);
+    }
+    let body = null,
+      winId = null;
     if (target && typeof target === 'object' && target.winId) winId = target.winId;
     else if (typeof target === 'string') winId = target;
     else if (target instanceof HTMLElement) body = target;
@@ -77,7 +79,8 @@ export class ThreeScene {
       body.appendChild(this.canvas);
     }
     if (body) {
-      const rw = body.clientWidth || 800, rh = body.clientHeight || 600;
+      const rw = body.clientWidth || 800,
+        rh = body.clientHeight || 600;
       this.renderer.setSize(rw, rh);
       this.camera.aspect = rw / rh;
       this.camera.updateProjectionMatrix();
@@ -88,9 +91,12 @@ export class ThreeScene {
   show(opts = {}) {
     const { title = 'Three', w = 700, h = 500 } = opts;
     const winId = window.wm?.spawn(title, {
-      w, h, html: '', transient: true,
+      w,
+      h,
+      html: '',
+      transient: true,
       onClose: () => this._destroy(),
-      ...(opts.noChrome    !== undefined ? { noChrome:    opts.noChrome    } : {}),
+      ...(opts.noChrome !== undefined ? { noChrome: opts.noChrome } : {}),
       ...(opts.transparent !== undefined ? { transparent: opts.transparent } : {}),
     });
     this._ownWinId = winId ?? null;
@@ -111,7 +117,11 @@ export class ThreeScene {
       const elapsed = (now - this._startTime) / 1000;
       this._lastTime = now;
       for (const fn of this._tickFns) {
-        try { fn(dt, elapsed); } catch (e) { console.error('[ThreeScene tick]', e); }
+        try {
+          fn(dt, elapsed);
+        } catch (e) {
+          console.error('[ThreeScene tick]', e);
+        }
       }
       this.renderer.render(this.scene, this.camera);
     };
@@ -120,7 +130,10 @@ export class ThreeScene {
   }
 
   stop() {
-    if (this._rafId) { cancelAnimationFrame(this._rafId); this._rafId = null; }
+    if (this._rafId) {
+      cancelAnimationFrame(this._rafId);
+      this._rafId = null;
+    }
     this._live?.release();
     return this;
   }
@@ -133,7 +146,11 @@ export class ThreeScene {
   // bind(name, fn) — registers a live signal for use in tick callbacks via scene.get(name)
   bind(name, fn) {
     this._bindings[name] = fn;
-    window.__ar_signalRoutes?.push({ source: String(name), sink: 'ThreeScene', label: String(name) });
+    window.__ar_signalRoutes?.push({
+      source: String(name),
+      sink: 'ThreeScene',
+      label: String(name),
+    });
     return this;
   }
 
@@ -142,8 +159,14 @@ export class ThreeScene {
     return fn ? fn() : undefined;
   }
 
-  add(obj) { this.scene.add(obj); return this; }
-  remove(obj) { this.scene.remove(obj); return this; }
+  add(obj) {
+    this.scene.add(obj);
+    return this;
+  }
+  remove(obj) {
+    this.scene.remove(obj);
+    return this;
+  }
 
   z(n) {
     this._z = n;
@@ -164,15 +187,19 @@ export class ThreeScene {
   }
 
   _destroy() {
-    if (this._destroyed) return;   // idempotent; also stops dispose()→onStop re-entry
+    if (this._destroyed) return; // idempotent; also stops dispose()→onStop re-entry
     this._destroyed = true;
     this.stop();
     this._tickFns = [];
     this._bindings = {};
     if (this.canvas.parentNode) this.canvas.parentNode.removeChild(this.canvas);
     this.renderer.dispose();
-    if (this._ownWinId) { const id = this._ownWinId; this._ownWinId = null; window.wm?.remove?.(id, { animate: false }); }
+    if (this._ownWinId) {
+      const id = this._ownWinId;
+      this._ownWinId = null;
+      window.wm?.remove?.(id, { animate: false });
+    }
     _scenes.delete(this);
-    this._scoped?.dispose();       // removes from run-scoped set; releases keep-alive
+    this._scoped?.dispose(); // removes from run-scoped set; releases keep-alive
   }
 }

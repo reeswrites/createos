@@ -25,32 +25,46 @@ function hexToHsl(hex) {
   const r = parseInt(hex.slice(1, 3), 16) / 255;
   const g = parseInt(hex.slice(3, 5), 16) / 255;
   const b = parseInt(hex.slice(5, 7), 16) / 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  let h = 0, s = 0;
+  const max = Math.max(r, g, b),
+    min = Math.min(r, g, b);
+  let h = 0,
+    s = 0;
   const l = (max + min) / 2;
   if (max !== min) {
     const d = max - min;
     s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
     switch (max) {
-      case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
-      case g: h = ((b - r) / d + 2) / 6; break;
-      case b: h = ((r - g) / d + 4) / 6; break;
+      case r:
+        h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+        break;
+      case g:
+        h = ((b - r) / d + 2) / 6;
+        break;
+      case b:
+        h = ((r - g) / d + 4) / 6;
+        break;
     }
   }
   return [Math.round(h * 360), Math.round(s * 100), Math.round(l * 100)];
 }
 
 function hslToHex(h, s, l) {
-  s /= 100; l /= 100;
+  s /= 100;
+  l /= 100;
   const k = (n) => (n + h / 30) % 12;
   const a = s * Math.min(l, 1 - l);
-  const f = (n) => Math.round(255 * (l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)))));
+  const f = (n) =>
+    Math.round(255 * (l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)))));
   return `#${f(0).toString(16).padStart(2, '0')}${f(8).toString(16).padStart(2, '0')}${f(4).toString(16).padStart(2, '0')}`;
 }
 
 function resolveToHex(color) {
   if (/^#[0-9a-f]{6}$/i.test(color)) return color;
-  try { return colorToHex(color); } catch (_) { return '#ff0000'; }
+  try {
+    return colorToHex(color);
+  } catch (_) {
+    return '#ff0000';
+  }
 }
 
 // ── Color popup (singleton) ───────────────────────────────────────────────────
@@ -78,7 +92,9 @@ function getColorPopup() {
   const lSlider = el.querySelector('.ar-cp-l');
   const hexInput = el.querySelector('.ar-cp-hex');
 
-  let h = 0, s = 100, l = 50;
+  let h = 0,
+    s = 100,
+    l = 50;
   let onChangeCb = null;
   let anchorEl = null;
 
@@ -86,10 +102,8 @@ function getColorPopup() {
     hSlider.style.background = `linear-gradient(to right,
       hsl(0,${s}%,${l}%),hsl(60,${s}%,${l}%),hsl(120,${s}%,${l}%),
       hsl(180,${s}%,${l}%),hsl(240,${s}%,${l}%),hsl(300,${s}%,${l}%),hsl(359,${s}%,${l}%))`;
-    sSlider.style.background =
-      `linear-gradient(to right,hsl(${h},0%,${l}%),hsl(${h},100%,${l}%))`;
-    lSlider.style.background =
-      `linear-gradient(to right,hsl(${h},${s}%,5%),hsl(${h},${s}%,50%),hsl(${h},${s}%,95%))`;
+    sSlider.style.background = `linear-gradient(to right,hsl(${h},0%,${l}%),hsl(${h},100%,${l}%))`;
+    lSlider.style.background = `linear-gradient(to right,hsl(${h},${s}%,5%),hsl(${h},${s}%,50%),hsl(${h},${s}%,95%))`;
   }
 
   function emitColor() {
@@ -100,15 +114,26 @@ function getColorPopup() {
     onChangeCb?.(hex);
   }
 
-  hSlider.addEventListener('input', () => { h = +hSlider.value; emitColor(); });
-  sSlider.addEventListener('input', () => { s = +sSlider.value; emitColor(); });
-  lSlider.addEventListener('input', () => { l = +lSlider.value; emitColor(); });
+  hSlider.addEventListener('input', () => {
+    h = +hSlider.value;
+    emitColor();
+  });
+  sSlider.addEventListener('input', () => {
+    s = +sSlider.value;
+    emitColor();
+  });
+  lSlider.addEventListener('input', () => {
+    l = +lSlider.value;
+    emitColor();
+  });
 
   hexInput.addEventListener('change', () => {
     const v = hexInput.value.trim();
     if (/^#[0-9a-f]{6}$/i.test(v)) {
       [h, s, l] = hexToHsl(v);
-      hSlider.value = h; sSlider.value = s; lSlider.value = l;
+      hSlider.value = h;
+      sSlider.value = s;
+      lSlider.value = l;
       emitColor();
     }
   });
@@ -136,7 +161,9 @@ function getColorPopup() {
     onChangeCb = onChange;
     const resolved = resolveToHex(hex);
     [h, s, l] = hexToHsl(resolved);
-    hSlider.value = h; sSlider.value = s; lSlider.value = l;
+    hSlider.value = h;
+    sSlider.value = s;
+    lSlider.value = l;
     preview.style.background = resolved;
     hexInput.value = resolved;
     updateSliderBg();
@@ -151,8 +178,12 @@ function getColorPopup() {
     anchorEl = null;
   }
 
-  function isOpen() { return el.style.display !== 'none'; }
-  function currentAnchor() { return anchorEl; }
+  function isOpen() {
+    return el.style.display !== 'none';
+  }
+  function currentAnchor() {
+    return anchorEl;
+  }
 
   _popup = { show, hide, isOpen, currentAnchor };
   return _popup;
@@ -161,8 +192,8 @@ function getColorPopup() {
 // ── State machinery ───────────────────────────────────────────────────────────
 
 const setWidgetsEffect = StateEffect.define();
-const setGhostEffect   = StateEffect.define();
-const setInlayEffect   = StateEffect.define();
+const setGhostEffect = StateEffect.define();
+const setInlayEffect = StateEffect.define();
 
 export const toggleInlayHintsEffect = StateEffect.define();
 
@@ -181,7 +212,7 @@ export const inlayField = StateField.define({
     for (const e of tr.effects) if (e.is(setInlayEffect)) deco = e.value;
     return deco;
   },
-  provide: f => EditorView.decorations.from(f),
+  provide: (f) => EditorView.decorations.from(f),
 });
 
 export const widgetsField = StateField.define({
@@ -191,7 +222,7 @@ export const widgetsField = StateField.define({
     for (const e of tr.effects) if (e.is(setWidgetsEffect)) deco = e.value;
     return deco;
   },
-  provide: f => EditorView.decorations.from(f),
+  provide: (f) => EditorView.decorations.from(f),
 });
 
 export const ghostField = StateField.define({
@@ -201,7 +232,7 @@ export const ghostField = StateField.define({
     for (const e of tr.effects) if (e.is(setGhostEffect)) deco = e.value;
     return deco;
   },
-  provide: f => EditorView.decorations.from(f),
+  provide: (f) => EditorView.decorations.from(f),
 });
 
 // ── Widget types ──────────────────────────────────────────────────────────────
@@ -210,7 +241,7 @@ export class ColorSwatchWidget extends WidgetType {
   constructor(colorStr, argFrom, argLength) {
     super();
     this.colorStr = colorStr;
-    this.argFrom  = argFrom;
+    this.argFrom = argFrom;
     this.argLength = argLength;
   }
 
@@ -229,14 +260,17 @@ export class ColorSwatchWidget extends WidgetType {
 
     swatch.addEventListener('mousedown', (e) => e.stopImmediatePropagation());
     swatch.addEventListener('click', (e) => {
-      e.preventDefault(); e.stopPropagation();
+      e.preventDefault();
+      e.stopPropagation();
       const popup = getColorPopup();
       if (popup.isOpen() && popup.currentAnchor() === swatch) {
         popup.hide();
       } else {
         popup.show(swatch, hex, (newHex) => {
           const newStr = `"${newHex}"`;
-          view.dispatch({ changes: { from: this.argFrom, to: this.argFrom + currentLength, insert: newStr } });
+          view.dispatch({
+            changes: { from: this.argFrom, to: this.argFrom + currentLength, insert: newStr },
+          });
           currentLength = newStr.length;
           swatch.style.background = newHex;
           swatch.title = newHex;
@@ -251,9 +285,9 @@ export class ColorSwatchWidget extends WidgetType {
 export class ScrubWidget extends WidgetType {
   constructor(value, argFrom, argLength, setDragging) {
     super();
-    this.value       = value;
-    this.argFrom     = argFrom;
-    this.argLength   = argLength;
+    this.value = value;
+    this.argFrom = argFrom;
+    this.argLength = argLength;
     this._setDragging = setDragging;
   }
 
@@ -272,26 +306,28 @@ export class ScrubWidget extends WidgetType {
       this._setDragging(true);
       scrub.classList.add('ar-scrub-active');
 
-      const startX   = e.clientX;
+      const startX = e.clientX;
       const startVal = this.value;
-      const isInt    = Number.isInteger(startVal);
-      const mag      = Math.abs(startVal) || 1;
-      const step     = mag >= 100 ? 2 : mag >= 10 ? 1 : 0.1;
+      const isInt = Number.isInteger(startVal);
+      const mag = Math.abs(startVal) || 1;
+      const step = mag >= 100 ? 2 : mag >= 10 ? 1 : 0.1;
 
-      let currentFrom   = this.argFrom;
+      let currentFrom = this.argFrom;
       let currentLength = this.argLength;
-      let currentVal    = startVal;
+      let currentVal = startVal;
 
       const onMove = (ev) => {
         const delta = ev.clientX - startX;
-        let newVal  = startVal + Math.round(delta / 3) * step;
+        let newVal = startVal + Math.round(delta / 3) * step;
         newVal = isInt ? Math.round(newVal) : Math.round(newVal * 10) / 10;
         if (newVal === currentVal) return;
 
         const newStr = String(newVal);
-        view.dispatch({ changes: { from: currentFrom, to: currentFrom + currentLength, insert: newStr } });
+        view.dispatch({
+          changes: { from: currentFrom, to: currentFrom + currentLength, insert: newStr },
+        });
         currentLength = newStr.length;
-        currentVal    = newVal;
+        currentVal = newVal;
         scrub.textContent = newStr;
       };
 
@@ -311,20 +347,32 @@ export class ScrubWidget extends WidgetType {
 }
 
 class InlayHintWidget extends WidgetType {
-  constructor(label) { super(); this.label = label; }
-  eq(other) { return this.label === other.label; }
+  constructor(label) {
+    super();
+    this.label = label;
+  }
+  eq(other) {
+    return this.label === other.label;
+  }
   toDOM() {
     const span = document.createElement('span');
     span.className = 'ar-inlay-hint';
     span.textContent = this.label + ':';
     return span;
   }
-  ignoreEvent() { return true; }
+  ignoreEvent() {
+    return true;
+  }
 }
 
 class GhostSwatchWidget extends WidgetType {
-  constructor(insertAt) { super(); this.insertAt = insertAt; }
-  eq(other) { return this.insertAt === other.insertAt; }
+  constructor(insertAt) {
+    super();
+    this.insertAt = insertAt;
+  }
+  eq(other) {
+    return this.insertAt === other.insertAt;
+  }
 
   toDOM(view) {
     let currentStr = '';
@@ -334,12 +382,18 @@ class GhostSwatchWidget extends WidgetType {
 
     swatch.addEventListener('mousedown', (e) => e.stopImmediatePropagation());
     swatch.addEventListener('click', (e) => {
-      e.preventDefault(); e.stopPropagation();
+      e.preventDefault();
+      e.stopPropagation();
       const popup = getColorPopup();
-      if (popup.isOpen() && popup.currentAnchor() === swatch) { popup.hide(); return; }
+      if (popup.isOpen() && popup.currentAnchor() === swatch) {
+        popup.hide();
+        return;
+      }
       popup.show(swatch, '#ff0000', (newHex) => {
         const newStr = `"${newHex}"`;
-        view.dispatch({ changes: { from: this.insertAt, to: this.insertAt + currentStr.length, insert: newStr } });
+        view.dispatch({
+          changes: { from: this.insertAt, to: this.insertAt + currentStr.length, insert: newStr },
+        });
         currentStr = newStr;
         swatch.style.background = newHex;
       });
@@ -353,8 +407,11 @@ class GhostSwatchWidget extends WidgetType {
 
 function buildInlayDecorations(code) {
   let ast;
-  try { ast = esprima.parseScript(code, { range: true, tolerant: true }); }
-  catch (_) { return Decoration.none; }
+  try {
+    ast = esprima.parseScript(code, { range: true, tolerant: true });
+  } catch (_) {
+    return Decoration.none;
+  }
 
   const items = [];
 
@@ -366,7 +423,7 @@ function buildInlayDecorations(code) {
     if (!params) return;
     for (let i = 0; i < node.arguments.length; i++) {
       const paramName = params[i];
-      if (!paramName || paramName.endsWith('?') && node.arguments.length <= i) continue;
+      if (!paramName || (paramName.endsWith('?') && node.arguments.length <= i)) continue;
       const label = paramName.replace(/\?$/, '');
       const arg = node.arguments[i];
       items.push({
@@ -394,8 +451,11 @@ function buildInlayDecorations(code) {
 
 function buildWidgetDecorations(code, setDragging) {
   let ast;
-  try { ast = esprima.parseScript(code, { range: true, tolerant: true }); }
-  catch (_) { return Decoration.none; }
+  try {
+    ast = esprima.parseScript(code, { range: true, tolerant: true });
+  } catch (_) {
+    return Decoration.none;
+  }
 
   const items = [];
 
@@ -405,7 +465,8 @@ function buildWidgetDecorations(code, setDragging) {
       if (arg.type !== 'Literal') continue;
       if (typeof arg.value === 'string' && isValidColor(arg.value)) {
         items.push({
-          from: arg.range[0], to: arg.range[0],
+          from: arg.range[0],
+          to: arg.range[0],
           deco: Decoration.widget({
             widget: new ColorSwatchWidget(arg.value, arg.range[0], arg.range[1] - arg.range[0]),
             side: -1,
@@ -413,9 +474,15 @@ function buildWidgetDecorations(code, setDragging) {
         });
       } else if (typeof arg.value === 'number') {
         items.push({
-          from: arg.range[0], to: arg.range[1],
+          from: arg.range[0],
+          to: arg.range[1],
           deco: Decoration.replace({
-            widget: new ScrubWidget(arg.value, arg.range[0], arg.range[1] - arg.range[0], setDragging),
+            widget: new ScrubWidget(
+              arg.value,
+              arg.range[0],
+              arg.range[1] - arg.range[0],
+              setDragging,
+            ),
           }),
         });
       }
@@ -432,7 +499,7 @@ function buildWidgetDecorations(code, setDragging) {
   }
 
   walk(ast);
-  items.sort((a, b) => a.from !== b.from ? a.from - b.from : a.to - b.to);
+  items.sort((a, b) => (a.from !== b.from ? a.from - b.from : a.to - b.to));
 
   const builder = new RangeSetBuilder();
   for (const { from, to, deco } of items) builder.add(from, to, deco);
@@ -440,90 +507,100 @@ function buildWidgetDecorations(code, setDragging) {
 }
 
 function buildGhostDecoration(view) {
-  const state  = view.state;
+  const state = view.state;
   const cursor = state.selection.main.head;
-  const line   = state.doc.lineAt(cursor);
+  const line = state.doc.lineAt(cursor);
   const before = line.text.slice(0, cursor - line.from);
-  const after  = line.text.slice(cursor - line.from);
+  const after = line.text.slice(cursor - line.from);
   if (!/(\w+)\.color\(\s*$/.test(before) || !/^\s*\)/.test(after)) return Decoration.none;
 
   const builder = new RangeSetBuilder();
-  builder.add(cursor, cursor, Decoration.widget({ widget: new GhostSwatchWidget(cursor), side: -1 }));
+  builder.add(
+    cursor,
+    cursor,
+    Decoration.widget({ widget: new GhostSwatchWidget(cursor), side: -1 }),
+  );
   return builder.finish();
 }
 
 // ── ViewPlugin ────────────────────────────────────────────────────────────────
 
-export const inlineWidgetsPlugin = ViewPlugin.fromClass(class {
-  constructor(view) {
-    this._view      = view;
-    this._dragging  = false;
-    this._destroyed = false;
-    this._rebounce  = null;
-    this._ghostDebounce = null;
-    this._setDragging = this._setDragging.bind(this);
-    this._scheduleWidgets(300);
-  }
-
-  update(update) {
-    if (this._destroyed || this._dragging) return;
-    const inlayToggled = update.transactions.some(tr =>
-      tr.effects.some(e => e.is(toggleInlayHintsEffect))
-    );
-    if (update.docChanged || inlayToggled) {
-      clearTimeout(this._rebounce);
-      this._rebounce = setTimeout(() => this._rebuildWidgets(), 700);
-    } else if (update.selectionSet) {
-      clearTimeout(this._ghostDebounce);
-      this._ghostDebounce = setTimeout(() => this._rebuildGhost(), 60);
+export const inlineWidgetsPlugin = ViewPlugin.fromClass(
+  class {
+    constructor(view) {
+      this._view = view;
+      this._dragging = false;
+      this._destroyed = false;
+      this._rebounce = null;
+      this._ghostDebounce = null;
+      this._setDragging = this._setDragging.bind(this);
+      this._scheduleWidgets(300);
     }
-  }
 
-  _scheduleWidgets(ms) {
-    clearTimeout(this._rebounce);
-    this._rebounce = setTimeout(() => this._rebuildWidgets(), ms);
-  }
+    update(update) {
+      if (this._destroyed || this._dragging) return;
+      const inlayToggled = update.transactions.some((tr) =>
+        tr.effects.some((e) => e.is(toggleInlayHintsEffect)),
+      );
+      if (update.docChanged || inlayToggled) {
+        clearTimeout(this._rebounce);
+        this._rebounce = setTimeout(() => this._rebuildWidgets(), 700);
+      } else if (update.selectionSet) {
+        clearTimeout(this._ghostDebounce);
+        this._ghostDebounce = setTimeout(() => this._rebuildGhost(), 60);
+      }
+    }
 
-  _rebuildWidgets() {
-    if (this._destroyed || this._dragging) return;
-    const code  = this._view.state.doc.toString();
-    const decos = buildWidgetDecorations(code, this._setDragging);
-    const inlayEnabled = this._view.state.field(inlayHintsEnabledField, false);
-    const inlay = inlayEnabled ? buildInlayDecorations(code) : Decoration.none;
-    this._view.dispatch({ effects: [setWidgetsEffect.of(decos), setInlayEffect.of(inlay)] });
-    this._rebuildGhost();
-  }
+    _scheduleWidgets(ms) {
+      clearTimeout(this._rebounce);
+      this._rebounce = setTimeout(() => this._rebuildWidgets(), ms);
+    }
 
-  _rebuildGhost() {
-    if (this._destroyed || this._dragging) return;
-    const deco = buildGhostDecoration(this._view);
-    this._view.dispatch({ effects: setGhostEffect.of(deco) });
-  }
+    _rebuildWidgets() {
+      if (this._destroyed || this._dragging) return;
+      const code = this._view.state.doc.toString();
+      const decos = buildWidgetDecorations(code, this._setDragging);
+      const inlayEnabled = this._view.state.field(inlayHintsEnabledField, false);
+      const inlay = inlayEnabled ? buildInlayDecorations(code) : Decoration.none;
+      this._view.dispatch({ effects: [setWidgetsEffect.of(decos), setInlayEffect.of(inlay)] });
+      this._rebuildGhost();
+    }
 
-  _setDragging(on) {
-    this._dragging = on;
-    if (!on) this._scheduleWidgets(200);
-  }
+    _rebuildGhost() {
+      if (this._destroyed || this._dragging) return;
+      const deco = buildGhostDecoration(this._view);
+      this._view.dispatch({ effects: setGhostEffect.of(deco) });
+    }
 
-  refresh() {
-    if (this._destroyed) return;
-    clearTimeout(this._rebounce);
-    this._rebuildWidgets();
-  }
+    _setDragging(on) {
+      this._dragging = on;
+      if (!on) this._scheduleWidgets(200);
+    }
 
-  clear() {
-    this._view.dispatch({
-      effects: [setWidgetsEffect.of(Decoration.none), setGhostEffect.of(Decoration.none), setInlayEffect.of(Decoration.none)],
-    });
-  }
+    refresh() {
+      if (this._destroyed) return;
+      clearTimeout(this._rebounce);
+      this._rebuildWidgets();
+    }
 
-  destroy() {
-    clearTimeout(this._rebounce);
-    clearTimeout(this._ghostDebounce);
-    this._destroyed = true;
-    this.clear();
-  }
-});
+    clear() {
+      this._view.dispatch({
+        effects: [
+          setWidgetsEffect.of(Decoration.none),
+          setGhostEffect.of(Decoration.none),
+          setInlayEffect.of(Decoration.none),
+        ],
+      });
+    }
+
+    destroy() {
+      clearTimeout(this._rebounce);
+      clearTimeout(this._ghostDebounce);
+      this._destroyed = true;
+      this.clear();
+    }
+  },
+);
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
@@ -535,7 +612,7 @@ export function initInlineWidgets(view) {
   const plugin = view.plugin(inlineWidgetsPlugin);
   return {
     refresh: () => plugin?.refresh(),
-    clear:   () => plugin?.clear(),
+    clear: () => plugin?.clear(),
     destroy: () => plugin?.destroy(),
   };
 }

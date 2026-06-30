@@ -11,8 +11,8 @@
 // a child pseudo-element would clip. The shared box is `position:fixed` on
 // <body>, immune to ancestor clipping.
 
-let _tip   = null;   // the shared tooltip element
-let _cur   = null;   // element currently being described
+let _tip = null; // the shared tooltip element
+let _cur = null; // element currently being described
 const _text = new WeakMap(); // el → original title (stripped while hovered)
 
 function _ensure() {
@@ -49,9 +49,9 @@ function _show(el) {
   tip.textContent = title;
   tip.style.opacity = '0'; // measure offscreen-ish before placing
   tip.style.left = '0';
-  tip.style.top  = '0';
+  tip.style.top = '0';
 
-  const r  = el.getBoundingClientRect();
+  const r = el.getBoundingClientRect();
   const tw = tip.offsetWidth;
   const th = tip.offsetHeight;
   const vw = window.innerWidth;
@@ -60,11 +60,11 @@ function _show(el) {
   let left = r.left + r.width / 2 - tw / 2;
   left = Math.max(4, Math.min(left, vw - tw - 4));
 
-  let top = r.bottom + 8;            // below the element, like nav
+  let top = r.bottom + 8; // below the element, like nav
   if (top + th + 4 > vh) top = r.top - th - 8; // flip above if no room
 
   tip.style.left = `${Math.round(left)}px`;
-  tip.style.top  = `${Math.round(top)}px`;
+  tip.style.top = `${Math.round(top)}px`;
   tip.style.opacity = '1';
 }
 

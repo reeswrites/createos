@@ -8,23 +8,23 @@ const _backdrops = [];
 // ── Fit helper (cover / contain / stretch) ────────────────────────────────────
 function _drawFit(canvas, src, fit) {
   const ctx = canvas.getContext('2d');
-  const cw = canvas.width, ch = canvas.height;
-  const sw = src.videoWidth ?? src.naturalWidth  ?? src.width  ?? cw;
+  const cw = canvas.width,
+    ch = canvas.height;
+  const sw = src.videoWidth ?? src.naturalWidth ?? src.width ?? cw;
   const sh = src.videoHeight ?? src.naturalHeight ?? src.height ?? ch;
   if (!sw || !sh) return;
   if (fit === 'stretch') {
     ctx.drawImage(src, 0, 0, cw, ch);
   } else {
-    const scale = fit === 'cover'
-      ? Math.max(cw / sw, ch / sh)
-      : Math.min(cw / sw, ch / sh);
-    const dw = sw * scale, dh = sh * scale;
+    const scale = fit === 'cover' ? Math.max(cw / sw, ch / sh) : Math.min(cw / sw, ch / sh);
+    const dw = sw * scale,
+      dh = sh * scale;
     ctx.drawImage(src, (cw - dw) / 2, (ch - dh) / 2, dw, dh);
   }
 }
 
 export function cleanupBackdrops() {
-  _backdrops.forEach(h => h.stop?.());
+  _backdrops.forEach((h) => h.stop?.());
   _backdrops.length = 0;
 }
 
@@ -38,11 +38,15 @@ export class DrawTarget {
   }
 
   #ctx() {
-    return this.#gc(this.#z).getContext("2d");
+    return this.#gc(this.#z).getContext('2d');
   }
 
-  get width()  { return this.#gc(this.#z).width; }
-  get height() { return this.#gc(this.#z).height; }
+  get width() {
+    return this.#gc(this.#z).width;
+  }
+  get height() {
+    return this.#gc(this.#z).height;
+  }
 
   // ── Background / clear ────────────────────────────────────────────────────
 
@@ -63,14 +67,14 @@ export class DrawTarget {
 
   // ── Filled shapes ─────────────────────────────────────────────────────────
 
-  rect(x, y, w, h, color = "#fff") {
+  rect(x, y, w, h, color = '#fff') {
     const ctx = this.#ctx();
     ctx.fillStyle = color;
     ctx.fillRect(x, y, w, h);
     return this;
   }
 
-  circle(x, y, r, color = "#fff") {
+  circle(x, y, r, color = '#fff') {
     const ctx = this.#ctx();
     ctx.fillStyle = color;
     ctx.beginPath();
@@ -79,7 +83,7 @@ export class DrawTarget {
     return this;
   }
 
-  arc(x, y, r, start, end, color = "#fff") {
+  arc(x, y, r, start, end, color = '#fff') {
     const ctx = this.#ctx();
     ctx.fillStyle = color;
     ctx.beginPath();
@@ -90,7 +94,7 @@ export class DrawTarget {
     return this;
   }
 
-  poly(points, color = "#fff") {
+  poly(points, color = '#fff') {
     if (points.length < 2) return this;
     const ctx = this.#ctx();
     ctx.fillStyle = color;
@@ -104,7 +108,7 @@ export class DrawTarget {
 
   // ── Stroked shapes ────────────────────────────────────────────────────────
 
-  rectStroke(x, y, w, h, color = "#fff", thickness = 1) {
+  rectStroke(x, y, w, h, color = '#fff', thickness = 1) {
     const ctx = this.#ctx();
     ctx.strokeStyle = color;
     ctx.lineWidth = thickness;
@@ -112,7 +116,7 @@ export class DrawTarget {
     return this;
   }
 
-  ring(x, y, r, color = "#fff", thickness = 1) {
+  ring(x, y, r, color = '#fff', thickness = 1) {
     const ctx = this.#ctx();
     ctx.strokeStyle = color;
     ctx.lineWidth = thickness;
@@ -122,7 +126,7 @@ export class DrawTarget {
     return this;
   }
 
-  arcStroke(x, y, r, start, end, color = "#fff", thickness = 1) {
+  arcStroke(x, y, r, start, end, color = '#fff', thickness = 1) {
     const ctx = this.#ctx();
     ctx.strokeStyle = color;
     ctx.lineWidth = thickness;
@@ -132,7 +136,7 @@ export class DrawTarget {
     return this;
   }
 
-  line(x1, y1, x2, y2, color = "#fff", thickness = 1) {
+  line(x1, y1, x2, y2, color = '#fff', thickness = 1) {
     const ctx = this.#ctx();
     ctx.strokeStyle = color;
     ctx.lineWidth = thickness;
@@ -143,7 +147,7 @@ export class DrawTarget {
     return this;
   }
 
-  polyStroke(points, color = "#fff", thickness = 1, closed = true) {
+  polyStroke(points, color = '#fff', thickness = 1, closed = true) {
     if (points.length < 2) return this;
     const ctx = this.#ctx();
     ctx.strokeStyle = color;
@@ -158,39 +162,44 @@ export class DrawTarget {
 
   // ── Text ──────────────────────────────────────────────────────────────────
 
-  text(str, x, y, size = 24, color = "#fff", {
-    font      = "sans-serif",
-    align     = "left",
-    baseline  = "alphabetic",
-    weight    = "normal",
-    style     = "normal",
-    stroke    = false,
-    strokeColor = "#000",
-    strokeWidth = 2,
-    shadow    = false,
-    shadowColor = "rgba(0,0,0,0.6)",
-    shadowBlur  = 4,
-    shadowX     = 2,
-    shadowY     = 2,
-    gradient  = null,   // array of CSS colors, top→bottom fill gradient
-  } = {}) {
+  text(
+    str,
+    x,
+    y,
+    size = 24,
+    color = '#fff',
+    {
+      font = 'sans-serif',
+      align = 'left',
+      baseline = 'alphabetic',
+      weight = 'normal',
+      style = 'normal',
+      stroke = false,
+      strokeColor = '#000',
+      strokeWidth = 2,
+      shadow = false,
+      shadowColor = 'rgba(0,0,0,0.6)',
+      shadowBlur = 4,
+      shadowX = 2,
+      shadowY = 2,
+      gradient = null, // array of CSS colors, top→bottom fill gradient
+    } = {},
+  ) {
     const ctx = this.#ctx();
     ctx.font = `${style} ${weight} ${size}px ${font}`;
     ctx.textAlign = align;
     ctx.textBaseline = baseline;
 
     if (shadow) {
-      ctx.shadowColor   = shadowColor;
-      ctx.shadowBlur    = shadowBlur;
+      ctx.shadowColor = shadowColor;
+      ctx.shadowBlur = shadowBlur;
       ctx.shadowOffsetX = shadowX;
       ctx.shadowOffsetY = shadowY;
     }
 
     if (gradient && gradient.length >= 2) {
-      const met = ctx.measureText(str);
-      const w   = met.width;
-      const h   = size * 1.2;
-      const g   = ctx.createLinearGradient(x, y - h, x, y + h * 0.2);
+      const h = size * 1.2;
+      const g = ctx.createLinearGradient(x, y - h, x, y + h * 0.2);
       gradient.forEach((c, i) => g.addColorStop(i / (gradient.length - 1), c));
       ctx.fillStyle = g;
     } else {
@@ -200,13 +209,17 @@ export class DrawTarget {
     ctx.fillText(str, x, y);
 
     if (stroke) {
-      ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
       ctx.strokeStyle = strokeColor;
-      ctx.lineWidth   = strokeWidth;
+      ctx.lineWidth = strokeWidth;
       ctx.strokeText(str, x, y);
     }
 
-    ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
     return this;
   }
 
@@ -229,26 +242,50 @@ export class DrawTarget {
 
   // ── State ─────────────────────────────────────────────────────────────────
 
-  push() { this.#ctx().save(); return this; }
-  pop()  { this.#ctx().restore(); return this; }
+  push() {
+    this.#ctx().save();
+    return this;
+  }
+  pop() {
+    this.#ctx().restore();
+    return this;
+  }
 
-  alpha(n)     { this.#ctx().globalAlpha = n; return this; }
-  blend(mode)  { this.#ctx().globalCompositeOperation = mode; return this; }
+  alpha(n) {
+    this.#ctx().globalAlpha = n;
+    return this;
+  }
+  blend(mode) {
+    this.#ctx().globalCompositeOperation = mode;
+    return this;
+  }
 
   // ── Transform ─────────────────────────────────────────────────────────────
 
-  translate(x, y)  { this.#ctx().translate(x, y); return this; }
-  rotate(rad)      { this.#ctx().rotate(rad); return this; }
-  scale(x, y = x)  { this.#ctx().scale(x, y); return this; }
+  translate(x, y) {
+    this.#ctx().translate(x, y);
+    return this;
+  }
+  rotate(rad) {
+    this.#ctx().rotate(rad);
+    return this;
+  }
+  scale(x, y = x) {
+    this.#ctx().scale(x, y);
+    return this;
+  }
 
-  resetTransform() { this.#ctx().setTransform(1, 0, 0, 1, 0, 0); return this; }
+  resetTransform() {
+    this.#ctx().setTransform(1, 0, 0, 1, 0, 0);
+    return this;
+  }
 
   reset() {
     const ctx = this.#ctx();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1;
-    ctx.globalCompositeOperation = "source-over";
-    ctx.shadowColor = "transparent";
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.shadowColor = 'transparent';
     ctx.shadowBlur = 0;
     ctx.lineWidth = 1;
     return this;
@@ -263,7 +300,8 @@ export class DrawTarget {
     const pw = Math.max(1, Math.round(dw / blockSize));
     const ph = Math.max(1, Math.round(dh / blockSize));
     const off = document.createElement('canvas');
-    off.width = pw; off.height = ph;
+    off.width = pw;
+    off.height = ph;
     const offCtx = off.getContext('2d');
     offCtx.drawImage(source, 0, 0, pw, ph);
     ctx.imageSmoothingEnabled = false;
@@ -278,7 +316,8 @@ export class DrawTarget {
     pre.style.cssText = `background:${bg};color:${color};font:${Math.max(4, Math.floor(800 / cols))}px/1.1 monospace;margin:0;padding:4px;white-space:pre;overflow:hidden;`;
     const update = (src = canvas) => {
       const off = document.createElement('canvas');
-      off.width = cols; off.height = r;
+      off.width = cols;
+      off.height = r;
       const offCtx = off.getContext('2d');
       offCtx.drawImage(src, 0, 0, cols, r);
       const px = offCtx.getImageData(0, 0, cols, r).data;
@@ -311,19 +350,24 @@ export class DrawTarget {
   // cleanupBackdrops() is called automatically on reset.
 
   backdrop(source, { z, fit = 'cover', loop = true } = {}) {
-    const targetZ  = z ?? (this.#z - 1);
+    const targetZ = z ?? this.#z - 1;
     const bdCanvas = this.#gc(targetZ);
 
     // Build the stop handle up-front so the raf closure can reference it
     let _rafId = null;
-    let _live  = null;
+    let _live = null;
     let _cameraLease = null;
     const h = {
       layer: targetZ,
       stop: () => {
-        if (_rafId !== null) { cancelAnimationFrame(_rafId); _rafId = null; }
-        _live?.release(); _live = null;
-        _cameraLease?.release(); _cameraLease = null;
+        if (_rafId !== null) {
+          cancelAnimationFrame(_rafId);
+          _rafId = null;
+        }
+        _live?.release();
+        _live = null;
+        _cameraLease?.release();
+        _cameraLease = null;
         const i = _backdrops.indexOf(h);
         if (i !== -1) _backdrops.splice(i, 1);
         const j = this._ownBackdrops?.indexOf(h) ?? -1;
@@ -390,13 +434,21 @@ export class DrawTarget {
   // footage loop and lets the idle watcher auto-stop the run.
   stopBackdrops() {
     if (!this._ownBackdrops) return;
-    for (const h of [...this._ownBackdrops]) { try { h.stop?.(); } catch { /* gone */ } }
+    for (const h of [...this._ownBackdrops]) {
+      try {
+        h.stop?.();
+      } catch {
+        /* gone */
+      }
+    }
     this._ownBackdrops = [];
   }
 
   // ── Layer targeting ───────────────────────────────────────────────────────
 
-  at(z) { return new DrawTarget(z, this.#gc); }
+  at(z) {
+    return new DrawTarget(z, this.#gc);
+  }
 }
 
 // Register teardown with the reset registry (ADR 008).

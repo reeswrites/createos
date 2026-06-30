@@ -151,7 +151,7 @@ describe('Plugin.bridge', () => {
 
 describe('Plugin.canvas', () => {
   it('returns null when iframe has no canvas (same-origin stub)', () => {
-    const { iframe } = mockDOM();
+    mockDOM();
     const p = PluginHost.create('<html></html>');
     p.spawn('P');
     // contentDocument.querySelector returns null (mock)

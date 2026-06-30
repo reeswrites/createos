@@ -1,17 +1,26 @@
 {
   "version": 1,
-  "toolbar": { "micOn": false, "cameraOn": false },
+  "toolbar": {
+    "micOn": false,
+    "cameraOn": false
+  },
   "windows": [
     {
       "type": "editor",
       "editorId": 1,
       "title": "Beat Pattern",
-      "x": 20, "y": 20, "w": 560, "h": 420,
+      "x": 20,
+      "y": 20,
+      "w": 560,
+      "h": 420,
       "visible": true,
       "nochrome": false,
       "transparent": false,
-      "audio": { "muted": false, "volume": 1 },
-      "code": "// Beat Pattern — drum groove + melody using mini-notation\n// Mini-notation: x=hit, .=rest, [ ]=group, < >=alternate\n\nconst kick  = audio.kick();   // MembraneSynth (kick drum)\nconst snare = audio.noise();  // NoiseSynth (snare)\nconst hat   = audio.metal();  // MetalSynth (hi-hat)\nconst mel   = audio.synth({ oscillator: { type: 'triangle' },\n  envelope: { attack: 0.01, decay: 0.1, sustain: 0.3, release: 0.6 } });\n\n// Classic 4/4 with offbeat snare and 8th hi-hats\npat('x . . x x . x .', kick).volume(-8).bpm(128).start();\npat('. . x . . . x .', snare).volume(-12).bpm(128).start();\npat('x x x x x x x x', hat).volume(-20).bpm(128).start();\n\n// Ascending melody that alternates each cycle\npat('<[C4 E4] [G4 B4] [A4 C5] [F4 A4]>', mel)\n  .slow(2).volume(-14).bpm(128).start();\n\n// Open a visualizer\nwm.spawn('Visualizer', { type: 'viz', source: 'master', style: 'bars',\n  w: 420, h: 180, x: 300, y: 240 });\n",
+      "audio": {
+        "muted": false,
+        "volume": 1
+      },
+      "code": "// Beat Pattern — drum groove + melody on the Strudel engine (ADR 035)\n// Mini-notation: bd=kick, sd=snare, hh=hat; ~=rest, *N=repeat, [ ]=group.\nawait samples(\"github:tidalcycles/dirt-samples\");   // load the drum kit (one-time)\nsetcps(0.5);                                         // ~120 bpm feel\n\nstack(\n  s(\"bd ~ ~ bd ~ ~ bd ~\"),          // kick\n  s(\"~ ~ sd ~ ~ ~ sd ~\"),           // snare on the backbeat\n  s(\"hh*8\").gain(0.4),              // 8th-note hi-hats\n  note(\"c4 e4 g4 b4 a4 g4 e4 c4\")   // melody over the top\n    .s(\"triangle\").slow(2).gain(0.4)\n).play();\n\n// Live spectrum visualizer of the master bus\nwm.spawn(\"Visualizer\", { type: \"viz\", source: \"master\", style: \"bars\",\n  w: 420, h: 180, x: 300, y: 240 });\n",
       "mode": "text",
       "blocksJson": null,
       "executionState": "running"
@@ -19,7 +28,10 @@
     {
       "type": "output",
       "editorId": 1,
-      "x": 590, "y": 20, "w": 420, "h": 180,
+      "x": 590,
+      "y": 20,
+      "w": 420,
+      "h": 180,
       "visible": false
     }
   ],

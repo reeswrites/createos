@@ -61,6 +61,43 @@ export class Sprite {
 
   get frameCount() { return this._frames.length; }
 
+  // Clone the current frame into a new appended frame and select it.
+  duplicateFrame() {
+    const fi = this._fi;
+    const ni = this._addFrameCanvas();
+    this._frames[ni].getContext('2d').drawImage(this._frames[fi], 0, 0);
+    return this.frame(ni);
+  }
+
+  // Remove the current frame (no-op when only one remains); clamp + render.
+  removeFrame() {
+    if (this._frames.length <= 1) return this;
+    this._frames.splice(this._fi, 1);
+    this._fi = Math.min(this._fi, this._frames.length - 1);
+    this._render();
+    return this;
+  }
+
+  // Reorder the current frame by `dir` (±1); follows it to the new slot.
+  moveFrame(dir) {
+    const fi = this._fi, to = fi + dir;
+    if (to < 0 || to >= this._frames.length) return this;
+    [this._frames[fi], this._frames[to]] = [this._frames[to], this._frames[fi]];
+    this._fi = to;
+    this._render();
+    return this;
+  }
+
+  // Draw frame `i` (default current) into a target canvas, sizing it to the
+  // pixel-resolution frame. Keeps the backing _frames array private — the seam
+  // the SpriteFrameAdapter reads through for thumbnails.
+  drawFrameTo(target, i = this._fi) {
+    target.width = this._w;
+    target.height = this._h;
+    target.getContext('2d').drawImage(this._frames[i], 0, 0);
+    return this;
+  }
+
   // ── Pixel drawing ────────────────────────────────────────────────────────────
 
   // Set pixel at (x,y) on current (or given) frame

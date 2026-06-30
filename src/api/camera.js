@@ -1,4 +1,4 @@
-import { onReset } from '../runtime/reset-registry.js';
+import { runScoped } from '../runtime/run-scoped.js';
 import { notify, registerCommand } from '../events/index.js';
 import { recordStream } from './recorder.js';
 import { initCameraLease } from './media-lease.js';
@@ -66,9 +66,11 @@ async function _getSharedSource(key, constraints, id) {
 }
 
 export function cleanupCameras(editorId) {
-  // Scope to the resetting editor so a camera held by another editor's still-live
-  // output keeps streaming. editorId == null → full release (global / hard reset).
-  // Iterate a copy: _release() splices itself out of _openCameras.
+  // Manual "release matching cameras" helper (tests call it). Per-handle,
+  // owner-filtered reset teardown is also handled by run-scoped.js (ADR 041) —
+  // each CameraStream registers a runScoped handle (an INPUT: no keep-alive).
+  // editorId == null → full release (global / hard reset). Iterate a copy:
+  // _release() splices itself out of _openCameras.
   for (const c of [..._openCameras]) {
     if (editorId == null || c._ownerEditorId == null || c._ownerEditorId === editorId) c._release();
   }
@@ -82,6 +84,10 @@ class CameraStream {
     this._ownerEditorId = ownerEditorId;
     source.acquire();
     _openCameras.push(this);
+    // Owner-scoped teardown via the shared run-scoped handler (ADR 041). owner is
+    // passed in (open() awaits, so it was captured before the await). A camera is
+    // an INPUT — runScoped (no keep-alive), never runScopedOutput (ADR 009/023).
+    this._scoped = runScoped({ owner: ownerEditorId, onStop: () => this._release() });
   }
 
   get element()  { return this._source.element; }
@@ -127,6 +133,7 @@ class CameraStream {
     const i = _openCameras.indexOf(this);
     if (i >= 0) _openCameras.splice(i, 1);
     this._source.release();   // stops tracks only when last handle releases
+    this._scoped?.dispose();  // removes from run-scoped set (onStop re-enters, guarded)
   }
 }
 
@@ -280,8 +287,9 @@ export function initCamera() {
   initCameraLease(_startToolbarCamera, _stopToolbarCamera);
 }
 
-// Register teardown with the reset registry (ADR 008).
-onReset(cleanupCameras);
+// Per-handle, owner-filtered reset teardown is handled by run-scoped.js (ADR
+// 041) — each CameraStream registers a runScoped handle. cleanupCameras() stays
+// as a manual release-all helper for tests.
 
 // ── Event bus command handler ─────────────────────────────────────────────────
 registerCommand('camera:close', ({ deviceId }) => {

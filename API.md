@@ -833,7 +833,8 @@ vision.drawFace(ctx?,  { color, pointSize, mirror } = {})
 vision.drawHands(ctx?, { color, lineWidth, pointSize, mirror } = {})
 vision.drawPose(ctx?,  { color, lineWidth, pointSize, minVisibility, mirror } = {})
 
-// Config — call before first vision use; first-run-wins (page refresh to change)
+// Config. pose is first-run-wins (call before first pose use; page refresh to change).
+// hands.numHands applies live (any time) — pushed to the recognizer via setOptions.
 vision.configure({ pose:  { model: 'lite'|'full'|'heavy', numPoses: 1 } })
 vision.configure({ hands: { numHands: 2 } })   // default 1 — track both hands
 

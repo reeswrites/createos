@@ -1,14 +1,17 @@
 import * as THREE from 'three';
-import { onReset } from '../runtime/reset-registry.js';
 import { liveOutput } from '../runtime/keep-alive.js';
+import { runScoped } from '../runtime/run-scoped.js';
 
 export { THREE };
 
-const _scenes = [];
+const _scenes = new Set();
 
+// Manual "destroy every scene" helper (used by tests + app). Per-instance,
+// owner-filtered reset teardown is handled by run-scoped.js (ADR 041): each
+// scene registers a runScoped handle in its ctor, so there is no onReset here.
 export function cleanupThree() {
-  for (const s of _scenes) s._destroy();
-  _scenes.length = 0;
+  for (const s of [..._scenes]) s._destroy();
+  _scenes.clear();
 }
 
 export class ThreeScene {
@@ -28,6 +31,11 @@ export class ThreeScene {
     this._lastTime = null;
     this._destroyed = false;
     this._bindings = {};
+    // Owner-scoped teardown via the shared run-scoped handler (ADR 041). Keep-alive
+    // is toggled separately by start()/stop() (this output's liveness toggles), so
+    // this uses runScoped (no keep-alive), not runScopedOutput.
+    this._ownerEditorId = window.__ar_active_editor_id;
+    this._scoped = runScoped({ owner: this._ownerEditorId, onStop: () => this._destroy() });
 
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(75, (width || 800) / (height || 600), 0.1, 1000);
@@ -48,7 +56,7 @@ export class ThreeScene {
       `z-index:${z}`, 'pointer-events:none',
     ].join(';');
 
-    _scenes.push(this);
+    _scenes.add(this);
   }
 
   // ── Mount / show (ADR 040) ─────────────────────────────────────────────────
@@ -156,15 +164,15 @@ export class ThreeScene {
   }
 
   _destroy() {
+    if (this._destroyed) return;   // idempotent; also stops dispose()→onStop re-entry
+    this._destroyed = true;
     this.stop();
     this._tickFns = [];
     this._bindings = {};
     if (this.canvas.parentNode) this.canvas.parentNode.removeChild(this.canvas);
     this.renderer.dispose();
     if (this._ownWinId) { const id = this._ownWinId; this._ownWinId = null; window.wm?.remove?.(id, { animate: false }); }
-    this._destroyed = true;
+    _scenes.delete(this);
+    this._scoped?.dispose();       // removes from run-scoped set; releases keep-alive
   }
 }
-
-// Register teardown with the reset registry (ADR 008).
-onReset(cleanupThree);

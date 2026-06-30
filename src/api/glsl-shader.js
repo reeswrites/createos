@@ -256,6 +256,9 @@ export class GLShader extends ShaderLayerBase {
   // ── Public API (mirrors Shader) ──────────────────────────────────────────
 
   start() {
+    // Detached (no .mount()/.show()) — spawn our own window so .start() works
+    // standalone, as the docs show. (The old editor-output fallback is gone — ADR 040.)
+    if (!this._container && !this._ownWinId) return this.show();
     this._registerLive();
     if (!this._gl) {
       try { this._init(); } catch (e) {

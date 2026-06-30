@@ -23,7 +23,7 @@ import { addEditorIcon, removeEditorIcon, updateEditorIconLabel, duplicateEditor
 import { runResetHandlers } from '../runtime/reset-registry.js';
 import { emit, clearRunScoped } from '../events/index.js';
 import { eventCompletionSource } from './event-completion.js';
-import { freezeTimers, restoreTimers } from '../runtime/timer-manager.js';
+import { PauseController } from '../runtime/pause-controller.js';
 import {
   initBlockly, getWorkspaceCode, resizeBlockly, workspaceIsEmpty,
   loadWorkspaceJSON, registerSidebarDeleteZone,
@@ -32,23 +32,38 @@ import { jsToBlocks } from '../blocks/js-to-blocks.js';
 
 // ── Syntax linter (esprima-based) ────────────────────────────────────────────
 
+// Parse user code the way the runtime runs it: injected inside an async IIFE,
+// so top-level `await` is legal (esprima rejects it in a bare script). Returns
+// null on success, or the original script-parse error otherwise.
+function _parseRunnable(code) {
+  try {
+    esprima.parseScript(code, { tolerant: false, range: true, loc: true });
+    return null;
+  } catch (errScript) {
+    try {
+      // Mirror app.js's async IIFE wrap so top-level await parses.
+      esprima.parseScript('(async()=>{' + code + '\n})()', { tolerant: false });
+      return null;
+    } catch (_) {
+      return errScript;
+    }
+  }
+}
+
 function _jsLinterSource(view) {
   const code = view.state.doc.toString();
   if (!code.trim()) return [];
-  try {
-    esprima.parseScript(code, { tolerant: false, range: true, loc: true });
-    return [];
-  } catch (err) {
-    // esprima error has .lineNumber, .column, .description, .index
-    const from = err.index ?? 0;
-    const to   = Math.min(from + 1, view.state.doc.length);
-    return [{
-      from,
-      to,
-      severity: 'error',
-      message: err.description ?? err.message ?? 'Syntax error',
-    }];
-  }
+  const err = _parseRunnable(code);
+  if (!err) return [];
+  // esprima error has .lineNumber, .column, .description, .index
+  const from = err.index ?? 0;
+  const to   = Math.min(from + 1, view.state.doc.length);
+  return [{
+    from,
+    to,
+    severity: 'error',
+    message: err.description ?? err.message ?? 'Syntax error',
+  }];
 }
 
 const jsLinterExtension = [
@@ -211,7 +226,20 @@ export class EditorInstance {
     this._listeners = [];
     this._keepAlive = new Set();
     this._hadOutput = false;
-    this._pausedState = null;
+    // Pause mechanics (freeze/restore tracked timers) live in PauseController
+    // (ADR 043); the idle watcher, UI state, and window.__ar_paused stay here.
+    // trackedSetters resolves the namespaced setters at resume time so restored
+    // timers re-register in this._intervals/_timeouts.
+    this._pause = new PauseController({
+      intervals:     this._intervals,
+      timeouts:      this._timeouts,
+      clearInterval: this._native.clearInterval,
+      clearTimeout:  this._native.clearTimeout,
+      trackedSetters: () => {
+        const ns = `__ar_e${this.id}`;
+        return { setInterval: window[`${ns}_setInterval`], setTimeout: window[`${ns}_setTimeout`] };
+      },
+    });
 
     this.blocklyWorkspace = null;
     this.blocksMode = false;
@@ -385,9 +413,8 @@ export class EditorInstance {
               this._native.clearTimeout(this._autoExecTimer);
               this._autoExecTimer = this._native.setTimeout(() => {
                 const code = this.cm.state.doc.toString();
-                // Only auto-run if code parses cleanly
-                try { esprima.parseScript(code, { tolerant: false }); }
-                catch (_) { return; }
+                // Only auto-run if code parses cleanly (async-IIFE aware)
+                if (_parseRunnable(code)) return;
                 this.execute({ soft: true });
               }, 1000);
             }
@@ -855,6 +882,7 @@ export class EditorInstance {
   }
 
   _setStopped() {
+    this._clearTrace();   // every stop path converges here (manual stop, error, idle auto-stop) — kill stale execution-trail glow
     if (this.idleWatcher) { this._native.clearInterval(this.idleWatcher); this.idleWatcher = null; }
     const isPopped = !!document.getElementById(`win-console-${this.id}`);
     if (!isPopped) {
@@ -887,13 +915,16 @@ export class EditorInstance {
   }
 
   _checkLiveOrStop() {
-    if (this.btnState === 'running' && !this._isLive()) this._setStopped();
+    // Not-live means every output is gone (e.g. the user closed the Canvas/output
+    // window). Any timers/audio/RAF still running are "orphaned drivers" — do a
+    // REAL teardown (stopRunning), not a cosmetic _setStopped, so they're cleared.
+    if (this.btnState === 'running' && !this._isLive()) this.stopRunning();
   }
 
   _startIdleWatcher() {
     this.idleWatcher = this._native.setInterval(() => {
       if (this.btnState !== 'running') { this._native.clearInterval(this.idleWatcher); this.idleWatcher = null; return; }
-      if (!this._isLive()) this._setStopped();
+      if (!this._isLive()) this.stopRunning();   // tear down orphaned drivers, not just the UI
     }, 300);
   }
 
@@ -908,26 +939,20 @@ export class EditorInstance {
       target?.removeEventListener(type, handler, options));
     this._listeners = [];
     runResetHandlers(this.id, false);   // hard reset/stop — tear everything down (Canvas windows too)
-    this._pausedState = null;
-    this._clearTrace();
-    this._setStopped();
+    this._pause.clear();
+    this._setStopped();                 // _setStopped() clears the execution trail
   }
 
   pauseRunning() {
     if (this.idleWatcher) { this._native.clearInterval(this.idleWatcher); this.idleWatcher = null; }
-    this._pausedState = freezeTimers(
-      this._intervals, this._timeouts,
-      this._native.clearInterval, this._native.clearTimeout,
-    );
+    this._pause.pause();
     window.__ar_paused = true;
     this._setPaused();
   }
 
   resumeRunning() {
-    const ns = `__ar_e${this.id}`;
     window.__ar_paused = false;
-    restoreTimers(this._pausedState, window[`${ns}_setInterval`], window[`${ns}_setTimeout`]);
-    this._pausedState = null;
+    this._pause.resume();
     this._setRunning();
     this._startIdleWatcher();
   }
@@ -940,7 +965,7 @@ export class EditorInstance {
     this._clearTrace();
     window.__ar_paused    = false;
     window.__ar_usesAudio = undefined;
-    this._pausedState = null;
+    this._pause.clear();
     this._listeners.forEach(({ target, type, handler, options }) =>
       target?.removeEventListener(type, handler, options));
     this._listeners = [];

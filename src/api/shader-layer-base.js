@@ -59,10 +59,10 @@ export class ShaderLayerBase {
   // Named uniform write — makes route().to(shader, 'uCustom.x') work (ADR 025).
   //
   // 'uCustom' / 'custom' → unpack {x,y,z,w} into _custom via set(); value is also
-  // stored in _uniforms so route's read-modify-write swizzle
-  //   (`sink._uniforms?.[uname]`) can read the current state before updating one
-  //   component. Other names are stored in _uniforms for forward-compat but only
-  //   reach the GPU if explicitly declared in the shader.
+  // stored in _uniforms so route's read-modify-write swizzle can read the current
+  //   state (via getUniform()) before updating one component. Other names are
+  //   stored in _uniforms for forward-compat but only reach the GPU if explicitly
+  //   declared in the shader.
   //
   // ⚠️  Mutual exclusion: bind() and setUniform('uCustom') conflict —
   //   _packAudioCustom() overwrites _custom[0..3] every frame when a source is
@@ -77,6 +77,16 @@ export class ShaderLayerBase {
       this._uniforms[name] = val;
     }
     return this;
+  }
+
+  // Read twin of setUniform — the owned seam route's swizzle reads through
+  // (instead of poking _uniforms directly). Vector names default to a zeroed
+  // {x,y,z,w} so a read-modify-write of one component never writes garbage.
+  getUniform(name) {
+    if (name === 'uCustom' || name === 'custom') {
+      return this._uniforms.uCustom ?? { x: 0, y: 0, z: 0, w: 0 };
+    }
+    return this._uniforms[name];
   }
 
   // ── Audio binding ────────────────────────────────────────────────────────

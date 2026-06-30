@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "toolbar": {
+    "micOn": true,
+    "cameraOn": true
+  },
+  "windows": [
+    {
+      "type": "editor",
+      "editorId": 1,
+      "title": "Karaoke",
+      "x": 20,
+      "y": 20,
+      "w": 560,
+      "h": 420,
+      "visible": true,
+      "nochrome": false,
+      "transparent": false,
+      "audio": {
+        "muted": false,
+        "volume": 1
+      },
+      "code": "// Karaoke — speak and your words bloom over your camera feed.\n// Speech-to-text drives floating text; the camera is just the backdrop.\nroute(Source.camera)\n  .tap('audio:word:final', ({ word }, winId) => {\n    wm.addText(winId, word,\n      120 + Math.random() * 1360,\n      100 + Math.random() * 700,\n      { fontSize: 48 + Math.random() * 72 | 0,\n        color: `hsl(${Math.random() * 360 | 0},100%,70%)`,\n        bold: true, decay: 6000 });\n  })\n  .show('Karaoke', { w: 800, h: 450 });\n",
+      "mode": "text",
+      "blocksJson": null,
+      "executionState": "running"
+    },
+    {
+      "type": "output",
+      "editorId": 1,
+      "x": 590,
+      "y": 20,
+      "w": 800,
+      "h": 450,
+      "visible": false
+    }
+  ],
+  "desktop": []
+}

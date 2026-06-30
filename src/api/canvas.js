@@ -170,6 +170,9 @@ class Canvas extends DrawTarget {
     this._disposed = true;
     for (const u of this._unsubs) { try { u(); } catch { /* already gone */ } }
     this._unsubs = [];
+    // Stop backdrops mounted on this surface so their keep-alive + raf don't
+    // outlive the window (else the run never idle-stops and audio keeps firing).
+    this.stopBackdrops();
     this._live?.release();
     if (this.winId) { window.wm?.remove?.(this.winId, { animate: false }); this.winId = null; }
     _instances.delete(this);

@@ -1,18 +1,31 @@
 import * as Tone from "tone";
 import { Shader } from "./shader.js";
-import { onReset } from '../runtime/reset-registry.js';
 import { liveOutput } from '../runtime/keep-alive.js';
+import { runScoped } from '../runtime/run-scoped.js';
 import { acquireMicRunScoped } from './media-lease.js';
 import { readAnalyser } from './analyser-read.js';
+import { isAudioSignal } from './signal-shape.js';
 
-const _vizs = [];
+const _vizs = new Set();
 
 // Registered by PianoRollViz to receive note events from Instrument.play()
 export const _noteHooks = [];
 
+// Manual "destroy every viz" helper (app.js imports it). Per-instance,
+// owner-filtered reset teardown is handled by run-scoped.js (ADR 041): each viz
+// registers a runScoped handle in its ctor, so there is no onReset here.
 export function cleanupViz() {
-  for (const v of _vizs) v._destroy();
-  _vizs.length = 0;
+  for (const v of [..._vizs]) v._destroy();
+  _vizs.clear();
+}
+
+// Owner-scoped teardown via the shared run-scoped handler (ADR 041). Keep-alive
+// is toggled separately by each viz's start()/stop() (liveness toggles), so this
+// uses runScoped (no keep-alive), not runScopedOutput.
+function _registerViz(v) {
+  v._ownerEditorId = window.__ar_active_editor_id;
+  v._scoped = runScoped({ owner: v._ownerEditorId, onStop: () => v._destroy() });
+  _vizs.add(v);
 }
 
 // ── Viz shader presets ────────────────────────────────────────────────────────
@@ -64,7 +77,7 @@ export class AudioViz {
       try { node.connect(this._analyser); } catch (_) {}
     }
 
-    _vizs.push(this);
+    _registerViz(this);
   }
 
   _initCanvas() {
@@ -209,9 +222,13 @@ export class AudioViz {
   static get presets() { return Object.keys(VIZ_SHADER_PRESETS); }
 
   _destroy() {
+    if (this._destroyed) return;   // idempotent; stops dispose()→onStop re-entry
+    this._destroyed = true;
     this.stop();
     this._canvas?.remove();
     try { this._analyser.dispose(); } catch (_) {}
+    _vizs.delete(this);
+    this._scoped?.dispose();
   }
 }
 
@@ -229,7 +246,7 @@ export class SpectrogramCanvas {
     if (this._micMode) acquireMicRunScoped(); // run-scoped: auto-released on reset (ADR 023)
 
     if (!this._micMode && source) {
-      if (source && typeof source === 'object' && 'fft' in source) {
+      if (isAudioSignal(source)) {
         this._signal = source;
       } else {
         this._analyser = new Tone.Analyser('fft', bins);
@@ -254,7 +271,7 @@ export class SpectrogramCanvas {
       this._live = liveOutput(this);
     }
 
-    _vizs.push(this);
+    _registerViz(this);
     this._start();
   }
 
@@ -327,9 +344,13 @@ export class SpectrogramCanvas {
   get canvas() { return this._canvas; }
 
   _destroy() {
+    if (this._destroyed) return;
+    this._destroyed = true;
     this.stop();
     this._canvas?.remove();
     if (this._analyser) try { this._analyser.dispose(); } catch (_) {}
+    _vizs.delete(this);
+    this._scoped?.dispose();
   }
 }
 
@@ -361,7 +382,7 @@ export class PianoRollViz {
       if (this._notes.length > 500) this._notes.shift();
     };
     _noteHooks.push(this._hook);
-    _vizs.push(this);
+    _registerViz(this);
   }
 
   start() {
@@ -444,10 +465,14 @@ export class PianoRollViz {
   get canvas() { return this._canvas; }
 
   _destroy() {
+    if (this._destroyed) return;
+    this._destroyed = true;
     this.stop();
     this._canvas?.remove();
     const i = _noteHooks.indexOf(this._hook);
     if (i >= 0) _noteHooks.splice(i, 1);
+    _vizs.delete(this);
+    this._scoped?.dispose();
   }
 }
 
@@ -489,5 +514,6 @@ function _durToMs(dur) {
   return 500;
 }
 
-// Register teardown with the reset registry (ADR 008).
-onReset(cleanupViz);
+// Reset teardown is owner-filtered via run-scoped.js (ADR 041): each viz
+// registers a runScoped handle in its ctor. cleanupViz() remains as a manual
+// "destroy all" helper for app.js / tests.

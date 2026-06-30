@@ -174,7 +174,8 @@ describe('SpectrogramCanvas', () => {
   });
 
   test('accepts a signal object (has .fft getter)', () => {
-    const fakeSig = { fft: new Float32Array(32).fill(0.5) };
+    // A real audio.signal() carries both value + fft (isAudioSignal is two-field).
+    const fakeSig = { value: 0.5, fft: new Float32Array(32).fill(0.5) };
     const spec = new SpectrogramCanvas(fakeSig, { bins: 32, width: 64, height: 32 });
     expect(spec._signal).toBe(fakeSig);
     spec._destroy();

@@ -235,8 +235,9 @@ let _objectDetector = null;
 let _gestureRecognizer = null;
 let _faceLandmarker = null;
 
-// Hands: configurable before first use (first-run-wins, like pose). MediaPipe's
-// GestureRecognizer defaults to numHands:1 — bump via vision.configure({ hands }).
+// Hands: MediaPipe's GestureRecognizer defaults to numHands:1 — bump via
+// vision.configure({ hands }). Applied live via setOptions even after the
+// app-boot preload built the recognizer, so it works any time (not first-run-wins).
 let _handsConfig = { numHands: 1 };
 
 // Pose: lazy init, configurable before first use.
@@ -643,8 +644,14 @@ export const vision = {
     if (opts.pose && !_initPosePromise) {
       Object.assign(_poseConfig, opts.pose);
     }
-    if (opts.hands && !_initPromise) {
+    if (opts.hands) {
       Object.assign(_handsConfig, opts.hands);
+      // The GestureRecognizer is built at app-boot preload (numHands:1), so the
+      // pre-init guard never wins from user code. MediaPipe tasks accept live
+      // setOptions — push numHands onto the already-built recognizer too.
+      if (_gestureRecognizer) {
+        _gestureRecognizer.setOptions({ numHands: _handsConfig.numHands ?? 1 });
+      }
     }
     return this;
   },

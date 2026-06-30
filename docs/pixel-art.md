@@ -122,6 +122,15 @@ Sprite.edit({ width: 32, height: 32, scale: 16 })
 | minus | Line | Bresenham line — drag start→end |
 | square (outline) | Rectangle | Hollow rect — drag to size |
 | square (filled) | Rectangle fill | Solid rect — drag to size |
+| circle (outline) | Circle | Midpoint circle — drag from center, radius = drag distance |
+| circle (filled) | Circle fill | Solid disc — drag from center |
+
+After the tool icons, a divider separates two **view controls**:
+
+| Icon | Control | Behaviour |
+|------|---------|-----------|
+| border-all | Toggle grid | Show/hide the pixel grid overlay (on by default) |
+| expand | Resize grid | Prompts `W × H` and resizes the resolution; existing art kept top-left aligned |
 
 ### Palette
 
@@ -150,9 +159,12 @@ Click any thumbnail to switch to that frame.
 
 | Button | Output |
 |--------|--------|
+| Import | Loads a PNG / sprite sheet back into the editor. Slices a multi-frame sheet horizontally into N equal cells (prompts for frame count); resizes the grid to the cell size |
 | Code | Inserts `new Sprite(…)` + draw calls into the active editor; falls back to clipboard |
 | PNG | Downloads current frame at editor scale |
 | Sheet | Downloads all frames composited horizontally as a spritesheet |
+
+**Portability / handoff.** Three round-trip paths: **Code** (plain-text `Sprite` calls — paste into any createos instance, diffable, best for collaboration), a project `.vljson` export (carries full frame data on the sprite desktop icon), and **Sheet → Import** (PNG out, PNG back in).
 
 The generated code uses `sp.fill(x, y, w, 1, color)` for horizontal runs of the same color, keeping output compact.
 

@@ -13,9 +13,10 @@
 import { resolveDrawable, _isCanvas, _isVideo } from './drawable-source.js';
 import { liveOutput } from '../runtime/keep-alive.js';
 import { onReset } from '../runtime/reset-registry.js';
+import { runScoped } from '../runtime/run-scoped.js';
 import { notify, registerCommand } from '../events/index.js';
 
-const _pipelines = [];
+const _pipelines = new Set();
 const _stageRegistry = new Map(); // stageId → stage instance
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -52,6 +53,17 @@ export const Source = Object.freeze({
     vy: Object.freeze({ _src: 'gaze', field: 'vy' }),
   }),
 });
+
+// Owned accessors for the Source sentinel shape — the seam route() and pipe()
+// read through instead of hand-matching `x?._src === '...'` against the private
+// `{_src, field}` contract. Co-located with the definition so a rename here
+// can't silently desync a consumer in another module.
+export function sourceKind(x) {
+  return (x && typeof x === 'object' && typeof x._src === 'string') ? x._src : null;
+}
+export function sourceField(x) {
+  return x?.field;
+}
 
 // ── InputAdapter ──────────────────────────────────────────────────────────────
 // Head of every pipeline — wraps any supported source, including Promises.
@@ -709,14 +721,20 @@ export class Pipeline {
     this._head          = head;      // InputAdapter
     this._stages        = [];        // stages added by chain methods
     this._rafId         = null;
-    this._sentinel      = {};        // object held in __ar_keepAlive
+    this._sentinel      = { label: 'pipe' };  // keep-alive token (carries a label
+                                              // so the Signal Graph reads token.label,
+                                              // not 'Object' — ADR 041)
     this._displayCanvas = null;      // canvas shown to user (for canvas-terminal sinks)
     this._displayCtx    = null;
     // Owner editor — set when constructed during a run. Lets cleanup tear down
     // only this editor's pipelines so running one editor doesn't kill another's
     // live output (routes delegate to pipe internally — same scoping applies).
     this._ownerEditorId = window.__ar_active_editor_id;
-    _pipelines.push(this);
+    // Owner-scoped teardown via the shared run-scoped handler (ADR 041). Keep-alive
+    // is toggled separately by start()/stop() (liveness toggles), so this uses
+    // runScoped (no keep-alive), not runScopedOutput.
+    this._scoped = runScoped({ owner: this._ownerEditorId, onStop: () => this._destroy() });
+    _pipelines.add(this);
   }
 
   // ── Stage chain methods (each returns `this`) ─────────────────────────────
@@ -999,6 +1017,8 @@ export class Pipeline {
   }
 
   _destroy() {
+    if (this._destroyed) return;   // idempotent; stops dispose()→onStop re-entry
+    this._destroyed = true;
     notify('pipe:destroy', { id: this._id });
     this.stop();
     for (const stage of this._stages) {
@@ -1019,6 +1039,8 @@ export class Pipeline {
       this._ownWinId = null;
       window.wm?.remove?.(id, { animate: false });
     }
+    _pipelines.delete(this);
+    this._scoped?.dispose();   // removes from run-scoped set
   }
 }
 
@@ -1038,7 +1060,7 @@ export class Pipeline {
 let _pipeIdCounter = 0;
 
 export function pipe(source) {
-  if (source?._src === 'camera') source = window.Camera?.open();
+  if (sourceKind(source) === 'camera') source = window.Camera?.open();
   const p = new Pipeline(new InputAdapter(source));
   p._id = `pipe-${++_pipeIdCounter}`;
   notify('pipe:create', { id: p._id });
@@ -1172,34 +1194,30 @@ pipe.register = function(name, factory, descriptor = {}) {
 
 // ── Cleanup (called on every reset via editor-instance.js) ───────────────────
 
+// Manual "destroy matching pipelines" helper (tests + route's frame-route
+// teardown call it). Per-instance, owner-filtered reset teardown is also handled
+// by run-scoped.js (ADR 041) — each pipeline registers a runScoped handle. This
+// helper stays because it owns the residual GLOBAL teardown (_stageRegistry) and
+// is exercised directly by tests. Each _destroy() self-removes from _pipelines.
 export function cleanupPipelines(editorId) {
-  // Scope teardown to the resetting editor so a pipeline spawned by editor A
-  // survives editor B re-running. editorId == null → full global reset.
-  // Each pipeline's _destroy() removes its own stages from _stageRegistry, so a
-  // scoped reset leaves the surviving editor's stage entries intact.
-  const survivors = [];
-  for (const p of _pipelines) {
+  for (const p of [..._pipelines]) {
     if (editorId == null || p._ownerEditorId == null || p._ownerEditorId === editorId) {
       p._destroy();
-    } else {
-      survivors.push(p);
     }
   }
-  _pipelines.length = 0;
-  _pipelines.push(...survivors);
   if (editorId == null) _stageRegistry.clear();
 }
 
 // ── Event bus command handlers ────────────────────────────────────────────────
 registerCommand('pipe:destroy', ({ id }) => {
-  const p = _pipelines.find(p => p._id === id);
+  const p = [..._pipelines].find(p => p._id === id);
   if (p) p._destroy();
 });
 registerCommand('pipe:stop', ({ id }) => {
-  _pipelines.find(p => p._id === id)?.stop();
+  [..._pipelines].find(p => p._id === id)?.stop();
 });
 registerCommand('pipe:start', ({ id }) => {
-  _pipelines.find(p => p._id === id)?.start();
+  [..._pipelines].find(p => p._id === id)?.start();
 });
 registerCommand('pipe:stage:set', ({ stageId, ...props }) => {
   _stageRegistry.get(stageId)?.set?.(props);
@@ -1209,5 +1227,8 @@ registerCommand('pipe:stage:set-uniform', ({ stageId, name, value }) => {
   stage?._shaderInst?.setUniform?.(name, value);
 });
 
-// Register teardown with the reset registry (ADR 008).
-onReset(cleanupPipelines);   // receives editorId — scopes teardown per editor
+// Per-instance, owner-filtered reset teardown is handled by run-scoped.js (ADR
+// 041) — each pipeline registers a runScoped handle in its ctor. This residual
+// onReset only clears the GLOBAL stage registry on a full (editorId == null)
+// reset; cleanupPipelines() remains a manual destroy-all helper for tests.
+onReset((editorId) => { if (editorId == null) _stageRegistry.clear(); });

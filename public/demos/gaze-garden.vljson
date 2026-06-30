@@ -1,17 +1,26 @@
 {
   "version": 1,
-  "toolbar": { "micOn": false, "cameraOn": true },
+  "toolbar": {
+    "micOn": false,
+    "cameraOn": true
+  },
   "windows": [
     {
       "type": "editor",
       "editorId": 1,
       "title": "Gaze Garden",
-      "x": 20, "y": 20, "w": 600, "h": 560,
+      "x": 20,
+      "y": 20,
+      "w": 600,
+      "h": 560,
       "visible": true,
       "nochrome": false,
       "transparent": false,
-      "audio": { "muted": false, "volume": 1 },
-      "code": "// Gaze Garden — your eyes drive the brush (ADR 034)\n// A 🎯 chip appears bottom-right: click it once to calibrate,\n// follow the dot with your eyes, then look around the output window.\n// Wink to burst, blink to flash. Direction needs no calibration.\n\nconst c = new Canvas({ title: 'Gaze Garden' });\nconst W = c.width, H = c.height;\nconst cv = c.el;\nconst trail = [];\n\nfunction sprout(x, y, n = 1) {\n  for (let i = 0; i < n; i++) {\n    const a = Math.random() * Math.PI * 2, d = Math.random() * 26;\n    trail.push({ x: x + Math.cos(a) * d, y: y + Math.sin(a) * d, life: 1, hue: (190 + Math.random() * 150) | 0 });\n  }\n  if (trail.length > 240) trail.splice(0, trail.length - 240);\n}\n\ntick(() => {\n  c.alpha(0.1).rect(0, 0, W, H, '#04060f').alpha(1);\n\n  const p = vision.gazeIn(cv);   // viewport gaze point → canvas-local (needs calibration)\n  if (p) sprout(p.x, p.y, 2);\n\n  for (let i = trail.length - 1; i >= 0; i--) {\n    const t = trail[i];\n    t.life -= 0.018;\n    if (t.life <= 0) { trail.splice(i, 1); continue; }\n    c.alpha(t.life * 0.85).ring(t.x, t.y, 4 + (1 - t.life) * 26, `hsl(${t.hue}, 90%, 70%)`, 2);\n  }\n\n  // Live gaze cursor\n  if (p) c.alpha(0.9).ring(p.x, p.y, 10, '#cffaff', 2.5);\n  c.alpha(1);\n\n  // Direction works without calibration — show it as a hint ring at the edge\n  const g = vision.gaze();\n  if (g) {\n    const ex = { left: 30, right: W - 30, center: W / 2, up: W / 2, down: W / 2 }[g.dir];\n    const ey = { up: 30, down: H - 30, center: 30, left: H / 2, right: H / 2 }[g.dir];\n    c.alpha(vision.calibrated ? 0.3 : 0.8).ring(ex, ey, 14, '#ff0', 2).alpha(1);\n  }\n});\n\n// Wink = a ring of sprouts where you look\nvision.onWink('left',  () => { const p = vision.gazeIn(cv); if (p) sprout(p.x, p.y, 30); });\nvision.onWink('right', () => { const p = vision.gazeIn(cv); if (p) sprout(p.x, p.y, 30); });\n\n// Blink = white flash\nvision.onBlink(() => c.alpha(0.6).rect(0, 0, W, H, '#fff').alpha(1));\n",
+      "audio": {
+        "muted": false,
+        "volume": 1
+      },
+      "code": "// Gaze Garden — your eyes drive the brush (ADR 034)\n// A 🎯 chip appears bottom-right: click it once to calibrate,\n// follow the dot with your eyes, then look around the output window.\n// Wink to burst, blink to flash. Direction needs no calibration.\n\nconst c = new Canvas({ title: 'Gaze Garden' });\nconst W = c.width, H = c.height;\nconst cv = c.el;\nconst trail = [];\n\nfunction sprout(x, y, n = 1) {\n  for (let i = 0; i < n; i++) {\n    const a = Math.random() * Math.PI * 2, d = Math.random() * 26;\n    trail.push({ x: x + Math.cos(a) * d, y: y + Math.sin(a) * d, life: 1, hue: (190 + Math.random() * 150) | 0 });\n  }\n  if (trail.length > 240) trail.splice(0, trail.length - 240);\n}\n\ntick(16).do(() => {\n  c.alpha(0.1).rect(0, 0, W, H, '#04060f').alpha(1);\n\n  const p = vision.gazeIn(cv);   // viewport gaze point → canvas-local (needs calibration)\n  if (p) sprout(p.x, p.y, 2);\n\n  for (let i = trail.length - 1; i >= 0; i--) {\n    const t = trail[i];\n    t.life -= 0.018;\n    if (t.life <= 0) { trail.splice(i, 1); continue; }\n    c.alpha(t.life * 0.85).ring(t.x, t.y, 4 + (1 - t.life) * 26, `hsl(${t.hue}, 90%, 70%)`, 2);\n  }\n\n  // Live gaze cursor\n  if (p) c.alpha(0.9).ring(p.x, p.y, 10, '#cffaff', 2.5);\n  c.alpha(1);\n\n  // Direction works without calibration — show it as a hint ring at the edge\n  const g = vision.gaze();\n  if (g) {\n    const ex = { left: 30, right: W - 30, center: W / 2, up: W / 2, down: W / 2 }[g.dir];\n    const ey = { up: 30, down: H - 30, center: 30, left: H / 2, right: H / 2 }[g.dir];\n    c.alpha(vision.calibrated ? 0.3 : 0.8).ring(ex, ey, 14, '#ff0', 2).alpha(1);\n  }\n});\n\n// Wink = a ring of sprouts where you look\nvision.onWink('left',  () => { const p = vision.gazeIn(cv); if (p) sprout(p.x, p.y, 30); });\nvision.onWink('right', () => { const p = vision.gazeIn(cv); if (p) sprout(p.x, p.y, 30); });\n\n// Blink = white flash\nvision.onBlink(() => c.alpha(0.6).rect(0, 0, W, H, '#fff').alpha(1));\n",
       "mode": "text",
       "blocksJson": null,
       "executionState": "stopped"

@@ -103,7 +103,7 @@ In Blocks: a wire from `groove:bd` to `viz-color:set-uniform`. Visual dataflow w
 
 ## Scope of Changes
 
-### Pipeline (`src/api/render-pipeline.js`)
+### Pipeline (`src/api/visual/render-pipeline.js`)
 
 **Already exists:**
 - `p._id = 'pipe-N'` auto-assigned at `pipe()`
@@ -116,7 +116,7 @@ In Blocks: a wire from `groove:bd` to `viz-color:set-uniform`. Visual dataflow w
 - Control commands: `pipe:stop`, `pipe:start`, `pipe:stage:set`, `pipe:stage:set-uniform`
 - Notifications: `pipe-id:frame` per RAF tick (optional, high-frequency gate needed)
 
-### Pattern (`src/api/audio.js`)
+### Pattern (`src/api/audio/audio.js`)
 
 **Needed:**
 - `_patternRegistry` map: `patId → Pattern instance`
@@ -126,7 +126,7 @@ In Blocks: a wire from `groove:bd` to `viz-color:set-uniform`. Visual dataflow w
 - Control commands: `pattern:stop`, `pattern:start`, `pattern:set-speed`, `pattern:mute`
 - Cleanup: `cleanupAudio()` already clears Tone.Loop; add `_patternRegistry.clear()`
 
-### PIXI (`src/api/pixi.js`) — deferred, see below
+### PIXI (`src/api/visual/pixi.js`) — deferred, see below
 
 ### Window actors — already done
 

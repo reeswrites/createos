@@ -3,7 +3,7 @@
 **Status**: Implemented
 **Date**: 2026-06-30
 
-> **Implementation note**: Slice 3 of the wm decomposition (ADR 042). A new integration harness `tests/wm-paint-overlay.test.js` (6 tests) exercises the overlay through wm's public surface — spawn → 🖌️ toggle → pointer stroke → addText → close — and went green against the *un*-extracted code first. `_addPaintOverlay` (~385 lines) then moved verbatim into `src/api/paint-overlay.js` as `addPaintOverlay(win, body, visualEl, ctx)`; wm keeps a thin wrapper injecting the registries + snapshot fn. Harness stayed green through the move. All 1364 tests green.
+> **Implementation note**: Slice 3 of the wm decomposition (ADR 042). A new integration harness `tests/wm-paint-overlay.test.js` (6 tests) exercises the overlay through wm's public surface — spawn → 🖌️ toggle → pointer stroke → addText → close — and went green against the *un*-extracted code first. `_addPaintOverlay` (~385 lines) then moved verbatim into `src/api/widgets/paint-overlay.js` as `addPaintOverlay(win, body, visualEl, ctx)`; wm keeps a thin wrapper injecting the registries + snapshot fn. Harness stayed green through the move. All 1364 tests green.
 
 ## Context
 

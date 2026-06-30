@@ -16,7 +16,7 @@
 
 import { notify, subscribe } from '../events/index.js';
 import { runScopedOutput } from '../runtime/run-scoped.js';
-import { acquireMic } from '../api/media-lease.js';
+import { acquireMic } from '../api/media/media-lease.js';
 import { AudioTap } from './audio-tap.js';
 import { CTCBackend } from './ctc-backend.js';
 import { WhisperBackend } from './whisper-backend.js';

@@ -143,9 +143,9 @@ All stages usable directly in `pipe()` too. Named stages support live mutation a
 
 ## Implementation
 
-- `src/api/route.js` — core Route class, `route()` factory, `getLiveRoutes()` export
-- `src/api/render-pipeline.js` — `Source.mic`, new effect stages, live-stage-mutation methods
-- `src/api/signal-graph.js` — auto-populates from `getLiveRoutes()` in `show()`
+- `src/api/signal/route.js` — core Route class, `route()` factory, `getLiveRoutes()` export
+- `src/api/visual/render-pipeline.js` — `Source.mic`, new effect stages, live-stage-mutation methods
+- `src/api/signal/signal-graph.js` — auto-populates from `getLiveRoutes()` in `show()`
 - `src/editor/api-detector.js` — `usesRoute` pattern
 - `src/runtime/app.js` — `_registerBuiltin('route', route)`
 - `src/editor/completions.js` — `Route` toolkit category

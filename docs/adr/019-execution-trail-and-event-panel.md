@@ -70,7 +70,7 @@ When trace is disabled the `traceVisitor` is simply omitted — zero injection, 
 - **`live-patch.js`** becomes a visitor-pipeline host. Loop protection becomes `loopProtectionVisitor` (same logic, new shape). `addInfiniteLoopProtection(code)` becomes a thin wrapper over `transformCode(code, [loopProtectionVisitor])` for backwards compat.
 - **`editor-instance.js`** gains: trace toggle button in console row, `_traceEnabled` flag, a CM6 `StateEffect`/`StateField` for highlight decorations, and a `_nativeRAF` loop for flush.
 - **New file `src/editor/live-trace.js`**: exports `traceVisitor` and `window.__ar_trace` implementation.
-- **New file `src/api/event-panel.js`**: WM window, tap registration, rate-limit logic, row render.
+- **New file `src/api/wm/event-panel.js`**: WM window, tap registration, rate-limit logic, row render.
 - Decorations use a new CSS class `.ar-trace-line` — a left-border or background tint that fades via `@keyframes`. Color should be distinct from the existing error-line highlight.
 - Trace toggle state stored as `vl-trace-{id}` in localStorage so preference survives reload.
 - No impact on blocks mode — trace only applies to text-mode execution.

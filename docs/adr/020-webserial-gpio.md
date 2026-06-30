@@ -9,7 +9,7 @@ createOS has no way to talk to physical hardware (Arduinos, ESP32s, Picos). WebU
 
 ## Decision
 
-Add `src/api/serial.js` — a new module (separate from `device-sources.js`, following `midi.js` precedent) that exposes WebSerial via the event bus using the existing `registerSource` / `registerCommand` pattern from ADR 014.
+Add `src/api/io/serial.js` — a new module (separate from `device-sources.js`, following `midi.js` precedent) that exposes WebSerial via the event bus using the existing `registerSource` / `registerCommand` pattern from ADR 014.
 
 ### Event surface
 

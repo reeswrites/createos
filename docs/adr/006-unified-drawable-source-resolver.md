@@ -5,7 +5,7 @@
 
 ## Decision
 
-Extract a single leaf module `src/api/drawable-source.js` exporting
+Extract a single leaf module `src/api/visual/drawable-source.js` exporting
 `resolveDrawable(source)`, the one function that reduces a **Drawable Source**
 (Layer, CameraStream, bare `<video>`/`<canvas>`, bare `<img>`, or a
 `GLShader`/`Shader` instance) to its underlying `canvas`/`video`/`image`

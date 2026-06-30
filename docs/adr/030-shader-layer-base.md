@@ -7,7 +7,7 @@
 
 ### Duplicated non-GPU halves
 
-`Shader` (WebGPU, `src/api/shader.js`) and `GLShader` (WebGL, `src/api/glsl-shader.js`)
+`Shader` (WebGPU, `src/api/shader/shader.js`) and `GLShader` (WebGL, `src/api/shader/glsl-shader.js`)
 share identical non-GPU state and methods:
 
 - `_resolveVideoSrc()` — ADR 006 resolver call (byte-identical in both files)
@@ -52,7 +52,7 @@ after an editor switch deletes from the wrong (new) Set, leaking the output.
 
 ### 1. Extract `ShaderLayerBase`
 
-New file: `src/api/shader-layer-base.js`. Holds every non-GPU method both shaders share:
+New file: `src/api/shader/shader-layer-base.js`. Holds every non-GPU method both shaders share:
 
 - `_initBase({z, opacity, container, videoSrc})` — initializes shared state including
   `_custom: new Float32Array(4)` and `_uniforms: {}`.
@@ -74,7 +74,7 @@ keeps only its GPU half: WGSL device/pipeline/buffer for `Shader`, WebGL gl/prog
 
 ### 2. Extract `analyser-read.js` leaf
 
-New file: `src/api/analyser-read.js` — no imports (mirrors `drawable-source.js`).
+New file: `src/api/audio/analyser-read.js` — no imports (mirrors `drawable-source.js`).
 
 - `readAnalyser(src, bins?)` — normalizes Tone.Analyser (`getValue()` → dB → 0..1) and
   Web Audio AnalyserNode (`getByteFrequencyData` → byte → 0..1) to `Float32Array`. Handles
@@ -109,14 +109,14 @@ not also call `shader.bind()`. Documented in `docs/shader.md` and `docs/glsl-sha
 
 ## Implementation
 
-- `src/api/analyser-read.js` — new leaf
-- `src/api/shader-layer-base.js` — new base class
-- `src/api/shader.js` — extends ShaderLayerBase; imports removed; GPU half only
-- `src/api/glsl-shader.js` — extends ShaderLayerBase; GPU half only; overrides bind()
-- `src/api/audio.js` — imports readAnalyser from leaf; removes local _readFft
-- `src/api/viz.js` — imports readAnalyser from leaf; removes _localReadFft
-- `src/api/wm.js` — liveOutput() for window spawn/close
-- `src/api/signal-graph.js` — forEachLive() for node detection
+- `src/api/audio/analyser-read.js` — new leaf
+- `src/api/shader/shader-layer-base.js` — new base class
+- `src/api/shader/shader.js` — extends ShaderLayerBase; imports removed; GPU half only
+- `src/api/shader/glsl-shader.js` — extends ShaderLayerBase; GPU half only; overrides bind()
+- `src/api/audio/audio.js` — imports readAnalyser from leaf; removes local _readFft
+- `src/api/visual/viz.js` — imports readAnalyser from leaf; removes _localReadFft
+- `src/api/wm/wm.js` — liveOutput() for window spawn/close
+- `src/api/signal/signal-graph.js` — forEachLive() for node detection
 - `src/runtime/keep-alive.js` — forEachLive + liveCount accessors
 - `tests/analyser-read.test.js` — new, comprehensive
 - `tests/shader-layer-base.test.js` — new, stub subclass

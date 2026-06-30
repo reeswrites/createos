@@ -14,7 +14,7 @@ Use cases driving this:
 
 ## Decision
 
-### `TextLayer` class (`src/api/text-layer.js`)
+### `TextLayer` class (`src/api/widgets/text-layer.js`)
 
 A shared class instantiated by both `_addPaintOverlay` (wm.js) and `Paint` (paint.js). It owns:
 

@@ -48,13 +48,13 @@ import { searchMarksField, initSearch } from './cm-search.js';
 import { paramHintsExtension } from './param-hints.js';
 import { windowMemberCompletionSource } from './completions.js';
 import { shaderSignalPickerExtension } from './shader-signal-picker.js';
-import { startAudio } from '../api/audio.js';
+import { startAudio } from '../api/audio/audio.js';
 import {
   addEditorIcon,
   removeEditorIcon,
   updateEditorIconLabel,
   duplicateEditor,
-} from '../api/desktop-files.js';
+} from '../api/platform/desktop-files.js';
 // Per-subsystem cleanups are no longer imported here — each module self-registers
 // via onReset() and runResetHandlers() runs them all on reset (ADR 008).
 import { runResetHandlers } from '../runtime/reset-registry.js';

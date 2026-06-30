@@ -84,9 +84,9 @@ A new `TOOLKIT_CATEGORIES` entry `'Notepad'` is added to `BLOCKS_TODO` in `tests
 
 ## Consequences
 
-- New file: `src/api/notepad.js` — `Notepad` class + `cleanupNotepads` + `onReset` registration
+- New file: `src/api/widgets/notepad.js` — `Notepad` class + `cleanupNotepads` + `onReset` registration
 - Modified: `src/events/system-events.js` — 6 `note:*` entries + 5 `wm:{winId}:note:*` patterns
-- Modified: `src/api/desktop-files.js` — `note` glyph/CSS/`_activate`/`restoreDesktop`
+- Modified: `src/api/platform/desktop-files.js` — `note` glyph/CSS/`_activate`/`restoreDesktop`
 - Modified: `src/runtime/app.js` — import + `_registerBuiltin` + `__ar_widgetRestorers['note']`
 - Modified: `src/editor/completions.js` — `'Notepad'` toolkit category
 - Modified: `tests/blocks-coverage.test.js` — `'Notepad'` in `BLOCKS_TODO`

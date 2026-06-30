@@ -31,7 +31,7 @@ export function runResetHandlers() { /* iterate, per-handler try/catch */ }
 Each module self-registers at load:
 
 ```js
-// e.g. bottom of src/api/audio.js
+// e.g. bottom of src/api/audio/audio.js
 onReset(cleanupAudio);
 ```
 

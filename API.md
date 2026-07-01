@@ -254,6 +254,68 @@ s.attack(note) / s.release()
 s.volume(db) / s.connect(fx) / s.chain(fx1, fx2)
 ```
 
+### Voices — `Voice` (design your own synth, ADR 046)
+
+A **Voice** is a named, reusable, declarative sound descriptor any trigger surface
+(Piano / Drumpad / Launchpad) can play. Authored no-code in the **Synth Designer** panel
+or in code; embedded inline in bindings, so it travels with a project.
+
+```js
+Voice.define('Bass', {
+  engine: 'mono',        // fm|am|basic|mono|duo|pluck|membrane|metal|noise
+  poly: false,
+  opts: { oscillator: { type: 'sawtooth' }, envelope: { attack: 0.01, release: 0.3 } },
+  effects: [{ type: 'filter', frequency: 600 }, { type: 'distortion', distortion: 0.2 }],
+});
+Voice.define('Fn', () => ({ engine: 'pluck', poly: false })); // factory form (power-user door)
+
+const v = Voice.make('Bass');     // or Voice.make({engine:'fm', effects:[...]})
+v.output.toDestination();         // connect output to a destination / mixer strip
+v.trigger('C2', '8n');            // one-shot
+v.attack('C2'); v.release('C2');  // note on/off
+
+Voice.list() / Voice.get(name) / Voice.remove(name) / Voice.engines()
+Voice.design(seed?)               // open the visual Synth Designer panel (no-code)
+```
+
+Effect descriptor types: `reverb` (decay, wet), `chorus`, `delay` (delayTime, feedback, wet),
+`distortion` (distortion, wet), `filter` (filterType, frequency, Q), `compressor`
+(threshold, ratio).
+
+**Sample Voices** — play a recorded buffer instead of a synth:
+
+```js
+// Chromatic: one sample pitched across keys (Tone.Sampler) — pitch up speeds up
+Voice.sample({ name: 'Vox', url: 'vox.wav', mode: 'chromatic', baseNote: 'C4' });
+// Chopped: cut a loop into slices, each playable (finger-drumming)
+const d = Voice.sample({ name: 'Break', blob: myBlob, mode: 'chopped', slices: 16 });
+const v = Voice.make('Break');
+v.output.toDestination();
+v.triggerSlice(3);            // play slice index 3
+v.trigger(3, '8n', t);        // numeric note = slice index for chopped voices
+// preserveLength:true → Tone.GrainPlayer (pitch independent of tempo)
+```
+
+`blob`/`file` are stored in the IDB capture store and carried as a `blobKey` (travels like
+captured media, ADR 016); a direct `url` loads synchronously. Chopped voices expose
+`v.triggerSlice(i, time?, vel?)` and `v.sliceCount()`.
+
+**Faust Voices (physical modeling)** — compile Faust DSP to WASM in-browser (ADR 046 P4):
+
+```js
+// Built-in physical-modeling presets: 'Bowed String', 'Marimba', 'Clarinet', 'Flute'
+audio.piano().voice('Bowed String');   // play a bowed string across the keys
+audio.launchpad().bind(0, 'Marimba');
+
+// Design your own from Faust source (physmodels.lib = pm.*):
+Voice.faust('Guitar', 'import("stdfaust.lib"); process = pm.nylonGuitar_ui_MIDI <: _,_;');
+Voice.faust('Bell', bellDsp, { poly: true, voices: 8 });
+```
+
+The ~5 MB libfaust compiler downloads on first Faust Voice use (lazy). A Faust Voice plays
+on any surface + binding like any other. Note: Faust `keyOn` is immediate, so sequenced
+Faust voices aren't sample-accurate (P4a).
+
 ### Effects
 
 ```js
@@ -353,6 +415,20 @@ const dp   = audio.drumpad({ title, x, y, w, h })  // 8-pad drum machine + 16-st
   // Keyboard shortcuts: q w e r (top row) / a s d f (bottom row)
   // Toolbar: 🥁 New Drum Pad button; also audio.drumpad() or new Drumpad(opts)
 
+  // ── Bindings (ADR 046): give a pad your own Voice or an Action ──
+  dp.bind('kick', 'Wub')                 // replace a pad's default synth with a Voice (name or inline desc)
+  dp.bind(0, { engine: 'fm' })           // pad = index 0-7 or name; voice embedded inline (travels in project)
+  dp.unbind('kick')                      // revert the pad to its default drum synth
+  dp.bindAction('clap', 'drop')          // fire bus event 'drop' on strike → react with on('drop').do(fn)
+  dp.bindAction(2, 'cue', { silent: true }) // controller-only pad: fires the event, makes no sound
+
+  // ── Groovebox (P3): swing, per-step velocity, configurable size ──
+  audio.drumpad({ steps: 32, pads: 4, swing: 0.4 }) // {steps} default 16 · {pads} 1-8 · {swing} 0-1
+  dp.swing(0.4)                          // global swing (0-1)
+  dp.step(0, 4, true, 0.33)              // toggle step with velocity (0-1)
+  dp.accent(0, 8, 0.66)                  // set a step's accent without toggling
+  // UI: shift-click a step to cycle its accent. Per-step velocity drives loudness + onHit payload.
+
   // ── Event / signal API (per-instance; hooks cleared on reset, windows survive) ──
   dp.onHit(fn)            // fn({vi,id,label,source,step}) — any pad
   dp.onPad('kick', fn)    // fn({vi,id,label,source,step}) — scoped to one pad (index 0-7 or name)
@@ -368,6 +444,45 @@ const dp   = audio.drumpad({ title, x, y, w, h })  // 8-pad drum machine + 16-st
   sig.velocity             // alias for sig.value
   sig.stream(fn)           // push value to fn on every animation frame
   sig.onHit(fn)            // register a hit callback on this signal's pad scope
+```
+
+### Launchpad — `audio.launchpad` (ADR 047)
+
+A configurable live soundboard grid. Each cell is a Trigger you map to a **Voice** and/or
+an **Action** via the shared binding layer (ADR 046). No step sequencer (that's the Drum
+Pad) — live play is captured into a **Take**. Toolbar: ▦ New Launchpad button.
+
+```js
+const lp = audio.launchpad({ title, rows: 8, cols: 8, baseNote: 36, voice })
+  // Unbound cells play a default Voice at a per-cell pitch (baseNote + cellIndex)
+  lp.voice({ engine: 'am' })             // set the default voice for unbound cells
+
+  // ── Bindings — cell = index or 'r,c' ──
+  lp.bind(0, 'Bass')                     // a saved Voice on cell 0
+  lp.bind('2,3', { engine: 'fm' })       // inline voice at row 2, col 3
+  lp.bind(5, { kind: 'sample', mode: 'chopped', url: 'break.wav', slices: 16 })
+                                         //   chopped sample → cell plays its matching slice
+  lp.unbind(0)
+  lp.bindAction('7,7', 'drop')           // fire bus event 'drop' on strike → on('drop').do(fn)
+  lp.bindAction(1, 'cue', { silent: true }) // controller-only cell: event, no sound
+
+  // ── Events / signals ──
+  lp.onHit(fn)            // fn({cell,row,col,source,velocity}) — any cell
+  lp.onCell('2,3', fn)    // scoped to one cell (index or 'r,c')
+  lp.signal(cell?, { decay }) // decaying-pulse 0–1 (omit cell for whole grid)
+  // source: 'pad' | 'midi' | 'replay'
+  // MIDI (ADR 033): focus a Launchpad → MIDI Target; note maps noteNum − baseNote → cell.
+```
+
+### Piano per-key overrides (ADR 046)
+
+```js
+const p = audio.piano()
+p.voice({ engine: 'mono' })            // whole-keyboard custom Voice (live play only)
+p.bind('C4', { kind: 'sample', mode: 'chromatic', url: 'vox.wav', baseNote: 'C4' })
+p.bindAction('C2', 'drop', { silent: true }) // a key fires a bus event, no note
+p.unbind('C4')
+// The step sequencer keeps using the selected preset; overrides affect live play.
 ```
 
 ### Microphone

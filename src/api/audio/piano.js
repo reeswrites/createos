@@ -12,6 +12,10 @@
 
 import * as Tone from 'tone';
 import { WidgetEvents } from '../widgets/widget-events.js';
+import { BindingMap } from './binding.js';
+import { connectSurfaceStrip, releaseStrip } from './mixer.js';
+import { Voice } from './voice.js';
+import { notify } from '../../events/index.js';
 import { insertSnippet } from '../../editor/active-editor.js';
 import { mountWidgetShell, wireCaptureButton } from '../widgets/widget-shell.js';
 import { onReset } from '../../runtime/reset-registry.js';
@@ -167,7 +171,7 @@ function _buildEffect(cfg) {
   }
 }
 
-function _buildSynth(desc) {
+function _buildSynth(desc, out) {
   const { synth: sc = {}, effects: ec = [] } = desc;
   let inner;
   switch (sc.type ?? 'FM') {
@@ -185,8 +189,9 @@ function _buildSynth(desc) {
       break;
   }
   const effects = ec.map(_buildEffect).filter(Boolean);
-  if (effects.length) inner.chain(...effects, Tone.getDestination());
-  else inner.connect(Tone.getDestination());
+  const target = out ?? Tone.getDestination();
+  if (effects.length) inner.chain(...effects, target);
+  else inner.connect(target);
   return { inner, effects };
 }
 
@@ -216,6 +221,8 @@ export class Piano {
     baseOctave = 4,
     octaves = 2,
     steps: initSteps,
+    voice: initVoice,
+    bindings: initBindings,
     _desktopIconId: existingIconId,
   } = {}) {
     this._title = title;
@@ -250,14 +257,33 @@ export class Piano {
     this._autoSave = () => {};
     this._history = null;
 
+    // Surface output bus → one window-scoped mixer Strip (ADR 032/046). The preset
+    // synth + bound/default Voices all sum here instead of going to Destination.
+    this._out = new Tone.Gain();
+    this._strip = null;
+
     // Build synth from initial preset
     const presetDesc = Piano._presets[initPreset] ?? Piano._presets.electric;
-    const { inner, effects } = _buildSynth(presetDesc);
+    const { inner, effects } = _buildSynth(presetDesc, this._out);
     this._synth = inner;
     this._activeEffects = effects.map((node, i) => ({
       node,
       cfg: (presetDesc.effects ?? [])[i] ?? {},
     }));
+
+    // ── Per-key Voice/Action overrides + optional custom default voice (ADR 046) ──
+    // A bound key plays its own Voice / fires an Action instead of the chromatic
+    // preset synth; a default Voice (p.voice) replaces the preset across all keys.
+    this._bindings = new BindingMap({
+      onVoice: (h) => {
+        try {
+          h.output.connect(this._out);
+        } catch (_) {}
+      },
+    });
+    if (initBindings) this._bindings.restore(initBindings);
+    this._defaultDesc = initVoice ?? null;
+    this._defaultHandle = null;
 
     this._events = new WidgetEvents();
     _pianos.push(this);
@@ -323,6 +349,8 @@ export class Piano {
         octaves: this._octaves,
         preset: this._presetName,
         steps: this._steps.map((s) => [...s]),
+        voice: this._defaultDesc ?? undefined,
+        bindings: this._bindings.serialize(),
         _desktopIconId: this._desktopIconId,
       }),
       save: {
@@ -357,6 +385,7 @@ export class Piano {
     this._winId = shell.winId;
     this._autoSave = shell.save;
     this._history = shell.history;
+    this._strip = connectSurfaceStrip(this._out, this._title, 'piano', this._winId);
     const body = shell.body;
 
     // ── Piano keyboard ─────────────────────────────────────────────────────────
@@ -836,12 +865,48 @@ export class Piano {
   }
 
   /** pointerdown / keydown / MIDI → start holding note. vel 0-1 (default 1). */
+  // The sound source for a note: a bound Voice handle, the custom default Voice,
+  // or the chromatic preset synth. Voice handles use attack/release; the preset
+  // synth uses triggerAttack/triggerRelease — callers normalize via _attack/_release.
+  _soundFor(note) {
+    const bound = this._bindings.voiceFor(note);
+    if (bound) return bound;
+    if (this._defaultDesc) {
+      if (!this._defaultHandle) {
+        this._defaultHandle = Voice.make(this._defaultDesc);
+        try {
+          this._defaultHandle.output.connect(this._out);
+        } catch (_) {}
+      }
+      return this._defaultHandle;
+    }
+    return this._synth;
+  }
+
+  _attack(s, note, vel) {
+    if (s.attack) s.attack(note, Tone.now(), vel);
+    else s.triggerAttack(note, Tone.now(), vel);
+  }
+
+  _release(s, note) {
+    if (s.release) s.release(note, Tone.now());
+    else s.triggerRelease(note, Tone.now());
+  }
+
   _triggerAttack(note, source, vel = 1) {
     if (this._heldNotes.has(note)) return;
     this._heldNotes.add(note);
-    try {
-      this._synth.triggerAttack(note, Tone.now(), vel);
-    } catch (_) {}
+    if (!this._bindings.isSilent(note)) {
+      try {
+        this._attack(this._soundFor(note), note, vel);
+      } catch (_) {}
+    }
+    const action = this._bindings.actionFor(note);
+    if (action) {
+      try {
+        notify(action.event, { note, midi: noteToMidi(note), source, velocity: vel });
+      } catch (_) {}
+    }
     this._setKeyActive(note, true);
     this._fireNote(note, source, null, vel);
     // Performance capture: record live attacks; dur is back-filled on release.
@@ -857,9 +922,11 @@ export class Piano {
   _triggerRelease(note) {
     if (!this._heldNotes.has(note)) return;
     this._heldNotes.delete(note);
-    try {
-      this._synth.triggerRelease(note, Tone.now());
-    } catch (_) {}
+    if (!this._bindings.isSilent(note)) {
+      try {
+        this._release(this._soundFor(note), note);
+      } catch (_) {}
+    }
     this._setKeyActive(note, false);
     this._events.emit('note:off', { note, midi: noteToMidi(note) });
     const e = this._recNotes.get(note);
@@ -999,7 +1066,7 @@ export class Piano {
         node?.dispose();
       } catch (_) {}
     }
-    const { inner, effects } = _buildSynth(desc);
+    const { inner, effects } = _buildSynth(desc, this._out);
     this._synth = inner;
     this._presetName = name;
     this._activeEffects = effects.map((node, i) => ({ node, cfg: (desc.effects ?? [])[i] ?? {} }));
@@ -1017,6 +1084,46 @@ export class Piano {
     this._updateStepButtons();
     this._updateKeyboardHighlights();
     this._history?.commit();
+    this._autoSave();
+    return this;
+  }
+
+  // ── Per-key bindings + default voice (ADR 046) ───────────────────────────────
+  /** Bind one key (e.g. 'C4') to a custom Voice — a sample one-shot or synth —
+   *  overriding the chromatic preset for that key only. */
+  bind(note, voiceNameOrDesc) {
+    this._bindings.bindVoice(note, voiceNameOrDesc);
+    this._autoSave();
+    return this;
+  }
+
+  /** Bind a key to a named bus event on strike. opts.silent suppresses its sound. */
+  bindAction(note, event, opts = {}) {
+    this._bindings.bindAction(note, event, opts);
+    this._autoSave();
+    return this;
+  }
+
+  /** Remove any override from a key (reverts to the preset / default voice). */
+  unbind(note) {
+    this._bindings.unbind(note);
+    this._autoSave();
+    return this;
+  }
+
+  /** Replace the whole-keyboard sound with a custom Voice (live play; the step
+   *  sequencer keeps using the selected preset). Pass null to revert to preset. */
+  voice(nameOrDesc) {
+    this._defaultDesc =
+      nameOrDesc == null
+        ? null
+        : typeof nameOrDesc === 'string'
+          ? (Voice.get(nameOrDesc) ?? null)
+          : nameOrDesc;
+    try {
+      this._defaultHandle?.dispose?.();
+    } catch (_) {}
+    this._defaultHandle = null;
     this._autoSave();
     return this;
   }
@@ -1105,6 +1212,21 @@ export class Piano {
         node?.dispose();
       } catch (_) {}
     }
+    try {
+      this._defaultHandle?.dispose?.();
+    } catch (_) {}
+    try {
+      this._bindings.dispose();
+    } catch (_) {}
+    if (this._strip) {
+      try {
+        releaseStrip(this._title);
+      } catch (_) {}
+      this._strip = null;
+    }
+    try {
+      this._out?.dispose?.();
+    } catch (_) {}
   }
 }
 

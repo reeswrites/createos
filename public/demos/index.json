@@ -1,5 +1,19 @@
 [
   {
+    "id": "sound-lab",
+    "title": "Sound Lab",
+    "desc": "Design your own instruments — custom Voices, a Faust physical-model piano, a mappable Launchpad soundboard, and a swung Drumpad groove (ADR 046/047)",
+    "file": "sound-lab.vljson",
+    "tags": [
+      "audio",
+      "synth",
+      "voice",
+      "faust",
+      "launchpad",
+      "instrument"
+    ]
+  },
+  {
     "id": "plasma-shader",
     "title": "Plasma Shader",
     "desc": "Animated GLSL fragment shader — rainbow plasma effect driven by time",

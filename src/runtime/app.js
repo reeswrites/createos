@@ -18,6 +18,9 @@ import { AudioViz, SpectrogramCanvas, PianoRollViz } from '../api/visual/viz.js'
 import { mixer, openMixerPanel } from '../api/audio/mixer.js';
 import { Drumpad } from '../api/audio/drumpad.js';
 import { Piano } from '../api/audio/piano.js';
+import { Voice, initVoices } from '../api/audio/voice.js';
+import { openSynthDesigner } from '../api/audio/synth-designer.js';
+import { Launchpad } from '../api/audio/launchpad.js';
 import { Notepad } from '../api/widgets/notepad.js';
 import { Recording, recordStream, compositeCanvasStream } from '../api/media/recorder.js';
 import { Media } from '../api/media/media.js';
@@ -152,7 +155,20 @@ _registerBuiltin('mixer', mixer, {
   params: { strip: ['name'], add: ['node', 'opts?'] },
 });
 _registerBuiltin('Drumpad', Drumpad);
+_registerBuiltin('Launchpad', Launchpad);
 _registerBuiltin('Piano', Piano);
+_registerBuiltin('Voice', Voice, {
+  params: {
+    define: ['name', 'desc'],
+    make: ['nameOrDesc'],
+    get: ['name'],
+    remove: ['name'],
+    design: ['seed?'],
+    sample: ['opts'],
+    faust: ['name', 'code', 'opts?'],
+  },
+});
+_registerBuiltin('openSynthDesigner', openSynthDesigner, { params: ['seed?'] });
 _registerBuiltin('Notepad', Notepad);
 _registerBuiltin('notepad', (opts) => new Notepad(opts));
 _registerBuiltin('Recording', Recording);
@@ -581,6 +597,8 @@ window.onload = () => {
   // Boot user library — loads localStorage entries into memory, injects into toolkit + palette
   initLibrary();
   _registerBuiltin('library', library);
+  // Boot the Voice registry — seeds builtins + loads saved voices (ADR 046).
+  initVoices();
   // wire block applier before populating so stored blocks register immediately
   window.__ar_applyLibraryBlock = (definition, generator) => {
     applyExternalBlocks(definition.type, [{ definition, generator }]);
@@ -1122,6 +1140,29 @@ window.onload = () => {
       x: Math.round((dw - 560) / 2) + offset,
       y: Math.round((dh - 420) / 2) + offset,
     });
+  });
+
+  // ── "New Launchpad" button ────────────────────────────────────────────────
+  document.getElementById('newLaunchpadBtn')?.addEventListener('click', () => {
+    const desk = document.getElementById('desktop');
+    const dw = desk.offsetWidth,
+      dh = desk.offsetHeight;
+    const offset = (_vizCount++ % 6) * 24;
+    const lp = new Launchpad({ title: 'Launchpad' });
+    if (lp._winId) {
+      const win = document.getElementById(lp._winId);
+      if (win) {
+        const ww = parseInt(win.style.width) || 380;
+        const wh = parseInt(win.style.height) || 430;
+        win.style.left = Math.round((dw - ww) / 2) + offset + 'px';
+        win.style.top = Math.round((dh - wh) / 2) + offset + 'px';
+      }
+    }
+  });
+
+  // ── "Synth Designer" button ───────────────────────────────────────────────
+  document.getElementById('synthDesignerBtn')?.addEventListener('click', () => {
+    openSynthDesigner();
   });
 
   // ── "New Paint" button ────────────────────────────────────────────────────

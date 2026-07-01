@@ -2,6 +2,7 @@ import * as Tone from 'tone';
 import { AudioViz, SpectrogramCanvas, PianoRollViz, _noteHooks } from '../visual/viz.js';
 import { acquireStrip } from './mixer.js';
 import { Drumpad } from './drumpad.js';
+import { Launchpad } from './launchpad.js';
 import { Piano } from './piano.js';
 import { onReset } from '../../runtime/reset-registry.js';
 import { notify, registerCommand, registerSource, addBusTap } from '../../events/index.js';
@@ -923,6 +924,10 @@ class AudioAPI {
   // 8-pad drum machine with step sequencer.
   drumpad(opts = {}) {
     return new Drumpad(opts);
+  }
+  // Configurable live soundboard grid — map Voices/Actions to cells (ADR 047).
+  launchpad(opts = {}) {
+    return new Launchpad(opts);
   }
   // Polyphonic piano widget with chord sequencer and synth presets.
   piano(opts = {}) {

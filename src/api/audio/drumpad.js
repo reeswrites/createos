@@ -12,6 +12,9 @@
 
 import * as Tone from 'tone';
 import { WidgetEvents } from '../widgets/widget-events.js';
+import { BindingMap } from './binding.js';
+import { connectSurfaceStrip, releaseStrip } from './mixer.js';
+import { notify } from '../../events/index.js';
 import { insertSnippet } from '../../editor/active-editor.js';
 import { mountWidgetShell, wireCaptureButton } from '../widgets/widget-shell.js';
 import { onReset } from '../../runtime/reset-registry.js';
@@ -181,7 +184,10 @@ const VOICES = [
   },
 ];
 
-const STEPS = 16;
+const DEFAULT_STEPS = 16;
+// Accent levels a step cycles through on shift-click (velocity 0–1). First is the
+// default "on" velocity; last cycles back to off.
+const ACCENTS = [1, 0.66, 0.33];
 
 // ── Drumpad class ─────────────────────────────────────────────────────────────
 
@@ -194,16 +200,40 @@ export class Drumpad {
     h = 360,
     bpm: initBpm,
     patterns: initPatterns,
+    velocities: initVels,
+    steps: initSteps,
+    pads: initPads,
+    swing: initSwing,
+    bindings: initBindings,
     _desktopIconId: existingIconId,
   } = {}) {
-    this._voices = VOICES.map((v) => ({
-      ...v,
-      synth: v.make(),
-      steps: Array.from({ length: STEPS }, () => false),
-      _pad: null,
-      _flash: null,
-      _cells: [],
-    }));
+    this._steps = Math.max(1, initSteps ?? DEFAULT_STEPS);
+    // Surface output bus — everything this pad makes (built-in kit + bound/default
+    // Voices) sums here, then routes into one window-scoped mixer Strip (ADR 032/046).
+    this._out = new Tone.Gain();
+    this._strip = null;
+    // Pad count: a 1..8 subset of the built-in kit (>8 needs generated voices — see roadmap).
+    const padCount = Math.min(VOICES.length, Math.max(1, initPads ?? VOICES.length));
+    this._voices = VOICES.slice(0, padCount).map((v) => {
+      // Built-in kit voices default to Destination; reroute them onto the bus.
+      const synth = v.make();
+      try {
+        synth.disconnect();
+      } catch (_) {}
+      try {
+        synth.connect(this._out);
+      } catch (_) {}
+      return {
+        ...v,
+        synth,
+        steps: Array.from({ length: this._steps }, () => false),
+        vels: Array.from({ length: this._steps }, () => 1),
+        _pad: null,
+        _flash: null,
+        _cells: [],
+      };
+    });
+    this._swing = initSwing ?? 0;
     this._bpm = initBpm ?? 120;
     this._playing = false;
     this._paused = false;
@@ -217,6 +247,19 @@ export class Drumpad {
 
     // Replaced per-instance by the shell in _init(); no-op until then.
     this._autoSave = () => {};
+
+    // ── Per-pad Voice/Action bindings (ADR 046) ───────────────────────────────
+    // A bound Voice replaces a pad's default synth; a bound Action fires a named
+    // bus event on strike (optionally silencing the pad). Bound voices route to
+    // Destination like the built-in pad synths (drumpad has no surface strip).
+    this._bindings = new BindingMap({
+      onVoice: (h) => {
+        try {
+          h.output.connect(this._out);
+        } catch (_) {}
+      },
+    });
+    if (initBindings) this._bindings.restore(initBindings);
 
     // ── Event/signal hook state ───────────────────────────────────────────────
     this._events = new WidgetEvents();
@@ -238,7 +281,34 @@ export class Drumpad {
         });
       });
     }
+    if (initVels) {
+      initVels.forEach((vels, vi) => {
+        const v = this._voices[vi];
+        if (v)
+          vels?.forEach((vel, s) => {
+            if (s < v.vels.length) v.vels[s] = vel;
+          });
+      });
+    }
+    if (this._swing) this._applySwing();
     if (!existingIconId) this._autoSave(); // create desktop icon on first spawn
+  }
+
+  // Step cell background reflecting on/off + accent (velocity → alpha).
+  _stepBg(v, s) {
+    if (!v.steps[s]) return '#1a1a2e';
+    const vel = v.vels[s] ?? 1;
+    const alpha = vel >= 0.85 ? 'cc' : vel >= 0.5 ? '88' : '55';
+    return v.color + alpha;
+  }
+
+  // Apply the current swing amount to the shared Tone transport.
+  _applySwing() {
+    try {
+      const t = Tone.getTransport();
+      t.swing = this._swing;
+      t.swingSubdivision = '16n';
+    } catch (_) {}
   }
 
   // ── Resolve voice name/index → 0-7 or null ──────────────────────────────────
@@ -258,15 +328,69 @@ export class Drumpad {
   }
 
   // ── Trigger a voice (note + optional Tone time for precise scheduling) ──────
+  // A bound Voice (ADR 046) supersedes the pad's default synth; a bound Action
+  // fires its named bus event, and `silent` actions suppress the sound entirely.
   _trigger(vi, time = Tone.now(), ctx = {}) {
     const v = this._voices[vi];
-    if (!v?.synth) return;
+    if (!v) return;
     const vel = ctx.vel ?? 1;
-    try {
-      if (v.note) v.synth.triggerAttackRelease(v.note, v.dur, time, vel);
-      else v.synth.triggerAttackRelease(v.dur, time, vel);
-    } catch (_) {}
+    const handle = this._bindings.voiceFor(vi);
+    if (!this._bindings.isSilent(vi)) {
+      try {
+        if (handle) {
+          if (v.note) handle.trigger(v.note, v.dur, time, vel);
+          else handle.trigger('C2', v.dur, time, vel);
+        } else if (v.synth) {
+          if (v.note) v.synth.triggerAttackRelease(v.note, v.dur, time, vel);
+          else v.synth.triggerAttackRelease(v.dur, time, vel);
+        }
+      } catch (_) {}
+    }
+    const action = this._bindings.actionFor(vi);
+    if (action) {
+      try {
+        notify(action.event, {
+          vi,
+          id: v.id,
+          label: v.label,
+          source: ctx.source ?? 'pad',
+          velocity: vel,
+        });
+      } catch (_) {}
+    }
     this._fireHit(vi, ctx.source ?? 'pad', ctx.step ?? null, vel);
+  }
+
+  // ── Bindings (ADR 046) ──────────────────────────────────────────────────────
+  // Bind a pad (index 0-7 or name 'kick'/'Kick') to a custom Voice (name or
+  // inline descriptor), replacing its default drum synth.
+  bind(pad, voiceNameOrDesc) {
+    const vi = this._voiceIndex(pad);
+    if (vi != null) {
+      this._bindings.bindVoice(vi, voiceNameOrDesc);
+      this._autoSave();
+    }
+    return this;
+  }
+
+  // Bind a pad to a named bus event fired on strike. opts.silent suppresses sound.
+  bindAction(pad, event, opts = {}) {
+    const vi = this._voiceIndex(pad);
+    if (vi != null) {
+      this._bindings.bindAction(vi, event, opts);
+      this._autoSave();
+    }
+    return this;
+  }
+
+  // Remove any Voice/Action binding from a pad (reverts to its default synth).
+  unbind(pad) {
+    const vi = this._voiceIndex(pad);
+    if (vi != null) {
+      this._bindings.unbind(vi);
+      this._autoSave();
+    }
+    return this;
   }
 
   // ── MIDI input (ADR 033) — driven by the focus-routed coordinator ────────────
@@ -333,7 +457,12 @@ export class Drumpad {
       getState: () => ({
         title: this._title,
         bpm: this._bpm,
+        steps: this._steps,
+        pads: this._voices.length,
+        swing: this._swing,
         patterns: this._voices.map((v) => [...v.steps]),
+        velocities: this._voices.map((v) => [...v.vels]),
+        bindings: this._bindings.serialize(),
         _desktopIconId: this._desktopIconId,
       }),
       save: {
@@ -345,7 +474,11 @@ export class Drumpad {
         },
       },
       history: {
-        capture: () => ({ bpm: this._bpm, patterns: this._voices.map((v) => [...v.steps]) }),
+        capture: () => ({
+          bpm: this._bpm,
+          patterns: this._voices.map((v) => [...v.steps]),
+          velocities: this._voices.map((v) => [...v.vels]),
+        }),
         restore: (snap) => {
           this._bpm = snap.bpm;
           try {
@@ -356,7 +489,8 @@ export class Drumpad {
             if (!v) return;
             steps.forEach((on, s) => {
               v.steps[s] = on;
-              if (v._cells[s]) v._cells[s].style.background = on ? v.color + 'cc' : '#1a1a2e';
+              if (snap.velocities?.[vi]?.[s] != null) v.vels[s] = snap.velocities[vi][s];
+              if (v._cells[s]) v._cells[s].style.background = this._stepBg(v, s);
             });
           });
         },
@@ -368,6 +502,8 @@ export class Drumpad {
     this._winId = shell.winId;
     this._autoSave = shell.save;
     this._history = shell.history;
+    // One window-scoped mixer Strip for the whole pad (ADR 032/046).
+    this._strip = connectSurfaceStrip(this._out, this._title, 'drumpad', this._winId);
     const body = shell.body;
 
     // ── Pad grid (2 rows × 4 cols) ────────────────────────────────────────────
@@ -421,15 +557,14 @@ export class Drumpad {
 
     this._voices.forEach((v) => {
       const row = document.createElement('div');
-      row.style.cssText =
-        'display:grid;grid-template-columns:42px repeat(16,1fr);gap:2px;align-items:center;';
+      row.style.cssText = `display:grid;grid-template-columns:42px repeat(${this._steps},1fr);gap:2px;align-items:center;`;
 
       const lbl = document.createElement('span');
       lbl.style.cssText = `font-size:9px;color:${v.color};font-family:monospace;text-align:right;padding-right:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;`;
       lbl.textContent = v.label;
       row.appendChild(lbl);
 
-      for (let s = 0; s < STEPS; s++) {
+      for (let s = 0; s < this._steps; s++) {
         const cell = document.createElement('button');
         // Group visual: darken every 4th boundary
         const groupStart = s % 4 === 0;
@@ -438,9 +573,17 @@ export class Drumpad {
           `background:#1a1a2e;cursor:pointer;padding:0;` +
           (groupStart && s > 0 ? 'margin-left:2px;' : '');
         cell.dataset.step = s;
-        cell.addEventListener('click', () => {
-          v.steps[s] = !v.steps[s];
-          cell.style.background = v.steps[s] ? v.color + 'cc' : '#1a1a2e';
+        cell.title = 'click: toggle · shift-click: accent';
+        cell.addEventListener('click', (e) => {
+          if (e.shiftKey && v.steps[s]) {
+            // Cycle accent (velocity) on an already-on step.
+            const i = ACCENTS.indexOf(v.vels[s]);
+            v.vels[s] = ACCENTS[(i + 1) % ACCENTS.length];
+          } else {
+            v.steps[s] = !v.steps[s];
+            if (v.steps[s] && !ACCENTS.includes(v.vels[s])) v.vels[s] = ACCENTS[0];
+          }
+          cell.style.background = this._stepBg(v, s);
           this._history?.commit();
           this._autoSave();
         });
@@ -492,6 +635,7 @@ export class Drumpad {
         this._playing = true;
         this._paused = false;
         Tone.getTransport().bpm.value = parseInt(bpmIn.value) || 120;
+        this._applySwing();
         let step = 0;
         this._sequence = new Tone.Sequence(
           (time) => {
@@ -506,15 +650,15 @@ export class Drumpad {
             const activeVoices = [];
             this._voices.forEach((v, vi) => {
               if (v.steps[s]) {
-                this._trigger(vi, time, { source: 'seq', step: s });
+                this._trigger(vi, time, { source: 'seq', step: s, vel: v.vels[s] ?? 1 });
                 activeVoices.push(vi);
               }
             });
             const stepEv = { step: s, activeVoices };
             this._events.emit('step', stepEv);
-            step = (step + 1) % STEPS;
+            step = (step + 1) % this._steps;
           },
-          [...Array(STEPS).keys()],
+          [...Array(this._steps).keys()],
           '16n',
         );
         this._sequence.start(0);
@@ -541,6 +685,7 @@ export class Drumpad {
     clearBtn.addEventListener('click', () => {
       this._voices.forEach((v) => {
         v.steps.fill(false);
+        v.vels.fill(1);
         v._cells.forEach((c) => {
           c.style.background = '#1a1a2e';
         });
@@ -553,6 +698,24 @@ export class Drumpad {
       this._bpm = parseInt(bpmIn.value) || 120;
       Tone.getTransport().bpm.value = this._bpm;
       this._history?.commit();
+      this._autoSave();
+    });
+
+    // ── Swing control ───────────────────────────────────────────────────────────
+    const swingLbl = document.createElement('span');
+    swingLbl.style.cssText = 'color:#6c7086;font-size:10px;font-family:monospace;';
+    swingLbl.textContent = 'Swing';
+    const swingIn = document.createElement('input');
+    swingIn.type = 'range';
+    swingIn.min = '0';
+    swingIn.max = '1';
+    swingIn.step = '0.05';
+    swingIn.value = String(this._swing);
+    swingIn.title = 'Swing amount';
+    swingIn.style.cssText = 'width:56px;';
+    swingIn.addEventListener('input', () => {
+      this._swing = parseFloat(swingIn.value) || 0;
+      this._applySwing();
       this._autoSave();
     });
 
@@ -592,6 +755,8 @@ export class Drumpad {
     ctrl.appendChild(playBtn);
     ctrl.appendChild(stopBtn);
     ctrl.appendChild(clearBtn);
+    ctrl.appendChild(swingLbl);
+    ctrl.appendChild(swingIn);
     ctrl.appendChild(bpmLbl);
     ctrl.appendChild(bpmIn);
     ctrl.appendChild(codeBtn);
@@ -627,13 +792,32 @@ export class Drumpad {
     return this;
   }
 
-  /** Toggle a step on/off: voice index (0-7), step (0-15) */
-  step(vi, s, on = true) {
+  /** Toggle a step on/off (with optional 0–1 velocity): voice index, step index */
+  step(vi, s, on = true, vel) {
     const v = this._voices[vi];
-    if (!v) return this;
+    if (!v || s < 0 || s >= this._steps) return this;
     v.steps[s] = on;
-    if (v._cells[s]) v._cells[s].style.background = on ? v.color + 'cc' : '#1a1a2e';
+    if (vel != null) v.vels[s] = vel;
+    if (v._cells[s]) v._cells[s].style.background = this._stepBg(v, s);
     this._history?.commit();
+    this._autoSave();
+    return this;
+  }
+
+  /** Set a step's accent (velocity 0–1) without changing on/off. */
+  accent(vi, s, vel) {
+    const v = this._voices[vi];
+    if (!v || s < 0 || s >= this._steps) return this;
+    v.vels[s] = vel;
+    if (v._cells[s]) v._cells[s].style.background = this._stepBg(v, s);
+    this._autoSave();
+    return this;
+  }
+
+  /** Set the global swing amount (0–1). */
+  swing(amount = 0) {
+    this._swing = Math.max(0, Math.min(1, amount));
+    this._applySwing();
     this._autoSave();
     return this;
   }
@@ -641,7 +825,7 @@ export class Drumpad {
   /** Fill a voice row from a pattern string ('x . x .' etc.) */
   pattern(vi, str) {
     const tokens = str.trim().split(/\s+/);
-    for (let s = 0; s < STEPS; s++) this.step(vi, s, tokens[s % tokens.length] === 'x');
+    for (let s = 0; s < this._steps; s++) this.step(vi, s, tokens[s % tokens.length] === 'x');
     return this;
   }
 
@@ -740,6 +924,18 @@ export class Drumpad {
         v.synth?.dispose();
       } catch (_) {}
     });
+    try {
+      this._bindings.dispose();
+    } catch (_) {}
+    if (this._strip) {
+      try {
+        releaseStrip(this._title);
+      } catch (_) {}
+      this._strip = null;
+    }
+    try {
+      this._out?.dispose?.();
+    } catch (_) {}
   }
 }
 

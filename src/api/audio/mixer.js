@@ -343,6 +343,23 @@ export function releaseStrip(name) {
   _emitChange();
 }
 
+// Route a Trigger Surface's output Gain into a window-scoped Strip so the whole
+// surface (built-in kit + bound/default/Faust Voices) is one mixable channel
+// (ADR 032/046). Falls back to Destination if the mixer/audio graph isn't
+// available (headless/tests). Returns the Strip or null.
+export function connectSurfaceStrip(out, name, type, winId) {
+  try {
+    const strip = acquireStrip(name, { type, owner: winId, lifecycle: 'window' });
+    out.connect(strip.input);
+    return strip;
+  } catch (_) {
+    try {
+      out.toDestination();
+    } catch (_) {}
+    return null;
+  }
+}
+
 export function getStrip(name) {
   return _strips.get(name) || null;
 }

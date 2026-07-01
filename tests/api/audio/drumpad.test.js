@@ -7,15 +7,35 @@ vi.mock('tone', () => {
   function makeSynth() {
     return {
       triggerAttackRelease: vi.fn(),
+      triggerAttack: vi.fn(),
+      triggerRelease: vi.fn(),
+      connect: vi.fn(function() { return this; }),
+      chain: vi.fn(function() { return this; }),
+      start: vi.fn(),
       dispose: vi.fn(),
       toDestination() { return this; },
     };
   }
+  const mk = () => vi.fn(function() { return makeSynth(); });
   return {
     default: {},
-    MembraneSynth: vi.fn(function() { return makeSynth(); }),
-    NoiseSynth:    vi.fn(function() { return makeSynth(); }),
-    MetalSynth:    vi.fn(function() { return makeSynth(); }),
+    MembraneSynth: mk(),
+    NoiseSynth:    mk(),
+    MetalSynth:    mk(),
+    Synth:         mk(),
+    FMSynth:       mk(),
+    AMSynth:       mk(),
+    MonoSynth:     mk(),
+    DuoSynth:      mk(),
+    PluckSynth:    mk(),
+    PolySynth:     vi.fn(function() { return makeSynth(); }),
+    Gain:          mk(),
+    Reverb:        mk(),
+    Chorus:        mk(),
+    FeedbackDelay: mk(),
+    Distortion:    mk(),
+    Filter:        mk(),
+    Compressor:    mk(),
     Sequence:      vi.fn(function() { return { start: vi.fn(), stop: vi.fn(), dispose: vi.fn() }; }),
     now:           () => 0,
     getTransport:  () => ({
@@ -26,6 +46,13 @@ vi.mock('tone', () => {
     }),
   };
 });
+
+// ── Mixer stub — assert surface-strip routing (ADR 032/046) ────────────────────
+vi.mock('../../../src/api/audio/mixer.js', () => ({
+  connectSurfaceStrip: vi.fn((out, name, type) => ({ input: { __strip: name }, name, type })),
+  releaseStrip: vi.fn(),
+}));
+import { connectSurfaceStrip, releaseStrip } from '../../../src/api/audio/mixer.js';
 
 // ── DOM + WM stub ─────────────────────────────────────────────────────────────
 
@@ -378,5 +405,155 @@ describe('_destroy', () => {
     cleanupDrumpads();
     dp._trigger(0, 0, { source: 'pad' }); // hooks cleared by destroy
     expect(calls).toHaveLength(0);
+  });
+});
+
+// ── Bindings (ADR 046) ─────────────────────────────────────────────────────────
+
+import { on } from '../../../src/events/index.js';
+import { Voice, _resetVoicesForTesting } from '../../../src/api/audio/voice.js';
+
+describe('drumpad bindings', () => {
+  it('a bound Voice supersedes the default pad synth on trigger', () => {
+    const dp = new Drumpad();
+    const defaultSynth = dp._voices[0].synth;
+    dp.bind(0, { engine: 'fm' });
+    dp._trigger(0, 0, { source: 'pad' });
+    const handle = dp._bindings.voiceFor(0);
+    expect(handle.node.triggerAttackRelease).toHaveBeenCalled();
+    expect(defaultSynth.triggerAttackRelease).not.toHaveBeenCalled();
+  });
+
+  it('bindAction fires a named bus event on strike', () => {
+    const dp = new Drumpad();
+    let got = null;
+    on('drop').do((p) => { got = p; });
+    dp.bindAction(1, 'drop');
+    dp._trigger(1, 0, { source: 'pad' });
+    expect(got).toMatchObject({ vi: 1, source: 'pad' });
+  });
+
+  it('a silent action suppresses the pad sound but still fires the event', () => {
+    const dp = new Drumpad();
+    const synth = dp._voices[2].synth;
+    let fired = false;
+    on('mute-evt').do(() => { fired = true; });
+    dp.bindAction(2, 'mute-evt', { silent: true });
+    dp._trigger(2, 0, { source: 'pad' });
+    expect(synth.triggerAttackRelease).not.toHaveBeenCalled();
+    expect(fired).toBe(true);
+  });
+
+  it('bind accepts a registered Voice name, stored inline', () => {
+    _resetVoicesForTesting();
+    Voice.define('Wub', { engine: 'mono' });
+    const dp = new Drumpad();
+    dp.bind('kick', 'Wub');
+    expect(dp._bindings.get(0).voice.engine).toBe('mono');
+  });
+
+  it('serialized state includes bindings and round-trips through the constructor', () => {
+    const dp = new Drumpad();
+    dp.bind(0, { engine: 'am' });
+    dp.bindAction(3, 'x', { silent: true });
+    const state = { bindings: dp._bindings.serialize() };
+    const dp2 = new Drumpad({ bindings: state.bindings });
+    expect(dp2._bindings.get(0).voice.engine).toBe('am');
+    expect(dp2._bindings.actionFor(3)).toEqual({ event: 'x', silent: true });
+  });
+
+  it('unbind reverts a pad to its default synth', () => {
+    const dp = new Drumpad();
+    dp.bind(0, { engine: 'fm' });
+    dp.unbind(0);
+    const synth = dp._voices[0].synth;
+    dp._trigger(0, 0, { source: 'pad' });
+    expect(synth.triggerAttackRelease).toHaveBeenCalled();
+  });
+});
+
+// ── Groovebox rework (P3) ───────────────────────────────────────────────────────
+
+describe('drumpad groovebox', () => {
+  it('configurable step count', () => {
+    const dp = new Drumpad({ steps: 32 });
+    expect(dp._steps).toBe(32);
+    expect(dp._voices[0].steps.length).toBe(32);
+    expect(dp._voices[0].vels.length).toBe(32);
+  });
+
+  it('configurable pad count (1-8 subset)', () => {
+    const dp = new Drumpad({ pads: 4 });
+    expect(dp._voices.length).toBe(4);
+    const dp8 = new Drumpad({ pads: 99 });
+    expect(dp8._voices.length).toBe(8); // clamped to kit size
+  });
+
+  it('step accepts a velocity; accent sets it without toggling', () => {
+    const dp = new Drumpad();
+    dp.step(0, 0, true, 0.5);
+    expect(dp._voices[0].steps[0]).toBe(true);
+    expect(dp._voices[0].vels[0]).toBe(0.5);
+    dp.accent(0, 0, 0.33);
+    expect(dp._voices[0].vels[0]).toBe(0.33);
+    expect(dp._voices[0].steps[0]).toBe(true); // still on
+  });
+
+  it('sequencer passes per-step velocity to the trigger', () => {
+    const dp = new Drumpad();
+    dp.step(0, 0, true, 0.66);
+    const hits = [];
+    dp.onHit((e) => hits.push(e.velocity));
+    // simulate the sequence firing step 0 for voice 0
+    dp._trigger(0, 0, { source: 'seq', step: 0, vel: dp._voices[0].vels[0] });
+    expect(hits[0]).toBe(0.66);
+  });
+
+  it('swing clamps to 0-1 and applies to the transport', () => {
+    const dp = new Drumpad();
+    dp.swing(0.5);
+    expect(dp._swing).toBe(0.5);
+    dp.swing(9);
+    expect(dp._swing).toBe(1);
+  });
+
+  it('serialized state carries steps/pads/swing/velocities and round-trips', () => {
+    const dp = new Drumpad({ steps: 8, pads: 3, swing: 0.4 });
+    dp.step(0, 2, true, 0.33);
+    const state = {
+      steps: dp._steps,
+      pads: dp._voices.length,
+      swing: dp._swing,
+      patterns: dp._voices.map((v) => [...v.steps]),
+      velocities: dp._voices.map((v) => [...v.vels]),
+    };
+    const dp2 = new Drumpad(state);
+    expect(dp2._steps).toBe(8);
+    expect(dp2._voices.length).toBe(3);
+    expect(dp2._swing).toBe(0.4);
+    expect(dp2._voices[0].steps[2]).toBe(true);
+    expect(dp2._voices[0].vels[2]).toBe(0.33);
+  });
+});
+
+// ── Mixer strip routing (ADR 032/046, #1) ──────────────────────────────────────
+
+describe('drumpad mixer strip', () => {
+  it('acquires one window-scoped strip for the whole pad', () => {
+    const dp = new Drumpad({ title: 'Beat' });
+    expect(connectSurfaceStrip).toHaveBeenCalledWith(dp._out, 'Beat', 'drumpad', dp._winId);
+  });
+
+  it('a bound voice routes into the surface bus (_out), not Destination', () => {
+    const dp = new Drumpad();
+    dp.bind(0, { engine: 'fm' });
+    const h = dp._bindings.voiceFor(0);
+    expect(h.output.connect).toHaveBeenCalledWith(dp._out);
+  });
+
+  it('releases the strip on destroy', () => {
+    const dp = new Drumpad({ title: 'Beat2' });
+    dp._destroy(dp._playBtn);
+    expect(releaseStrip).toHaveBeenCalledWith('Beat2');
   });
 });

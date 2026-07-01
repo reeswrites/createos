@@ -78,6 +78,8 @@ const BLOCKS_TODO = new Set([
   'Actors',       // pattern/pipeline actor control — reactive wiring blocks pending (ADR 017)
   'Serial / GPIO', // WebSerial hardware I/O — user-gesture connect awkward in blocks; text-first (ADR 020)
   'Performance',  // replay/timeline of recorded Takes (ADR 031) — data-array + closure heavy; blocks pending
+  'Voices',       // designed synth/sample voices (ADR 046) — descriptor + factory heavy; blocks pending (Synth Designer is the no-code path)
+  'Launchpad',    // live soundboard grid (ADR 047) — bind/bindAction closure+descriptor heavy; blocks pending
 ]);
 
 const TOOLKIT_NAMES = TOOLKIT_CATEGORIES.map((c) => c.name);

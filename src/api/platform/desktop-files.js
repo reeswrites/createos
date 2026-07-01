@@ -86,6 +86,10 @@ async function _putCaptureBlob(key, blob) {
   } catch (_) {}
 }
 
+export async function getCaptureBlob(key) {
+  return _getCaptureBlob(key);
+}
+
 async function _getCaptureBlob(key) {
   try {
     const db = await _openCaptureDB();
@@ -241,6 +245,7 @@ const _FA_GLYPH = {
   editor: 'fa-solid fa-file-code',
   folder: 'fa-solid fa-folder',
   beat: 'fa-solid fa-drum',
+  launchpad: 'fa-solid fa-table-cells',
   sprite: 'fa-solid fa-border-all',
   paint: 'fa-solid fa-paintbrush',
   note: 'fa-solid fa-file-lines',
@@ -329,17 +334,19 @@ function _buildEl(icon) {
         ? ' dt-folder-icon'
         : icon.type === 'beat'
           ? ' dt-beat-icon'
-          : icon.type === 'sprite'
-            ? ' dt-sprite-icon'
-            : icon.type === 'paint'
-              ? ' dt-paint-icon'
-              : icon.type === 'ascii'
-                ? ' dt-ascii-icon'
-                : icon.type === 'note'
-                  ? ' dt-note-icon'
-                  : icon.type === 'piano'
-                    ? ' dt-piano-icon'
-                    : '');
+          : icon.type === 'launchpad'
+            ? ' dt-beat-icon'
+            : icon.type === 'sprite'
+              ? ' dt-sprite-icon'
+              : icon.type === 'paint'
+                ? ' dt-paint-icon'
+                : icon.type === 'ascii'
+                  ? ' dt-ascii-icon'
+                  : icon.type === 'note'
+                    ? ' dt-note-icon'
+                    : icon.type === 'piano'
+                      ? ' dt-piano-icon'
+                      : '');
   el.style.left = icon.x + 'px';
   el.style.top = icon.y + 'px';
   el.dataset.dtId = icon.id;
@@ -574,6 +581,22 @@ function _activate(icon) {
       .then((data) => {
         if (window.Drumpad) {
           new window.Drumpad({
+            ...data,
+            x: (icon.x ?? 100) + 80,
+            y: icon.y ?? 100,
+            _desktopIconId: icon.id,
+          });
+        }
+      })
+      .catch(() => {});
+    return;
+  }
+  if (icon.type === 'launchpad') {
+    fetch(icon.url)
+      .then((r) => r.json())
+      .then((data) => {
+        if (window.Launchpad) {
+          new window.Launchpad({
             ...data,
             x: (icon.x ?? 100) + 80,
             y: icon.y ?? 100,
@@ -1442,6 +1465,25 @@ export function restoreDesktop(icons = []) {
           icon.el.style.left = icon.x + 'px';
           icon.el.style.top = icon.y + 'px';
         }
+      } else if (saved.type === 'launchpad') {
+        const blob = new Blob([saved.content], { type: 'application/json' });
+        const burl = URL.createObjectURL(blob);
+        const icon = _addFileIcon(
+          saved.name,
+          '',
+          burl,
+          saved.x + 38,
+          saved.y + 38,
+          saved.content,
+          saved.iconOpts ?? null,
+          'launchpad',
+        );
+        icon.x = saved.x;
+        icon.y = saved.y;
+        if (icon.el) {
+          icon.el.style.left = icon.x + 'px';
+          icon.el.style.top = icon.y + 'px';
+        }
       } else if (saved.type === 'sprite') {
         const blob = new Blob([saved.content], { type: 'application/json' });
         const burl = URL.createObjectURL(blob);
@@ -1700,7 +1742,12 @@ export const DesktopAPI = {
     _putCaptureBlob(icon.id, blob);
     _saveDesktopState();
     if (download) _download(url, name);
-    return { id: icon.id, name: icon.name, type: icon.type, url: icon.url };
+    return { id: icon.id, name: icon.name, type: icon.type, url: icon.url, blobKey: icon.id };
+  },
+  // Resolve a stored capture blob by key (IDB) → Blob | null. Used by Sample
+  // Voices to load their audio buffer (ADR 046 / 016).
+  getBlob(key) {
+    return _getCaptureBlob(key);
   },
   update(id, opts = {}) {
     const icon = _icons.get(id);

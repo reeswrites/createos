@@ -20,6 +20,8 @@ import {
 import { buildSensorWindow } from './sensor-window.js';
 import { buildVizWindow, addVizPanel } from './viz-window.js';
 import { makeFileEntry, renderFlatFiles, renderDirContents } from './file-browser.js';
+import { makeNativeDirHandle, makeNativeFileHandle } from './native-fs-adapter.js';
+import { nativeCap } from '../../runtime/native.js';
 import { onReset } from '../../runtime/reset-registry.js';
 import { notify, registerCommand, tween, hasSubscribers } from '../../events/index.js';
 import { snapshotWindow, recordWindow } from '../media/window-capture.js';
@@ -1997,6 +1999,14 @@ export function initWM(onContentResize) {
         }
       }
       await _exitFullscreen();
+      const nativePickFile = nativeCap('pickFile');
+      if (nativePickFile) {
+        const res = await nativePickFile(opts);
+        if (!res) throw Object.assign(new Error('Cancelled'), { name: 'AbortError' });
+        const handle = makeNativeFileHandle(res.path, res.name);
+        if (key) fileHandles.set(key, handle);
+        return URL.createObjectURL(await handle.getFile());
+      }
       if (window.showOpenFilePicker) {
         try {
           const [handle] = await window.showOpenFilePicker({ multiple: false, ...opts });
@@ -2034,7 +2044,13 @@ export function initWM(onContentResize) {
 
       // Only prompt when we have nothing cached yet (skip if dropped files already available)
       if (!handles.length && !fallback && !_droppedFileHandles.length) {
-        if (window.showDirectoryPicker) {
+        const nativePickDir = nativeCap('pickDirectory');
+        if (nativePickDir) {
+          const res = await nativePickDir();
+          if (!res) throw Object.assign(new Error('Cancelled'), { name: 'AbortError' });
+          handles.push(makeNativeDirHandle(res.path, res.name));
+          if (multiKey) fileHandles.set(multiKey, handles);
+        } else if (window.showDirectoryPicker) {
           try {
             await _exitFullscreen();
             const h = await window.showDirectoryPicker({ mode: 'read' });
@@ -2044,7 +2060,7 @@ export function initWM(onContentResize) {
             if (err?.name === 'AbortError') throw err;
           }
         }
-        if (!handles.length) {
+        if (!handles.length && !nativePickDir) {
           fallback = await _pickDirViaInput();
           if (!fallback) throw Object.assign(new Error('Cancelled'), { name: 'AbortError' });
           if (fallbackKey) fileHandles.set(fallbackKey, fallback);
@@ -2116,7 +2132,13 @@ export function initWM(onContentResize) {
       });
 
       addBtn.addEventListener('click', async () => {
-        if (window.showDirectoryPicker) {
+        const nativePickDir = nativeCap('pickDirectory');
+        if (nativePickDir) {
+          const res = await nativePickDir();
+          if (!res) return;
+          handles.push(makeNativeDirHandle(res.path, res.name));
+          if (multiKey) fileHandles.set(multiKey, handles);
+        } else if (window.showDirectoryPicker) {
           try {
             await _exitFullscreen();
             const h = await window.showDirectoryPicker({ mode: 'read' });
@@ -2165,6 +2187,12 @@ export function initWM(onContentResize) {
     },
 
     async pickFolder() {
+      const nativePick = nativeCap('pickDirectory');
+      if (nativePick) {
+        const res = await nativePick();
+        if (!res) return null;
+        return { handle: makeNativeDirHandle(res.path, res.name), name: res.name };
+      }
       if (window.showDirectoryPicker) {
         try {
           await _exitFullscreen();

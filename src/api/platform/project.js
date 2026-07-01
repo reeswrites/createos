@@ -2,6 +2,7 @@ import { saveWorkspaceJSON } from '../../blocks/blocks.js';
 import { serializeDesktop, restoreDesktop } from './desktop-files.js';
 import { serializeMixer, restoreMixer } from '../audio/mixer.js';
 import { getWindowAdapter, geoOf, titleOf, readAudio, applyGeo } from '../wm/window-registry.js';
+import { nativeCap } from '../../runtime/native.js';
 
 // ── Serialize ─────────────────────────────────────────────────────────────────
 // Editor windows are serialized inline (they need the editor `instances`); every
@@ -101,6 +102,18 @@ export async function saveProject(wm, instances) {
   const data = serializeProject(wm, instances);
   const json = JSON.stringify(data, null, 2);
 
+  const nativeSave = nativeCap('saveFile');
+  if (nativeSave) {
+    const res = await nativeSave({
+      defaultPath: 'project.vljson',
+      data: json,
+      filters: [{ name: 'VL Project', extensions: ['vljson', 'json'] }],
+    });
+    // Saving locally makes it yours → authored/trusted (ADR 050).
+    if (res) nativeCap('setProjectProvenance')?.('authored');
+    return;
+  }
+
   if (window.showSaveFilePicker) {
     try {
       const handle = await window.showSaveFilePicker({
@@ -132,7 +145,15 @@ export async function saveProject(wm, instances) {
 export async function loadProject(wm, instances, appAPI) {
   let json;
 
-  if (window.showOpenFilePicker) {
+  const nativeOpen = nativeCap('openProjectFile');
+  if (nativeOpen) {
+    // Ungated combined dialog+read — File>Open is the user gesture (ADR 050).
+    const res = await nativeOpen({
+      filters: [{ name: 'VL Project', extensions: ['vljson', 'json'] }],
+    });
+    if (!res) return; // cancelled
+    json = res.text;
+  } else if (window.showOpenFilePicker) {
     try {
       const [handle] = await window.showOpenFilePicker({
         types: [
@@ -146,7 +167,7 @@ export async function loadProject(wm, instances, appAPI) {
     }
   }
 
-  if (!json) {
+  if (!json && !nativeOpen) {
     json = await new Promise((resolve) => {
       const input = document.createElement('input');
       input.type = 'file';
@@ -169,4 +190,7 @@ export async function loadProject(wm, instances, appAPI) {
     return;
   }
   await applyProject(data, wm, instances, appAPI);
+  // Opened from disk → treat as imported: untrusted until the user grants native access
+  // once (ADR 050). No-op in the browser build.
+  nativeCap('setProjectProvenance')?.('imported');
 }

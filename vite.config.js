@@ -44,7 +44,9 @@ function faustAssets() {
 }
 
 export default defineConfig({
-  base: '/createos/',
+  // Electron loads the build over file://, where an absolute base can't resolve — use a
+  // relative base for the desktop build (ELECTRON=1) and the GitHub-Pages path otherwise.
+  base: process.env.ELECTRON === '1' ? './' : '/createos/',
   plugins: [faustAssets()],
   optimizeDeps: {
     // transformers (ONNX Runtime Web) is dynamically imported by the STT engine; excluding
@@ -63,7 +65,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
-    include: ['tests/**/*.test.js'],
-    setupFiles: ['tests/setup.js'],
+    include: ['tests/unit/**/*.test.js'],
+    setupFiles: ['tests/unit/setup.js'],
   },
 });

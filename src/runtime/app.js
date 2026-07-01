@@ -27,6 +27,8 @@ import { Media } from '../api/media/media.js';
 import { VideoSignalAPI } from '../api/signal/video-signal.js';
 import '../api/io/device-sources.js'; // lazy device event sources (no exported API)
 import '../api/io/serial.js'; // WebSerial + GPIO on the bus (ADR 020, no window API)
+import '../api/io/native-bridge.js'; // Electron hotkeys + OSC → bus (no window API; ADR 048)
+import { nativeCap } from './native.js'; // native capability registry (provenance; ADR 050)
 import {
   DesktopAPI,
   initDesktop,
@@ -846,6 +848,7 @@ window.onload = () => {
     (async () => {
       if (_embedProject) {
         await applyProject(_embedProject, window.wm, window.__ar_instances, appAPI);
+        nativeCap('setProjectProvenance')?.('imported'); // embedded/shared = untrusted (ADR 050)
       }
       window.__ar_instances.forEach((inst) => inst.execute());
     })();
@@ -1377,6 +1380,7 @@ window.onload = () => {
           const data = await res.json();
           window.wm?.hide(WIN_ID); // close the gallery window before applying
           await applyProject(data, window.wm, window.__ar_instances, appAPI);
+          nativeCap('setProjectProvenance')?.('demo'); // gallery demo = untrusted (ADR 050)
         } catch (err) {
           btn.textContent = 'Error — try again';
           btn.disabled = false;

@@ -11,6 +11,7 @@
 // driver only calls read() on canvas stages.
 
 import { resolveDrawable, _isCanvas, _isVideo } from './drawable-source.js';
+import { openScreenSource } from '../media/screen.js';
 import { liveOutput } from '../../runtime/keep-alive.js';
 import { onReset } from '../../runtime/reset-registry.js';
 import { runScoped } from '../../runtime/run-scoped.js';
@@ -43,6 +44,7 @@ function _makeHiddenDiv() {
 // without an explicit await at the call site.
 export const Source = Object.freeze({
   camera: Object.freeze({ _src: 'camera' }),
+  screen: Object.freeze({ _src: 'screen' }),
   mic: Object.freeze({ _src: 'mic' }),
   // Gaze scalar sub-sources for route() (ADR 034). .x/.y = head-relative
   // direction (no calibration); .vx/.vy = viewport-pixel screen point (needs
@@ -1214,6 +1216,7 @@ let _pipeIdCounter = 0;
 
 export function pipe(source) {
   if (sourceKind(source) === 'camera') source = window.Camera?.open();
+  else if (sourceKind(source) === 'screen') source = openScreenSource(); // Promise<video>
   const p = new Pipeline(new InputAdapter(source));
   p._id = `pipe-${++_pipeIdCounter}`;
   notify('pipe:create', { id: p._id });

@@ -181,3 +181,7 @@ The full running text of a **Transcription** so far, carried by `audio:transcrip
 ### Model Manager
 The single owner of in-browser ML model lifecycle: which models exist, whether each is downloaded, download progress, deletion, and total storage used. Backends ask it to load a model rather than fetching directly, so a model downloads once and is reused. Surfaced to the user as a settings panel (toolbar entry) where models can be pre-downloaded or removed without writing code; the first programmatic use also triggers a download with progress shown on the spawned window.
 _Avoid_: model cache, downloader
+
+### Project Provenance
+Where a loaded project came from, and therefore how much a **Native Capability** may trust it (Electron only; ADR 050). One of: **authored** (created or saved locally here — trusted), **imported** (opened from a disk path or an embed/shared link), or **demo** (the bundled gallery). Because the renderer runs arbitrary user code, provenance is the gate on *whether* an untrusted project may reach data/device capabilities at all — distinct from the granted-roots gate on *which* paths. An authored project is trusted outright; imported/demo prompt the user once (cached for the session). The user's own File>Open is itself a trust gesture, so opening a project reads its own file ungated. Provenance is set by the renderer when a project is applied and enforced in the main process.
+_Avoid_: trusted/untrusted (that is the derived decision, not the source), origin

@@ -299,9 +299,14 @@ export class ScrubWidget extends WidgetType {
     const scrub = document.createElement('span');
     scrub.className = 'ar-scrub';
     scrub.textContent = String(this.value);
+    scrub.title = 'Alt-drag to scrub value';
 
     scrub.addEventListener('mousedown', (e) => {
       if (e.button !== 0) return;
+      // Plain drag must reach CodeMirror so text selection works; scrubbing only
+      // hijacks the drag when Alt/Option is held. Without this gate, dragging a
+      // selection across any numeric call-arg scrubs the value instead of selecting.
+      if (!e.altKey) return;
       e.preventDefault();
       this._setDragging(true);
       scrub.classList.add('ar-scrub-active');

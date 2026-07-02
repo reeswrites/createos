@@ -1,4 +1,5 @@
 import { vision, preloadVision } from '../api/media/vision.js';
+import { lang } from '../api/lang/lang.js';
 import { TOOLKIT_CATEGORIES, addToolkitEntries } from '../editor/completions.js';
 import {
   _registerBuiltin,
@@ -111,6 +112,18 @@ const nativeTimers = {
 // of truth. Users call registerAPI() to override or extend any built-in.
 _registerBuiltin('vision', vision, {
   params: { onGesture: ['name', 'fn'], onExpression: ['name', 'fn'] },
+});
+_registerBuiltin('lang', lang, {
+  params: {
+    isProfane: ['text'],
+    profanity: ['text'],
+    censor: ['text', 'mask?'],
+    block: ['...words'],
+    allow: ['...words'],
+    sentiment: ['text'],
+    classify: ['text'],
+    configure: ['opts?'],
+  },
 });
 _registerBuiltin('video', VideoSignalAPI, {
   params: {
@@ -1377,10 +1390,14 @@ window.onload = () => {
         btn.disabled = true;
         try {
           const res = await fetch(`/createos/demos/${file}`);
+          if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${file}`);
           const data = await res.json();
-          window.wm?.hide(WIN_ID); // close the gallery window before applying
           await applyProject(data, window.wm, window.__ar_instances, appAPI);
           nativeCap('setProjectProvenance')?.('demo'); // gallery demo = untrusted (ADR 050)
+          // Close only AFTER a successful load. applyProject() already calls wm.closeAll()
+          // (project.js), so this is the safety-net no-op on success — but crucially it means
+          // a failure leaves the gallery (and this button) alive so the catch UI is visible.
+          window.wm?.hide(WIN_ID);
         } catch (err) {
           btn.textContent = 'Error — try again';
           btn.disabled = false;

@@ -696,7 +696,7 @@ setcps(0.5);`,
       {
         label: 'dp.bind — play your own Voice on a pad',
         code: "const dp = audio.drumpad();\nVoice.define('Wub', { engine: 'mono', opts: { oscillator: { type: 'sawtooth' } }, effects: [{ type: 'filter', frequency: 400 }] });\ndp.bind('kick', 'Wub');        // replace the kick synth with your voice\n// dp.bind(0, { engine: 'fm' }); // or an inline descriptor\n// dp.unbind('kick');            // revert to the default drum synth",
-        hint: 'dp.bind(pad, voiceNameOrDesc) — replace a pad\'s default drum synth with a custom Voice (ADR 046). pad = index 0-7 or name. The voice is embedded inline and travels with the project. dp.unbind(pad) reverts.',
+        hint: "dp.bind(pad, voiceNameOrDesc) — replace a pad's default drum synth with a custom Voice (ADR 046). pad = index 0-7 or name. The voice is embedded inline and travels with the project. dp.unbind(pad) reverts.",
         tags: ['drum', 'voice', 'bind', 'synth', 'custom', 'design'],
       },
       {
@@ -748,7 +748,7 @@ setcps(0.5);`,
       {
         label: 'piano.bind / voice — custom sounds per key (ADR 046)',
         code: "const p = audio.piano();\np.voice({ engine: 'mono', opts: { oscillator: { type: 'sawtooth' } } }); // whole-keyboard voice\np.bind('C4', { kind: 'sample', mode: 'chromatic', url: 'vox.wav', baseNote: 'C4' }); // one key = a sample\np.bindAction('C2', 'drop', { silent: true }); // low key fires an event, no note\non('drop').do(() => canvas.bg('white'));",
-        hint: "p.voice(nameOrDesc) sets the whole-keyboard Voice (live play); p.bind(note, voice) overrides one key with a Voice/sample; p.bindAction(note, event, {silent}) fires a bus event on a key. p.unbind(note) reverts. The step sequencer keeps using the preset.",
+        hint: 'p.voice(nameOrDesc) sets the whole-keyboard Voice (live play); p.bind(note, voice) overrides one key with a Voice/sample; p.bindAction(note, event, {silent}) fires a bus event on a key. p.unbind(note) reverts. The step sequencer keeps using the preset.',
         tags: ['piano', 'bind', 'voice', 'sample', 'action', 'override', 'key'],
       },
       {
@@ -765,7 +765,7 @@ setcps(0.5);`,
       {
         label: 'audio.launchpad — live soundboard grid',
         code: "const lp = audio.launchpad({ title: 'Launchpad', rows: 8, cols: 8 });\n// Click cells to play. Unbound cells play a default voice at a per-cell pitch.\n// Map your own sounds/actions:\n// lp.bind(0, 'Bass');               // a saved Voice on cell 0\n// lp.bind('2,3', { engine: 'fm' }); // inline voice at row2,col3\n// lp.bindAction('7,7', 'drop');     // fire bus event 'drop' on strike",
-        hint: 'audio.launchpad({rows,cols,baseNote,voice}) — configurable live pad grid (ADR 047). Map each cell to a Voice (lp.bind) or a named bus Action (lp.bindAction). No sequencer (that\'s the Drum Pad); live play captures into a Take. Joins the MIDI Target rotation (input).',
+        hint: "audio.launchpad({rows,cols,baseNote,voice}) — configurable live pad grid (ADR 047). Map each cell to a Voice (lp.bind) or a named bus Action (lp.bindAction). No sequencer (that's the Drum Pad); live play captures into a Take. Joins the MIDI Target rotation (input).",
         tags: ['launchpad', 'soundboard', 'pad', 'grid', 'sampler', 'controller'],
       },
       {
@@ -1184,6 +1184,51 @@ setcps(0.5);`,
     ],
   },
   {
+    name: 'Language',
+    commands: [
+      {
+        label: 'is profane?',
+        code: "lang.isProfane('some text')",
+        hint: 'True if the text contains profanity. Obfuscation-resistant (f.u.c.k, fu*k, leetspeak). Instant, offline.',
+      },
+      {
+        label: 'profanity matches',
+        code: "lang.profanity('some text')",
+        hint: 'Matched profane terms — [{term, start, end}]. Empty array if clean.',
+      },
+      {
+        label: 'censor text',
+        code: "lang.censor('some text')",
+        hint: "Returns the text with profanity masked. Pass a mask char as 2nd arg, e.g. lang.censor(t, '*').",
+      },
+      {
+        label: 'add profane word',
+        code: "lang.block('customword')",
+        hint: 'Add custom term(s) to the profanity matcher. Chainable.',
+      },
+      {
+        label: 'allow word (whitelist)',
+        code: "lang.allow('scunthorpe')",
+        hint: 'Pardon word(s) so they never count as profane (kills false positives). Chainable.',
+      },
+      {
+        label: 'sentiment',
+        code: "lang.sentiment('I love this!')",
+        hint: "Instant AFINN sentiment — {score, comparative, label ('positive'|'negative'|'neutral'), positive, negative}.",
+      },
+      {
+        label: 'classify (ML)',
+        code: "const cats = await lang.classify('I love this!');",
+        hint: 'MediaPipe TextClassifier — [{category, score}]. Lazy-loads a WASM ML model on first call (async).',
+      },
+      {
+        label: 'configure classifier',
+        code: "lang.configure({ model: 'https://…/my_classifier.tflite' })",
+        hint: 'Swap the ML classifier model URL used by lang.classify(). Reloads on next call.',
+      },
+    ],
+  },
+  {
     name: 'Control',
     commands: [
       {
@@ -1310,7 +1355,7 @@ setcps(0.5);`,
       {
         label: 'tick(ms).do',
         code: 'tick(16).do(() => {\n  \n});',
-        hint: 'Interval loop — tick(ms) returns a composable selector. Modifiers: .every(n), .after(event), .within(ms). Returns a stop handle. Uses patched setInterval so it pauses/cleans like user code.',
+        hint: 'Interval loop. tick(fn) runs fn every frame (~16ms) and returns a stop handle — the plain animation loop. tick(ms) returns a composable selector: call .do(fn), with modifiers .every(n), .after(event), .within(ms). Uses patched setInterval so it pauses/cleans like user code.',
       },
       {
         label: 'tween',

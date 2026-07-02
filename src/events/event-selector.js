@@ -298,8 +298,13 @@ class TickSelector {
   }
 }
 
-export function tick(ms) {
-  return new TickSelector(ms);
+// tick(ms) → composable TickSelector (call .do(fn) to run; supports .every/.after/.within/.when).
+// tick(fn) → convenience: run fn every frame (~16ms) and return a cancel handle directly.
+// The function form is what reads naturally for a plain animation loop; without it,
+// `tick(() => {...})` silently builds a selector that is never started (no interval, no draw).
+export function tick(msOrFn) {
+  if (typeof msOrFn === 'function') return new TickSelector(16).do(msOrFn);
+  return new TickSelector(msOrFn);
 }
 
 // ── tween() ───────────────────────────────────────────────────────────────────

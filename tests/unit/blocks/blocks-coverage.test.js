@@ -80,6 +80,7 @@ const BLOCKS_TODO = new Set([
   'Performance',  // replay/timeline of recorded Takes (ADR 031) — data-array + closure heavy; blocks pending
   'Voices',       // designed synth/sample voices (ADR 046) — descriptor + factory heavy; blocks pending (Synth Designer is the no-code path)
   'Launchpad',    // live soundboard grid (ADR 047) — bind/bindAction closure+descriptor heavy; blocks pending
+  'Language',     // lang.* profanity/sentiment/classify — string-in/value-out; blocks pending
 ]);
 
 const TOOLKIT_NAMES = TOOLKIT_CATEGORIES.map((c) => c.name);

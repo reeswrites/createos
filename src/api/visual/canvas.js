@@ -44,10 +44,19 @@ class Canvas extends DrawTarget {
       cy = 60 + i * 36;
     }
 
-    // Local so the DrawTarget getter resolves our canvas without touching `this`
-    // before super() (legal: declaring/closing over a local var, not `this`).
+    // Local so the DrawTarget getter resolves our z=0 canvas without touching
+    // `this` before super() (legal: declaring/closing over a local var).
+    // The getter is z-AWARE: z=0 → our fixed-logical base canvas; any other z
+    // (e.g. backdrop()'s targetZ = this.#z - 1 = -1) → a real raster plane in the
+    // window's layer stack. This is what makes `c.backdrop('camera')` land on a
+    // SEPARATE plane below z=0, so `c.clear()` (which only clears z=0) never wipes
+    // it. `this` is only read at draw time (post-construction), so it is safe here.
     let canvasEl = null;
-    super(0, () => canvasEl);
+    super(0, (z) =>
+      z === 0 || z == null
+        ? canvasEl
+        : window.wm?.layer?.(this.winId, z, { raster: true, w: this._w, h: this._h }),
+    );
 
     this._key = key;
     this._w = w;
@@ -159,8 +168,11 @@ class Canvas extends DrawTarget {
    */
   layer(z) {
     if (z === 0) return this;
-    return new DrawTarget(z, () =>
-      window.wm?.layer?.(this.winId, z, { raster: true, w: this._w, h: this._h }),
+    // z-aware getter (like the ctor's): draws hit plane `z`, but a backdrop() on
+    // this sub-layer resolves its own targetZ (z-1) to the correct lower plane
+    // (z-1 === 0 → wm.layer returns the adopted base canvas, idempotent).
+    return new DrawTarget(z, (lz) =>
+      window.wm?.layer?.(this.winId, lz ?? z, { raster: true, w: this._w, h: this._h }),
     );
   }
 

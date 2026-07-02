@@ -381,6 +381,26 @@ describe('DrawTarget.backdrop', () => {
     expect(window.__ar_keepAlive.size).toBeLessThan(sizeBefore);
   });
 
+  test('backdrop targets the z-1 plane, so clear() (z=0) leaves it intact', () => {
+    // Regression: a z-aware getter must route backdrop onto a SEPARATE plane
+    // below z=0. If the getter collapsed every z onto z=0 (the old Canvas bug),
+    // backdrop and clear would fight one canvas. Here z=0 and z-1 are distinct.
+    window.__ar_keepAlive = new Set();
+    const { canvas } = makeCanvas(200, 100);
+    const { canvas: bdCanvas } = makeCanvas(200, 100);
+    // z-aware getter, mirroring Canvas's ctor: z=0 → base, anything else → plane.
+    const getLayerCanvas = vi.fn((z) => (z === 0 || z == null ? canvas : bdCanvas));
+    const draw = new DrawTarget(0, getLayerCanvas); // Canvas instance is #z=0
+
+    draw.backdrop(bdCanvas, { loop: true }); // targetZ = 0-1 = -1
+    draw.clear(); //                            resolves z=0
+
+    const zsRequested = getLayerCanvas.mock.calls.map((c) => c[0]);
+    expect(zsRequested).toContain(-1); // backdrop asked for a plane BELOW z=0
+    expect(zsRequested).toContain(0); //  clear stayed on z=0
+    expect(bdCanvas).not.toBe(canvas); // distinct planes → clear() can't wipe backdrop
+  });
+
   test('URL string source creates an Image (no raf)', () => {
     const { canvas } = makeCanvas(200, 100);
     const bdCanvas   = makeCanvas(200, 100).canvas;

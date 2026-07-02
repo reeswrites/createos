@@ -1468,6 +1468,11 @@ export function initWM(onContentResize) {
           pointerEvents: 'none',
         });
         if (getComputedStyle(body).position === 'static') body.style.position = 'relative';
+        // Make the body its own stacking context so planes order among themselves —
+        // crucially, a BELOW-base backdrop plane (z<0, e.g. Canvas.backdrop's z=-1)
+        // stays contained here instead of escaping to an ancestor context and sinking
+        // behind the window's own background (it would render invisible otherwise).
+        if (z < 0) body.style.isolation = 'isolate';
         body.appendChild(canvas);
       } else {
         // Managed GPU/pixi plane — DPR-resized (resolution-independent shaders).

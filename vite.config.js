@@ -51,7 +51,7 @@ export default defineConfig({
   optimizeDeps: {
     // transformers (ONNX Runtime Web) is dynamically imported by the STT engine; excluding
     // it keeps the WASM/worker assets intact and out of the pre-bundle (ADR 039).
-    exclude: ['@mediapipe/tasks-vision', '@huggingface/transformers'],
+    exclude: ['@mediapipe/tasks-vision', '@mediapipe/tasks-text', '@huggingface/transformers'],
     include: [
       '@codemirror/view',
       '@codemirror/state',

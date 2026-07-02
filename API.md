@@ -969,6 +969,44 @@ Pose landmark indices follow [MediaPipe Pose topology](https://ai.google.dev/edg
 
 ---
 
+## Language — `lang`
+
+Text language tools. Profanity + sentiment are **synchronous, offline, instant** (no download); `classify()` is an optional lazy-loaded ML model for advanced tasks.
+
+```js
+// Profanity — obscenity matcher (obfuscation-resistant: fu*k, sh1t, fuuuck, case)
+lang.isProfane(text)          // → boolean
+lang.profanity(text)          // → [{ term, start, end }]  (empty if clean)
+lang.censor(text, mask?)      // → masked string. mask omitted → grawlix (#$%@); pass a char to fill
+lang.block(...words)          // add custom profane term(s); chainable
+lang.allow(...words)          // whitelist word(s) so they never flag (false-positive guard); chainable
+
+// Sentiment — AFINN lexicon, instant
+lang.sentiment(text)          // → { score, comparative, label, positive, negative }
+                              //   label: 'positive' | 'negative' | 'neutral' (by comparative ±0.05)
+
+// Advanced ML classification — MediaPipe TextClassifier (lazy WASM, async)
+await lang.classify(text)     // → [{ category, score }]  (default model = BERT sentiment)
+lang.configure({ model })     // swap the .tflite classifier URL; reloads on next classify()
+```
+
+`isProfane`/`profanity`/`censor`/`sentiment` run instantly with no network. `classify()` downloads a MediaPipe model on first call (like `vision.*`) and stays warm after — `await` it and expect a first-call delay. Custom terms, whitelist, and the loaded model persist across resets (config, not run artifacts).
+
+```js
+// Say a bad word → react (STT + lang, no bad-word list)
+route(Source.mic).tap('audio:word:final', ({ word }) => {
+  if (lang.isProfane(word)) emit('boom');
+});
+
+// Live mood readout from a notepad
+on('note:change', ({ text }) => {
+  const { label, score } = lang.sentiment(text);
+  console.log(label, score);
+});
+```
+
+---
+
 ## Video Signals — `video`
 
 Sample pixel regions from canvas or camera as live numeric signals.

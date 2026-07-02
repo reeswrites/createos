@@ -8,13 +8,29 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Strategy: use vi.isolateModules for stateful tests, or just reimport
 // and work with the exported API (statefulness is acceptable for integration-style tests).
 
-let emit, notify, subscribe, registerCommand, registerSource, getLastPayload, clearRunScoped, hasSubscribers;
+let emit,
+  notify,
+  subscribe,
+  registerCommand,
+  registerSource,
+  getLastPayload,
+  clearRunScoped,
+  hasSubscribers;
 let on, any, tick, hold;
 
 beforeEach(async () => {
   // Re-import to get a fresh module instance per test would require vitest resetModules.
   // Instead we rely on clearRunScoped + direct cleanup via returned unsub handles.
-  ({ emit, notify, subscribe, registerCommand, registerSource, getLastPayload, clearRunScoped, hasSubscribers } = await import('../../../src/events/bus.js'));
+  ({
+    emit,
+    notify,
+    subscribe,
+    registerCommand,
+    registerSource,
+    getLastPayload,
+    clearRunScoped,
+    hasSubscribers,
+  } = await import('../../../src/events/bus.js'));
   ({ on, any, tick, hold } = await import('../../../src/events/event-selector.js'));
 });
 
@@ -30,13 +46,15 @@ describe('emit / subscribe (notification-only events)', () => {
   });
 
   it('multiple subscribers all fire', () => {
-    const a = vi.fn(), b = vi.fn();
+    const a = vi.fn(),
+      b = vi.fn();
     const ua = subscribe('test:multi', a);
     const ub = subscribe('test:multi', b);
     emit('test:multi', { v: 7 });
     expect(a).toHaveBeenCalledWith({ v: 7 });
     expect(b).toHaveBeenCalledWith({ v: 7 });
-    ua(); ub();
+    ua();
+    ub();
   });
 
   it('unsubscribe stops further notifications', () => {
@@ -48,13 +66,16 @@ describe('emit / subscribe (notification-only events)', () => {
   });
 
   it('subscriber error does not stop other subscribers', () => {
-    const bad = vi.fn(() => { throw new Error('boom'); });
+    const bad = vi.fn(() => {
+      throw new Error('boom');
+    });
     const good = vi.fn();
     const u1 = subscribe('test:err', bad);
     const u2 = subscribe('test:err', good);
     expect(() => emit('test:err', {})).not.toThrow();
     expect(good).toHaveBeenCalled();
-    u1(); u2();
+    u1();
+    u2();
   });
 });
 
@@ -94,22 +115,28 @@ describe('registerCommand()', () => {
   it('command handler error emits namespace:error', () => {
     const errSub = vi.fn();
     const unsub = subscribe('test:error', errSub);
-    registerCommand('test:throw', () => { throw new Error('handler fail'); });
+    registerCommand('test:throw', () => {
+      throw new Error('handler fail');
+    });
     emit('test:throw', {});
-    expect(errSub).toHaveBeenCalledWith(expect.objectContaining({
-      command: 'test:throw',
-      reason: 'handler fail',
-    }));
+    expect(errSub).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: 'test:throw',
+        reason: 'handler fail',
+      }),
+    );
     unsub();
   });
 
   it('async command handler rejection emits namespace:error', async () => {
     const errSub = vi.fn();
     const unsub = subscribe('test:error', errSub);
-    registerCommand('test:asyncthrow', async () => { throw new Error('async fail'); });
+    registerCommand('test:asyncthrow', async () => {
+      throw new Error('async fail');
+    });
     emit('test:asyncthrow', {});
     // Wait for the promise rejection to propagate
-    await new Promise(r => setTimeout(r, 10));
+    await new Promise((r) => setTimeout(r, 10));
     expect(errSub).toHaveBeenCalledWith(expect.objectContaining({ reason: 'async fail' }));
     unsub();
   });
@@ -164,12 +191,12 @@ describe('on(event).every(n)', () => {
   it('fires only on nth occurrence', () => {
     const fn = vi.fn();
     const stop = on('test:every').every(3).do(fn);
-    emit('test:every', {});  // 1
-    emit('test:every', {});  // 2
-    emit('test:every', {});  // 3 → fire
-    emit('test:every', {});  // 4
-    emit('test:every', {});  // 5
-    emit('test:every', {});  // 6 → fire
+    emit('test:every', {}); // 1
+    emit('test:every', {}); // 2
+    emit('test:every', {}); // 3 → fire
+    emit('test:every', {}); // 4
+    emit('test:every', {}); // 5
+    emit('test:every', {}); // 6 → fire
     expect(fn).toHaveBeenCalledTimes(2);
     stop();
   });
@@ -178,7 +205,9 @@ describe('on(event).every(n)', () => {
 describe('on(event).when(pred)', () => {
   it('fires only when predicate is true', () => {
     const fn = vi.fn();
-    const stop = on('test:when').when(d => d.v > 5).do(fn);
+    const stop = on('test:when')
+      .when((d) => d.v > 5)
+      .do(fn);
     emit('test:when', { v: 3 });
     emit('test:when', { v: 8 });
     emit('test:when', { v: 2 });
@@ -258,7 +287,7 @@ describe('faking beat:tick', () => {
 describe('registerSource()', () => {
   it('start called on first subscriber, stop on last', () => {
     const start = vi.fn(() => null);
-    const stop  = vi.fn();
+    const stop = vi.fn();
     registerSource('test:lazy-src', { start, stop });
 
     expect(start).not.toHaveBeenCalled();
@@ -283,7 +312,7 @@ describe('registerSource()', () => {
 
   it('clearRunScoped decrements source count', () => {
     const start = vi.fn(() => null);
-    const stop  = vi.fn();
+    const stop = vi.fn();
     registerSource('test:lazy-scope', { start, stop });
 
     window.__ar_active_editor_id = 42;
@@ -297,12 +326,13 @@ describe('registerSource()', () => {
 
   it('pattern match function triggers source once (shared count across matched events)', () => {
     const start = vi.fn(() => null);
-    registerSource(e => e.startsWith('test:pattern-'), { start });
+    registerSource((e) => e.startsWith('test:pattern-'), { start });
     const u1 = subscribe('test:pattern-a', () => {});
     const u2 = subscribe('test:pattern-b', () => {});
     // Both events increment the same source's count; start fires only on 0→1 (first sub)
     expect(start).toHaveBeenCalledTimes(1);
-    u1(); u2();
+    u1();
+    u2();
   });
 });
 
@@ -336,7 +366,9 @@ describe('on(event).when(object pattern) — filter mode', () => {
 
   it('array value = OR match', () => {
     const fn = vi.fn();
-    const stop = on('test:when-arr').when({ key: ['a', 'b'] }).do(fn);
+    const stop = on('test:when-arr')
+      .when({ key: ['a', 'b'] })
+      .do(fn);
     emit('test:when-arr', { key: 'a' });
     emit('test:when-arr', { key: 'c' });
     emit('test:when-arr', { key: 'b' });
@@ -357,7 +389,8 @@ describe('on(event).when(object pattern) — filter mode', () => {
 
 describe('on(event).when(prop, map) — explicit dispatch terminal', () => {
   it('dispatches to correct handler by property value', () => {
-    const fnA = vi.fn(), fnB = vi.fn();
+    const fnA = vi.fn(),
+      fnB = vi.fn();
     const stop = on('test:dispatch-explicit').when('key', { a: fnA, b: fnB });
     emit('test:dispatch-explicit', { key: 'a', extra: 1 });
     emit('test:dispatch-explicit', { key: 'b', extra: 2 });
@@ -379,7 +412,8 @@ describe('on(event).when(prop, map) — explicit dispatch terminal', () => {
 
 describe('on(event).when(fn-map) — terse dispatch via primary (window:key:down)', () => {
   it('dispatches by primary field', () => {
-    const w = vi.fn(), s = vi.fn();
+    const w = vi.fn(),
+      s = vi.fn();
     const stop = on('window:key:down').when({ w, s });
     emit('window:key:down', { key: 'w', winId: null });
     emit('window:key:down', { key: 's', winId: null });
@@ -404,6 +438,22 @@ describe('tick(ms)', () => {
     vi.advanceTimersByTime(350);
     expect(fn).toHaveBeenCalledTimes(3);
     stop();
+    vi.useRealTimers();
+  });
+
+  it('tick(fn) shorthand runs fn every frame and returns a cancel handle', () => {
+    // Regression: `tick(() => {...})` (used by demos for a plain animation loop)
+    // must actually run. Without the function-arg overload it builds a selector
+    // that is never started (no interval fires, nothing draws).
+    vi.useFakeTimers();
+    const fn = vi.fn();
+    const stop = tick(fn); // no .do() — the whole point
+    expect(typeof stop).toBe('function'); // returns a cancel handle, not a selector
+    vi.advanceTimersByTime(50); // ~16ms frames → 3 fires
+    expect(fn).toHaveBeenCalledTimes(3);
+    stop();
+    vi.advanceTimersByTime(50);
+    expect(fn).toHaveBeenCalledTimes(3); // cancelled
     vi.useRealTimers();
   });
 
@@ -448,7 +498,8 @@ describe('tick(ms)', () => {
   // fix it used the unpatched global window.setInterval → untracked native timers
   // that no reset ever cleared (zombie loops kept firing after window close).
   it('routes through the active editor tracked setInterval (so reset can clear it)', () => {
-    const realSet = window.setInterval, realClear = window.clearInterval;
+    const realSet = window.setInterval,
+      realClear = window.clearInterval;
     const trackedSet = vi.fn((cb, ms) => realSet(cb, ms));
     const trackedClear = vi.fn((id) => realClear(id));
     window.__ar_active_editor_id = 7;
@@ -456,7 +507,7 @@ describe('tick(ms)', () => {
     window.__ar_e7_clearInterval = trackedClear;
     try {
       const stop = tick(50).do(() => {});
-      expect(trackedSet).toHaveBeenCalledTimes(1);  // used the tracked one, not native global
+      expect(trackedSet).toHaveBeenCalledTimes(1); // used the tracked one, not native global
       stop();
       expect(trackedClear).toHaveBeenCalledTimes(1);
     } finally {
@@ -470,7 +521,7 @@ describe('tick(ms)', () => {
     delete window.__ar_active_editor_id;
     vi.useFakeTimers();
     const fn = vi.fn();
-    const stop = tick(100).do(fn);     // must still work with no tracker present
+    const stop = tick(100).do(fn); // must still work with no tracker present
     vi.advanceTimersByTime(250);
     expect(fn).toHaveBeenCalledTimes(2);
     stop();
@@ -488,7 +539,7 @@ describe('on(event).hold() — Set mode (paired events)', () => {
     emit('window:key:down', { key: 'a', code: 'KeyA', winId: null });
     expect(keys.has('w')).toBe(true);
     expect(keys.has('a')).toBe(true);
-    emit('window:key:up',   { key: 'w', code: 'KeyW', winId: null });
+    emit('window:key:up', { key: 'w', code: 'KeyW', winId: null });
     expect(keys.has('w')).toBe(false);
     expect(keys.has('a')).toBe(true);
   });
@@ -556,13 +607,16 @@ describe('addBusTap', () => {
   });
 
   it('tap error does not break _fire or other taps', () => {
-    const bad = vi.fn(() => { throw new Error('tap boom'); });
+    const bad = vi.fn(() => {
+      throw new Error('tap boom');
+    });
     const good = vi.fn();
     const r1 = addBusTap(bad);
     const r2 = addBusTap(good);
     expect(() => emit('test:tap:err', {})).not.toThrow();
     expect(good).toHaveBeenCalled();
-    r1(); r2();
+    r1();
+    r2();
   });
 
   it('taps survive clearRunScoped', () => {
@@ -598,7 +652,7 @@ describe('hasSubscribers', () => {
 
   it('runScopedOnly true for subscriptions created during an active run', () => {
     const prev = window.__ar_active_editor_id;
-    window.__ar_active_editor_id = 1;          // simulate an active editor run
+    window.__ar_active_editor_id = 1; // simulate an active editor run
     const unsub = subscribe('hs:run', () => {});
     expect(hasSubscribers('hs:run', { runScopedOnly: true })).toBe(true);
     unsub();

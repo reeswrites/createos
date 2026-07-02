@@ -1,5 +1,19 @@
 [
   {
+    "id": "watch-your-mouth",
+    "title": "Watch Your Mouth",
+    "desc": "Say a curse word and your head goes boom (non-gory) — speech-to-text feeds lang.isProfane, vision finds your head, a cartoon fireball hides it then it grows back.",
+    "file": "watch-your-mouth.vljson",
+    "tags": [
+      "stt",
+      "speech",
+      "lang",
+      "vision",
+      "camera",
+      "canvas"
+    ]
+  },
+  {
     "id": "sound-lab",
     "title": "Sound Lab",
     "desc": "Design your own instruments — custom Voices, a Faust physical-model piano, a mappable Launchpad soundboard, and a swung Drumpad groove (ADR 046/047)",

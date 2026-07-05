@@ -16,12 +16,17 @@ import * as esprima from 'esprima';
 // This catches API global renames silently leaving stale snippet references.
 // Method-level checking is deferred (Phase 4 Step 2 — "Manifest").
 
-// KNOWN_GLOBALS is DERIVED from app.js's _registerBuiltin('name') calls — the same
+// KNOWN_GLOBALS is DERIVED from the _registerBuiltin('name') calls — the same
 // registrations that put each API on window — rather than hand-copied (ADR 008 "list
 // → derived"; CONTEXT.md "API Descriptor"). The regex is indentation-agnostic, so it
 // catches both top-level and nested registrations. This retires the old hand-list and
 // the separate drift gate that existed only to police that the hand-list matched.
-const APP_SRC = readFileSync(resolve(process.cwd(), 'src/runtime/app.js'), 'utf8');
+// The bulk of registrations live in register-builtins.js; the runtime-dependent ones
+// (wm/pixi/library/captureWindow) stay in app.js's window.onload — grep both.
+const APP_SRC = [
+  readFileSync(resolve(process.cwd(), 'src/runtime/app.js'), 'utf8'),
+  readFileSync(resolve(process.cwd(), 'src/runtime/register-builtins.js'), 'utf8'),
+].join('\n');
 const KNOWN_GLOBALS = new Set(
   [...APP_SRC.matchAll(/_registerBuiltin\(\s*'([^']+)'/g)].map((m) => m[1]),
 );

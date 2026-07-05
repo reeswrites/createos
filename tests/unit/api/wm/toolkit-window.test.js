@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { initToolkitWindow } from '../../../../src/api/wm/toolkit-window.js';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { initToolkitWindow, toolkitWindowAdapter } from '../../../../src/api/wm/toolkit-window.js';
 
 // toolkit-window.js is the API Toolbox window type extracted from app.js's
 // window.onload. Before the extraction, createToolkit / _buildToolkitContent /
@@ -83,5 +83,47 @@ describe('toolkit-window (isolation)', () => {
     search.value = sample;
     search.dispatchEvent(new Event('input'));
     expect(btns.some((b) => b.style.display !== 'none')).toBe(true);
+  });
+});
+
+// Window Type Adapter (project save/load). restore reads createToolkit/nextToolkitId
+// off ctx.appAPI — the exact shape project.js builds ({ wm, appAPI, applyGeo } where
+// appAPI = { createEditor, createToolkit, nextToolkitId, updateManifest }). Regression
+// guard: commit 9d40887 changed restore to `ctx.appAPI._toolkit.createToolkit(id)`,
+// but appAPI has no `_toolkit` field, so loading any project with an API Toolbox window
+// threw a TypeError that aborted the whole applyProject().
+describe('toolkitWindowAdapter (project restore)', () => {
+  it('restore drives createToolkit off the real appAPI shape (no _toolkit)', () => {
+    const win = {};
+    const appAPI = {
+      createEditor: vi.fn(),
+      createToolkit: vi.fn(() => win),
+      nextToolkitId: vi.fn(() => 7),
+      updateManifest: vi.fn(),
+    };
+    const applyGeo = vi.fn();
+    const record = { type: 'toolkit', title: 'API Toolbox', x: 10, y: 20 };
+
+    expect(() =>
+      toolkitWindowAdapter.restore(record, { wm: {}, appAPI, applyGeo }),
+    ).not.toThrow();
+    expect(appAPI.nextToolkitId).toHaveBeenCalledOnce();
+    expect(appAPI.createToolkit).toHaveBeenCalledWith(7);
+    expect(applyGeo).toHaveBeenCalledWith(win, record);
+  });
+
+  it('serialize captures type + title + geometry', () => {
+    const ctx = {
+      titleOf: () => 'My Toolbox',
+      geoOf: () => ({ x: 5, y: 6, w: 200, h: 500 }),
+    };
+    expect(toolkitWindowAdapter.serialize({}, ctx)).toEqual({
+      type: 'toolkit',
+      title: 'My Toolbox',
+      x: 5,
+      y: 6,
+      w: 200,
+      h: 500,
+    });
   });
 });

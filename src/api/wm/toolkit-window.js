@@ -283,3 +283,17 @@ export function initToolkitWindow() {
 
   return { createToolkit, nextToolkitId };
 }
+
+// Window Type Adapter for toolkit windows (registered by app.js onload — restore needs
+// the live appAPI, so it reads createToolkit/nextToolkitId off the registry ctx rather
+// than the initToolkitWindow closure). Kept beside the toolkit code (ADR 055 discipline).
+export const toolkitWindowAdapter = {
+  serialize(win, ctx) {
+    return { type: 'toolkit', title: ctx.titleOf(win, 'API Toolbox'), ...ctx.geoOf(win) };
+  },
+  restore(w, ctx) {
+    const id = ctx.appAPI.nextToolkitId();
+    const win = ctx.appAPI.createToolkit(id);
+    ctx.applyGeo(win, w);
+  },
+};

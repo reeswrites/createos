@@ -296,6 +296,10 @@ subscribe(
 
 const _cache = { objects: [], hands: [], face: null, pose: null, gaze: null };
 
+// Self-driving handMask RAF cancels (ADR 054) — cleared by stopVision on reset.
+// These are INPUTS to a masked shader, so they never join keep-alive.
+const _maskLoops = [];
+
 const _gestureHandlers = [];
 const _expressionHandlers = [];
 const _gazeDirHandlers = []; // { dir, fn, prev }
@@ -669,6 +673,7 @@ export function stopVision() {
   _blinkHandlers.length = 0;
   _winkHandlers.length = 0;
   _prevDir = null;
+  for (const cancel of _maskLoops.splice(0)) cancel(); // stop handMask RAFs (ADR 054)
   // Calibration model + persisted map survive reset (not run artifacts).
 }
 
@@ -876,6 +881,74 @@ export const vision = {
     if (!_cache.hands.length) return null;
     const g = _cache.hands[0].gesture;
     return g === 'None' ? null : g;
+  },
+
+  // Ready-to-use dynamic mask driven by hand tracking (ADR 054). Returns a
+  // white-on-black canvas (luminance-native, so `.mask()`'s default channel reads
+  // it) that self-redraws every frame from vision.hands(), unioning all hands.
+  // Drop straight into a masked layer: `shader.mask(vision.handMask())`.
+  //   landmark : landmark index or array of indices to place blobs at (default 8,
+  //              the index fingertip). See MediaPipe hand landmark map.
+  //   radius   : blob radius, normalized to min(w,h) (default 0.12)
+  //   shape    : 'circle' | 'square'
+  //   smoothing: 0 (raw, jittery) … 1 (heavy lag). Exponential per-landmark lerp.
+  //   mirror   : 'auto' | bool — align with the selfie-mirrored camera view.
+  // Self-driving (run-scoped RAF, stopped on reset); NOT a keep-alive output —
+  // the masked shader it feeds is what holds the run alive.
+  handMask({
+    landmark = 8,
+    radius = 0.12,
+    shape = 'circle',
+    smoothing = 0.3,
+    mirror = 'auto',
+    w = 512,
+    h = 512,
+  } = {}) {
+    _ensureStarted();
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    const rpx = radius * Math.min(w, h);
+    const idxs = Array.isArray(landmark) ? landmark : [landmark];
+    const smoothed = new Map(); // 'hand:landmark' → { x, y } (normalized)
+    let rafId = null;
+    const draw = () => {
+      if (!window.__ar_paused && ctx) {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.fillStyle = 'black';
+        ctx.fillRect(0, 0, w, h);
+        ctx.save();
+        _applyMirror(ctx, mirror);
+        ctx.fillStyle = 'white';
+        _cache.hands.forEach((hand, hi) => {
+          const lm = hand.landmarks;
+          if (!lm?.length) return;
+          for (const li of idxs) {
+            const p = lm[li];
+            if (!p) continue;
+            const key = hi + ':' + li;
+            const prev = smoothed.get(key);
+            const sx = prev ? prev.x * smoothing + p.x * (1 - smoothing) : p.x;
+            const sy = prev ? prev.y * smoothing + p.y * (1 - smoothing) : p.y;
+            smoothed.set(key, { x: sx, y: sy });
+            const cx = sx * w,
+              cy = sy * h;
+            if (shape === 'square') ctx.fillRect(cx - rpx, cy - rpx, rpx * 2, rpx * 2);
+            else {
+              ctx.beginPath();
+              ctx.arc(cx, cy, rpx, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
+        });
+        ctx.restore();
+      }
+      rafId = requestAnimationFrame(draw);
+    };
+    rafId = requestAnimationFrame(draw);
+    _maskLoops.push(() => cancelAnimationFrame(rafId));
+    return canvas;
   },
 
   face() {

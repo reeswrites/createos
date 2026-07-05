@@ -93,6 +93,24 @@ void main() {
 }`;
 }
 
+// Mask pass (ADR 054): a second full-screen draw that multiplies the already-
+// rendered framebuffer by a per-pixel coverage scalar. channel/invert are
+// uniforms (no recompile on change). Sampled at gl_FragCoord/res, matching how
+// the main shader samples uVideo (same texture origin convention).
+const MASK_FRAG_GLSL = `precision highp float;
+uniform sampler2D uMask;
+uniform vec2 uResolution;
+uniform float uMaskChannel; // 0 = luminance, 1 = alpha
+uniform float uMaskInvert;  // 0 or 1
+void main() {
+  vec2 uv = gl_FragCoord.xy / uResolution;
+  vec4 mc = texture2D(uMask, uv);
+  float lum = dot(mc.rgb, vec3(0.299, 0.587, 0.114));
+  float m = mix(lum, mc.a, step(0.5, uMaskChannel));
+  m = mix(m, 1.0 - m, step(0.5, uMaskInvert));
+  gl_FragColor = vec4(m, m, m, m);
+}`;
+
 // ── GLShader class ───────────────────────────────────────────────────────────
 
 export class GLShader extends ShaderLayerBase {
@@ -108,6 +126,9 @@ export class GLShader extends ShaderLayerBase {
     this._rafId = null;
     this._startTime = null;
     this._videoTex = null;
+    this._buf = null;
+    this._maskTex = null; // second-pass mask texture (ADR 054)
+    this._maskProgram = null;
 
     _glShaders.push(this);
     registerShaderInstance(this._id, this); // register in shared shader registry for event bus commands
@@ -179,8 +200,9 @@ export class GLShader extends ShaderLayerBase {
     }
     notify('shader:compile', { id: this._id, type: 'glsl' });
 
-    // Full-screen triangle (same topology as WGSL Shader)
-    const buf = gl.createBuffer();
+    // Full-screen triangle (same topology as WGSL Shader). Kept on `this` so the
+    // mask pass can rebind it for its own draw.
+    const buf = (this._buf = gl.createBuffer());
     gl.bindBuffer(gl.ARRAY_BUFFER, buf);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
     const posLoc = gl.getAttribLocation(this._program, 'position');
@@ -209,17 +231,90 @@ export class GLShader extends ShaderLayerBase {
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
   }
 
-  // ── Video frame upload ───────────────────────────────────────────────────
+  // ── Frame upload ─────────────────────────────────────────────────────────
 
-  _copyVideoFrame() {
-    const src = this._resolveVideoSrc();
-    if (!src || !this._videoTex) return;
+  // Shared texture-upload leaf — one copy for video, one for the mask (ADR 054).
+  _copyFrameToTexture(tex, src) {
+    if (!src || !tex) return;
     if (src instanceof HTMLVideoElement && src.readyState < 2) return;
     const gl = this._gl;
-    gl.bindTexture(gl.TEXTURE_2D, this._videoTex);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
     try {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, src);
     } catch (_) {}
+  }
+
+  _copyVideoFrame() {
+    this._copyFrameToTexture(this._videoTex, this._resolveVideoSrc());
+  }
+
+  // ── Mask pass (ADR 054) ────────────────────────────────────────────────────
+
+  // Lazily compile the mask program + texture on first masked frame. Returns
+  // false (and warns once) if compilation fails, so a bad mask never kills the
+  // main shader.
+  _ensureMask() {
+    if (this._maskProgram === false) return false; // failed earlier
+    if (this._maskProgram) return true;
+    const gl = this._gl;
+    try {
+      const vert = this._compileShader(gl.VERTEX_SHADER, VERT_GLSL);
+      const frag = this._compileShader(gl.FRAGMENT_SHADER, MASK_FRAG_GLSL);
+      const prog = gl.createProgram();
+      gl.attachShader(prog, vert);
+      gl.attachShader(prog, frag);
+      gl.linkProgram(prog);
+      gl.deleteShader(vert);
+      gl.deleteShader(frag);
+      if (!gl.getProgramParameter(prog, gl.LINK_STATUS))
+        throw new Error(gl.getProgramInfoLog(prog));
+      this._maskProgram = prog;
+      this._maskLoc = {
+        position: gl.getAttribLocation(prog, 'position'),
+        uMask: gl.getUniformLocation(prog, 'uMask'),
+        uResolution: gl.getUniformLocation(prog, 'uResolution'),
+        uMaskChannel: gl.getUniformLocation(prog, 'uMaskChannel'),
+        uMaskInvert: gl.getUniformLocation(prog, 'uMaskInvert'),
+      };
+      this._maskTex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, this._maskTex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      return true;
+    } catch (e) {
+      console.warn('GLShader.mask() unavailable:', e.message);
+      this._maskProgram = false;
+      return false;
+    }
+  }
+
+  // Second full-screen draw: multiply the rendered framebuffer by the mask.
+  _maskPass() {
+    if (!this._resolveMaskSrc() || !this._ensureMask()) return;
+    const gl = this._gl;
+    const c = this._canvas;
+    this._copyFrameToTexture(this._maskTex, this._resolveMaskSrc());
+
+    gl.useProgram(this._maskProgram);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this._buf);
+    gl.enableVertexAttribArray(this._maskLoc.position);
+    gl.vertexAttribPointer(this._maskLoc.position, 2, gl.FLOAT, false, 0, 0);
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, this._maskTex);
+    if (this._maskLoc.uMask) gl.uniform1i(this._maskLoc.uMask, 0);
+    if (this._maskLoc.uResolution) gl.uniform2f(this._maskLoc.uResolution, c.width, c.height);
+    if (this._maskLoc.uMaskChannel)
+      gl.uniform1f(this._maskLoc.uMaskChannel, this._maskOpts.channel === 'alpha' ? 1 : 0);
+    if (this._maskLoc.uMaskInvert)
+      gl.uniform1f(this._maskLoc.uMaskInvert, this._maskOpts.invert ? 1 : 0);
+
+    // dst *= mask (per channel), then restore normal over-blend
+    gl.blendFunc(gl.ZERO, gl.SRC_COLOR);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
   }
 
   // ── Uniforms ─────────────────────────────────────────────────────────────
@@ -253,6 +348,7 @@ export class GLShader extends ShaderLayerBase {
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
+    if (this._maskSrc) this._maskPass();
   }
 
   // ── Public API (mirrors Shader) ──────────────────────────────────────────
@@ -306,13 +402,18 @@ export class GLShader extends ShaderLayerBase {
     this._resizeObserver = null;
     if (this._gl) {
       if (this._videoTex) this._gl.deleteTexture(this._videoTex);
+      if (this._maskTex) this._gl.deleteTexture(this._maskTex);
       if (this._program) this._gl.deleteProgram(this._program);
+      if (this._maskProgram) this._gl.deleteProgram(this._maskProgram);
     }
     this._canvas?.remove();
     this._canvas = null;
     this._gl = null;
     this._program = null;
     this._videoTex = null;
+    this._maskTex = null;
+    this._maskProgram = null;
+    this._buf = null;
   }
 
   // Save a named GLSL body to the user library — persists across projects.

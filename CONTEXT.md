@@ -87,6 +87,12 @@ The composition primitive (`window.timeline`) that schedules multiple **Takes** 
 ### Drawable Source
 Any object the visual APIs can treat as a frame source: a `Layer`, a `CameraStream`, a bare `<video>`/`<canvas>`, or a `GLShader`/`Shader` instance. **Resolving** a Drawable Source means reducing it to the underlying `canvas` or `video` element. The sync resolver (`resolveDrawable`) handles these object forms only; string forms (`'camera'`, image URLs) are a separate async concern layered on by `draw.backdrop` (see ADR 006).
 
+### Layer Clip
+The **static** masking tool: restricting a layer to a fixed or CSS-animatable geometric region (circle, polygon, SVG path). `.clip(shape)` on a mounted layer. Operates on the layer's DOM element, not its pixels, so it is effectively free (compositor-thread) and works on any layer type. Use when the region is a geometric shape that does not depend on live pixel content. Contrast **Layer Mask**.
+
+### Layer Mask
+The **dynamic/arbitrary** masking tool: restricting a layer to a region defined by the live pixels of any **Drawable Source** — a paint canvas, camera feed, another shader, a hand-tracking canvas. `.mask(source, opts)`. Because the region is a drawable, it can move, animate, or be redrawn every frame at no extra API cost. Distinct from **Layer Clip** along the axis that actually matters — *static geometry* vs *dynamic content* — not by rendering backend. A mask reduces each source pixel to a scalar coverage value that scales the masked layer's output. See ADR 054.
+
 ### Editor Persistence
 Each Editor Instance saves its code to `localStorage` under key `vl-ide-code-{id}`. A manifest key `vl-ide-editors` holds the ordered list of active editor IDs. On page load all editors in the manifest are recreated with their saved code.
 

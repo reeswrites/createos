@@ -301,6 +301,16 @@ describe('structural guards', () => {
     const r = route(() => 0.5);
     expect(() => r.wait(3)).toThrow('visual/frame method');
   });
+
+  it('mask() queues a mask stage op on a frame source (ADR 054)', () => {
+    const r = route(Source.camera);
+    const maskCanvas = { getContext: () => {}, width: 8, height: 8 };
+    r.mask(maskCanvas, { channel: 'alpha' });
+    const last = r._stageQueue[r._stageQueue.length - 1];
+    expect(last).toMatchObject({ op: 'add', type: 'mask' });
+    expect(last.args[0]).toBe(maskCanvas);
+    expect(last.args[1]).toEqual({ channel: 'alpha' });
+  });
 });
 
 // ── Sink resolution ───────────────────────────────────────────────────────────

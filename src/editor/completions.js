@@ -1084,6 +1084,41 @@ setcps(0.5);`,
     ],
   },
   {
+    name: 'Masking',
+    commands: [
+      {
+        label: 'clip — static region',
+        code: "// Static geometry mask: restrict a layer to a fixed shape (compositor, free).\nconst s = new Shader(SHADER_PRESETS.plasma).mount(myCanvas);\ns.fx?.(30)?.clip?.('circle(30% at 50% 50%)');\n// Or on a Canvas layer: c.fx(30).clip('polygon(50% 0, 100% 100%, 0 100%)');",
+        hint: '.clip(shape) restricts a mounted layer to a fixed/CSS-animatable region (circle/polygon/SVG path) via clip-path. Compositor-thread, effectively free. Use for STATIC geometry; use .mask() for dynamic pixel regions.',
+        tags: ['clip', 'mask', 'static', 'clip-path', 'region'],
+      },
+      {
+        label: 'mask a shader with a drawable',
+        code: '// Dynamic mask: show the shader only where the mask canvas is bright.\nconst m = Mask.circle({ x: 0.5, y: 0.5, r: 0.3 });\nconst s = new Shader(SHADER_PRESETS.plasma).mask(m).start();\n// animate the hole:\nlet t = 0;\ntick(() => { t += 0.02; m.update({ x: 0.5 + Math.sin(t) * 0.3 }); });',
+        hint: 'shader.mask(source, { channel:"luminance"|"alpha", invert }) restricts the layer to the source drawable’s region. source is ANY Drawable Source (paint canvas, camera, another shader). .mask(null) clears.',
+        tags: ['mask', 'shader', 'dynamic', 'drawable', 'region'],
+      },
+      {
+        label: 'Mask.circle / feather',
+        code: '// Procedural shape masks (white-on-black, normalized 0–1 coords).\nconst hard = Mask.circle({ x: 0.5, y: 0.5, r: 0.25 });\nconst soft = Mask.feather({ x: 0.5, y: 0.5, r: 0.3, softness: 0.5 });\nnew Shader(SHADER_PRESETS.noise).mask(soft).start();',
+        hint: 'Mask.circle(opts) / Mask.feather(opts) return a white-on-black canvas with .update(opts) for animation. Register your own with Mask.register(name, factory).',
+        tags: ['mask', 'circle', 'feather', 'procedural', 'shape'],
+      },
+      {
+        label: 'hand-tracked mask (vision)',
+        code: "// Reveal a camera shader only under your fingertips.\nconst mask = vision.handMask({ landmark: 8, radius: 0.15, smoothing: 0.3 });\npipe(Source.camera)\n  .glshader(`\n    vec4 c = texture2D(uVideo, uv);\n    gl_FragColor = vec4(1.0 - c.rgb, 1.0);\n  `, { mask })\n  .show('Hand Mask', { w: 700, h: 500 });",
+        hint: 'vision.handMask({landmark, radius, shape, smoothing, mirror}) returns a self-driving white-on-black canvas tracking hand landmarks (unions all hands). Drop straight into .mask(). Pass mask: in a pipe .glshader() opts.',
+        tags: ['mask', 'vision', 'hand', 'tracking', 'handMask', 'camera'],
+      },
+      {
+        label: 'temporal mask (route)',
+        code: "// Mask on for 3s, off for 2s, on a loop.\nconst r = route(Source.camera)\n  .mask(Mask.circle({ r: 0.35 }))\n  .wait(3)\n  .clearEffects()\n  .wait(2)\n  .loop()\n  .show('Temporal Mask', { w: 700, h: 500 });\n// r.toggle('mask') from a beat/gesture handler",
+        hint: "route(...).mask(source, opts) is a timeline-able stage — .wait()/.loop()/.toggle('mask'). Chain .mask(a).mask(b) to INTERSECT two separate sources (each is a multiply pass).",
+        tags: ['mask', 'route', 'pipe', 'temporal', 'toggle', 'intersection'],
+      },
+    ],
+  },
+  {
     name: 'Vision',
     commands: [
       {

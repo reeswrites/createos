@@ -81,6 +81,7 @@ const BLOCKS_TODO = new Set([
   'Voices',       // designed synth/sample voices (ADR 046) — descriptor + factory heavy; blocks pending (Synth Designer is the no-code path)
   'Launchpad',    // live soundboard grid (ADR 047) — bind/bindAction closure+descriptor heavy; blocks pending
   'Language',     // lang.* profanity/sentiment/classify — string-in/value-out; blocks pending
+  'Masking',      // clip/mask/Mask/vision.handMask (ADR 054) — drawable+closure heavy like Route; text-first, blocks pending
 ]);
 
 const TOOLKIT_NAMES = TOOLKIT_CATEGORIES.map((c) => c.name);

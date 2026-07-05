@@ -535,6 +535,11 @@ class Route {
   glshader(body, o) {
     return this._addStageOp('glshader', [body, o ?? {}]);
   }
+  // Mask the frame to a drawable's region (ADR 054). Chain .mask().mask() to
+  // intersect separate sources; time it with .wait()/.toggle('mask').
+  mask(source, opts) {
+    return this._addStageOp('mask', [source, opts ?? {}]);
+  }
 
   _addStageOp(type, args) {
     if (this._pipeline && this._pipeline._rafId) {

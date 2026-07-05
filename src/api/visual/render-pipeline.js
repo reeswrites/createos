@@ -321,6 +321,7 @@ class GLShaderStage {
       opacity: this._opts.opacity ?? 1,
       container,
     });
+    if (this._opts.mask) this._shaderInst.mask(this._opts.mask, this._opts.maskOpts); // ADR 054
     this._shaderInst.video(upstream).start();
   }
 
@@ -373,6 +374,7 @@ class ShaderStage {
       opacity: this._opts.opacity ?? 1,
       container,
     });
+    if (this._opts.mask) this._shaderInst.mask(this._opts.mask, this._opts.maskOpts); // ADR 054
     this._shaderInst.video(upstream).start();
   }
 
@@ -651,6 +653,97 @@ class TintStage {
   }
 }
 
+// ── MaskStage ─────────────────────────────────────────────────────────────────
+// Restrict the upstream frame to a mask drawable's region (ADR 054). Canvas-tier
+// analog of Shader/GLShader.mask(): draw upstream, then composite the mask with
+// `destination-in`. destination-in respects only the mask's ALPHA, so for
+// channel:'luminance' (default) we first convert the mask's luminance → alpha on
+// an offscreen canvas — making `.mask(src, {channel})` behave identically whether
+// it lands on a GPU shader or this 2D stage. Chaining .mask().mask() = two passes
+// = intersection.
+
+class MaskStage {
+  constructor(upstream, source, opts = {}) {
+    this._upstream = upstream;
+    this._source = source;
+    this._channel = opts.channel ?? 'luminance';
+    this._invert = !!opts.invert;
+    this._canvas = document.createElement('canvas');
+    this._ctx = null;
+    this._mc = document.createElement('canvas'); // offscreen: mask → alpha
+    this._mctx = null;
+    this._isShader = false;
+  }
+  _start() {
+    const src = this._upstream._getSource();
+    this._canvas.width = _srcWidth(src);
+    this._canvas.height = _srcHeight(src);
+    this._ctx = this._canvas.getContext('2d');
+    this._mctx = this._mc.getContext('2d', { willReadFrequently: true });
+  }
+  read() {
+    if (!this._ctx) return;
+    const src = this._upstream._getSource();
+    if (_isVideo(src) && src.readyState < 2) return;
+    const mask = resolveDrawable(this._source) ?? this._source;
+    const { width: w, height: h } = this._canvas;
+
+    this._ctx.globalCompositeOperation = 'source-over';
+    this._ctx.clearRect(0, 0, w, h);
+    this._ctx.drawImage(src, 0, 0, w, h);
+    if (!mask) return; // no mask → passthrough
+
+    const alphaMask = this._maskToAlpha(mask, w, h);
+    this._ctx.globalCompositeOperation = 'destination-in';
+    this._ctx.drawImage(alphaMask, 0, 0, w, h);
+    this._ctx.globalCompositeOperation = 'source-over';
+  }
+  // Render the mask into an offscreen whose ALPHA encodes coverage (per channel/
+  // invert), so a plain destination-in cuts correctly.
+  _maskToAlpha(mask, w, h) {
+    if (this._mc.width !== w || this._mc.height !== h) {
+      this._mc.width = w;
+      this._mc.height = h;
+    }
+    this._mctx.globalCompositeOperation = 'source-over';
+    this._mctx.clearRect(0, 0, w, h);
+    try {
+      this._mctx.drawImage(mask, 0, 0, w, h);
+    } catch (_) {
+      return this._mc;
+    }
+    const img = this._mctx.getImageData(0, 0, w, h);
+    const d = img.data;
+    const alphaChannel = this._channel === 'alpha';
+    for (let i = 0; i < d.length; i += 4) {
+      let m = alphaChannel
+        ? d[i + 3] / 255
+        : (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114) / 255;
+      if (this._invert) m = 1 - m;
+      d[i + 3] = m * 255; // coverage → alpha; RGB irrelevant for destination-in
+    }
+    this._mctx.putImageData(img, 0, 0);
+    return this._mc;
+  }
+  set(props) {
+    if (props.source !== undefined) this._source = props.source;
+    if (props.channel !== undefined) this._channel = props.channel;
+    if (props.invert !== undefined) this._invert = !!props.invert;
+  }
+  _getSource() {
+    return this._canvas;
+  }
+  get canvas() {
+    return this._canvas;
+  }
+  _destroy() {
+    this._canvas.remove();
+    this._mc.remove();
+    this._ctx = null;
+    this._mctx = null;
+  }
+}
+
 // ── NegativeStage ─────────────────────────────────────────────────────────────
 
 class NegativeStage extends FxStage {
@@ -881,6 +974,14 @@ export class Pipeline {
   tint(color = '#ffffff', id) {
     return this._pushStage(new TintStage(this._last(), color), 'tint', id);
   }
+  /**
+   * Mask the frame to a drawable's region (ADR 054). source: any Drawable Source.
+   * opts: { channel: 'luminance'|'alpha', invert }. Chain .mask().mask() to
+   * intersect separate sources.
+   */
+  mask(source, opts = {}, id) {
+    return this._pushStage(new MaskStage(this._last(), source, opts), 'mask', id);
+  }
   /** Invert all pixel values (photographic negative). */
   negative(id) {
     return this._pushStage(new NegativeStage(this._last()), 'negative', id);
@@ -931,6 +1032,7 @@ export class Pipeline {
       ascii: (up, o = {}) => new AsciiStage(up, o),
       pixelate: (up, o = {}) => new PixelateStage(up, o),
       fx: (up, f) => new FxStage(up, f),
+      mask: (up, source, opts = {}) => new MaskStage(up, source, opts),
     };
   }
 

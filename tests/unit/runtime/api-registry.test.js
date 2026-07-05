@@ -2,6 +2,7 @@ import { describe, test, expect } from 'vitest';
 import {
   _registerBuiltin,
   registerAPI,
+  reassertBuiltins,
   _beginRun,
   _endRun,
   getAPI,
@@ -16,6 +17,36 @@ import {
 
 let _counter = 0;
 function uid() { return `__test_api_${_counter++}`; }
+
+// ── reassertBuiltins (ADR 035 — heals evalScope global clobber) ────────────────
+
+describe('reassertBuiltins', () => {
+  test('re-applies a registered builtin that was clobbered on window', () => {
+    const name = uid();
+    const impl = () => 'render-pipeline-pipe';
+    _registerBuiltin(name, impl);
+    // Simulate strudel evalScope overwriting the global with its own export
+    window[name] = () => 'strudel-compose';
+    expect(window[name]()).toBe('strudel-compose');
+    reassertBuiltins();
+    expect(window[name]).toBe(impl); // registry wins again
+    delete window[name];
+  });
+
+  test('re-applies every registered builtin, not just one', () => {
+    const a = uid(),
+      b = uid();
+    _registerBuiltin(a, 'A');
+    _registerBuiltin(b, 'B');
+    window[a] = 'clobbered';
+    window[b] = 'clobbered';
+    reassertBuiltins();
+    expect(window[a]).toBe('A');
+    expect(window[b]).toBe('B');
+    delete window[a];
+    delete window[b];
+  });
+});
 
 // ── _registerBuiltin ─────────────────────────────────────────────────────────
 

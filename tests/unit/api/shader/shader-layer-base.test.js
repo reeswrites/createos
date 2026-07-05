@@ -197,6 +197,55 @@ describe('video + _resolveVideoSrc', () => {
   });
 });
 
+// ── mask / _resolveMaskSrc (ADR 054) ──────────────────────────────────────────
+
+describe('mask + _resolveMaskSrc', () => {
+  it('stores source + default opts (luminance, not inverted)', () => {
+    const s = make();
+    const canvas = { getContext: () => {}, width: 8, height: 8 };
+    s.mask(canvas);
+    expect(s._maskSrc).toBe(canvas);
+    expect(s._maskOpts).toEqual({ channel: 'luminance', invert: false });
+  });
+
+  it('honors channel + invert opts', () => {
+    const s = make();
+    s.mask({ getContext: () => {}, width: 1, height: 1 }, { channel: 'alpha', invert: true });
+    expect(s._maskOpts).toEqual({ channel: 'alpha', invert: true });
+  });
+
+  it('_resolveMaskSrc resolves a bare canvas via resolveDrawable', () => {
+    const canvas = { getContext: () => {}, width: 4, height: 4 };
+    const s = make();
+    s.mask(canvas);
+    expect(s._resolveMaskSrc()).toBe(canvas);
+  });
+
+  it('.mask(null) clears the mask and resolver returns null', () => {
+    const s = make();
+    s.mask({ getContext: () => {}, width: 1, height: 1 });
+    s.mask(null);
+    expect(s._maskSrc).toBeNull();
+    expect(s._resolveMaskSrc()).toBeNull();
+  });
+
+  it('.mask() with no arg clears', () => {
+    const s = make();
+    s.mask({ getContext: () => {}, width: 1, height: 1 });
+    s.mask();
+    expect(s._maskSrc).toBeNull();
+  });
+
+  it('returns this for chaining', () => {
+    const s = make();
+    expect(s.mask(null)).toBe(s);
+  });
+
+  it('_maskSrc defaults to null on a fresh instance', () => {
+    expect(make()._maskSrc).toBeNull();
+  });
+});
+
 // ── opacity / z / canvas getter ───────────────────────────────────────────────
 
 describe('style setters', () => {

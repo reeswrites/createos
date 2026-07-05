@@ -4,6 +4,7 @@ import { TOOLKIT_CATEGORIES, addToolkitEntries } from '../editor/completions.js'
 import {
   _registerBuiltin,
   registerAPI,
+  reassertBuiltins,
   _setToolkitApplier,
   _setBlocksApplier,
 } from './api-registry.js';
@@ -40,6 +41,7 @@ import {
 import { initProjectManager } from '../api/platform/project-manager.js';
 import { initDOMCaptures, captureWindow as _captureWindow } from '../editor/editor-capture.js';
 import { pipe, Source } from '../api/visual/render-pipeline.js';
+import { Mask } from '../api/visual/mask-registry.js';
 import { registerWindowType } from '../api/wm/window-registry.js';
 import { route } from '../api/signal/route.js';
 import { timeline } from '../api/signal/timeline.js';
@@ -153,6 +155,9 @@ _registerBuiltin('GLShader', GLShader, { params: ['fragmentBody', 'opts?'] });
 _registerBuiltin('GLSL_PRESETS', GLSL_PRESETS);
 _registerBuiltin('Canvas', Canvas, { params: ['opts?'] });
 _registerBuiltin('pipe', pipe);
+_registerBuiltin('Mask', Mask, {
+  params: { register: ['name', 'factory'], circle: ['opts?'], feather: ['opts?'] },
+});
 _registerBuiltin('Source', Source);
 _registerBuiltin('route', route);
 _registerBuiltin('timeline', timeline);
@@ -198,7 +203,12 @@ _registerBuiltin('Media', Media);
 // imported namespace so they exist before the first run, and .play() awaits init.
 // Registered with literal names (not a loop) so the completion-coherence gate and
 // the toolkit/detection surfaces can see each one.
-initStrudel();
+// Strudel's evalScope (async) blind-writes all its exports onto globalThis after
+// this returns, clobbering same-named builtins (notably @strudel/core's `on as pipe`
+// vs the render-pipeline `pipe`). Re-assert the app's builtins once it settles so the
+// registry wins. `.finally` covers the case where evalScope ran (clobbered) then a
+// later init step threw. See api-registry.reassertBuiltins() + ADR 035.
+Promise.resolve(initStrudel()).finally(reassertBuiltins);
 const _S = strudelGlobals();
 // sources
 _registerBuiltin('note', _S.note, { params: ['pattern'] });

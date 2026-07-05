@@ -47,6 +47,18 @@ export function _registerBuiltin(name, impl, descriptor = null) {
   if (descriptor) _descriptors.set(name, descriptor);
 }
 
+// Re-apply every registered builtin to window. Defends against a *later* global
+// writer clobbering an app builtin with a same-named value: Strudel's evalScope
+// blind-writes ALL its exports to globalThis (@strudel/core index.mjs `globalThis[r]=o`),
+// and @strudel/core exports `on as pipe` — which shadows the render-pipeline `pipe`.
+// Because evalScope runs async during initStrudel(), it lands *after* the synchronous
+// _registerBuiltin() calls at boot. Re-asserting from the registry (the source of
+// truth for what the app owns) heals `pipe` and any current/future collision with no
+// hardcoded name list. Call once strudel init settles. See ADR 035.
+export function reassertBuiltins() {
+  for (const [name, impl] of _registry) window[name] = impl;
+}
+
 // ── Public API — exposed on window.registerAPI ───────────────────────────────
 
 /**

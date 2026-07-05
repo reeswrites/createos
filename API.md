@@ -117,6 +117,7 @@ s.stop()               // pause
 s.set([r, g, b, a])   // set all custom channels
 s.set(index, value)    // set one channel (0=x 1=y 2=z 3=w)
 s.video(source)        // set video/canvas source
+s.mask(source, opts?)  // restrict to a mask drawable's region (see Masking below)
 s.opacity(0–1)
 s.z(n)
 ```
@@ -177,6 +178,54 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 ```
 
 **Presets:** `GLSL_PRESETS` — `{ gradient, plasma, waves, circles, noise }` fragment body strings.
+
+---
+
+## Masking — `.clip()` (static) · `.mask()` (dynamic)
+
+Restrict a layer to a region. Two tools, split by **static geometry vs dynamic content** (not by backend):
+
+**`.clip(shape)`** — fixed or CSS-animatable geometry (circle/polygon/SVG path), via `clip-path` on the layer element. Compositor-thread, effectively free. On any mounted layer (`Canvas.fx(z)`, Layer).
+
+```js
+c.fx(30).clip('circle(30% at 50% 50%)');
+c.fx(30).clip('polygon(50% 0, 100% 100%, 0 100%)');
+```
+
+**`.mask(source, opts?)`** — restrict to the region defined by any **Drawable Source**'s live pixels (a paint canvas, camera feed, another shader, a hand-tracking canvas). On `Shader`, `GLShader`, and the pipeline (`pipe`/`route`). Dynamic for free — a live source re-uploads every frame.
+
+```js
+const m = Mask.circle({ x: 0.5, y: 0.5, r: 0.3 });
+new Shader(SHADER_PRESETS.plasma).mask(m).start();
+tick(() => m.update({ x: 0.5 + Math.sin(performance.now() / 500) * 0.3 }));
+
+s.mask(null);           // clear the mask
+```
+
+`opts = { channel: 'luminance' | 'alpha', invert: false }`. `channel` selects how a source pixel reduces to coverage (default luminance — draw white shapes on black); `invert` flips it. The mask stretches to the layer (same mapping as `.video()`). Single mask per shader (last-wins).
+
+**`Mask`** — procedural shape factories (white-on-black, normalized 0–1 coords, `.update(opts)` for animation):
+```js
+Mask.circle({ x, y, r })                    // hard-edged disc
+Mask.feather({ x, y, r, softness })         // soft radial edge
+Mask.register('name', (opts) => canvas)     // add your own; also Mask.name(opts)
+```
+
+**Pipeline / temporal masking** — `route(...).mask()` and `pipe(...).mask()` are timeline-able (`.wait()`/`.loop()`/`.toggle('mask')`). Chaining **intersects** separate sources:
+```js
+route(Source.camera).mask(handMask).wait(3).clearEffects().wait(2).loop().show();
+pipe(Source.camera).mask(a).mask(b).show();  // a ∩ b (two multiply passes)
+pipe(Source.camera).glshader(body, { mask }).show();  // forward a mask into a string-body shader
+```
+
+**`vision.handMask(opts?)`** — a ready-to-use mask tracking hand landmarks (mirror + smoothing handled, self-driving). `opts`: `{ landmark = 8, radius = 0.12, shape = 'circle', smoothing = 0.3, mirror = 'auto' }`.
+```js
+new Shader(body).mask(vision.handMask({ landmark: 8, radius: 0.15 })).start();
+```
+
+**Live control:** `emit('shader:mask', { id, source, opts })` swaps a running shader's mask from outside its own code.
+
+See ADR 054 for the second-pass mechanism (masking is a compositing op on rendered output, so it works on every shader form — body, ShaderToy, full-source).
 
 ---
 

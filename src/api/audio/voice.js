@@ -200,7 +200,10 @@ function buildSampleHandle(desc) {
   // Direct url builds synchronously (triggers can fire immediately); a blobKey
   // must be read from IDB first, so that path loads asynchronously.
   if (desc.url) buildNode(desc.url);
-  else resolveSampleUrl(desc).then(buildNode).catch(() => {});
+  else
+    resolveSampleUrl(desc)
+      .then(buildNode)
+      .catch(() => {});
 
   const sliceCount = () => Math.max(1, desc.slices ?? 16);
 

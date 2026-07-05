@@ -29,6 +29,8 @@ export class ShaderLayerBase {
     this._boundSignal = null; // audio.signal() obj
     this._boundAnalyser = null; // Tone.Analyser | AnalyserNode | 'mic'
     this._videoSrc = videoSrc;
+    this._maskSrc = null; // dynamic mask drawable (ADR 054)
+    this._maskOpts = { channel: 'luminance', invert: false };
     this._live = null; // liveOutput handle
   }
 
@@ -43,6 +45,32 @@ export class ShaderLayerBase {
   video(src) {
     this._videoSrc = src;
     return this;
+  }
+
+  // ── Mask source (ADR 054) ──────────────────────────────────────────────────
+  //
+  // Restrict this layer to the region defined by a live Drawable Source's pixels.
+  // Masking is a SECOND full-screen pass (multiply the rendered framebuffer by a
+  // per-pixel coverage scalar) — never a fragment-source injection — so it works
+  // on every shader form (body / ShaderToy / full-source) identically. The mask
+  // texture lives in that second pass's own program/pipeline, so there is no
+  // binding collision with the video texture.
+  //
+  //   channel: 'luminance' (default) | 'alpha' — how a source pixel → scalar
+  //   invert:  false — flip the coverage (m → 1 - m)
+  //
+  // `.mask(null)` (or no arg) clears the mask; the second pass is skipped.
+  // Single mask per layer (last-wins). Intersect separate sources via the
+  // pipeline: pipe(cam).mask(a).mask(b) chains two multiply passes.
+  mask(source = null, { channel = 'luminance', invert = false } = {}) {
+    this._maskSrc = source;
+    this._maskOpts = { channel, invert };
+    return this;
+  }
+
+  // Resolve the mask drawable (same permissive passthrough as video).
+  _resolveMaskSrc() {
+    return this._maskSrc ? (resolveDrawable(this._maskSrc) ?? this._maskSrc) : null;
   }
 
   // ── Custom vec4 uniform ──────────────────────────────────────────────────

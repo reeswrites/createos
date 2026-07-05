@@ -22,6 +22,7 @@ function makeCtx(w = 800, h = 600) {
     getImageData: vi.fn().mockImplementation((x, y, w2, h2) => ({
       data: pixels.slice(0, w2 * h2 * 4),
     })),
+    putImageData: vi.fn(),
     clearRect:   vi.fn(),
     save:        vi.fn(),
     restore:     vi.fn(),
@@ -143,6 +144,41 @@ describe('pipe() source resolution', () => {
 });
 
 // ── AsciiStage ────────────────────────────────────────────────────────────────
+
+describe('MaskStage (ADR 054)', () => {
+  it('mask is registered in STAGE_CTORS (so it survives timelined routes)', () => {
+    expect(typeof Pipeline.STAGE_CTORS.mask).toBe('function');
+  });
+
+  it('pipe(src).mask(m) pushes a MaskStage', () => {
+    const src = makeCanvas(800, 600).canvas;
+    const mask = makeCanvas(800, 600).canvas;
+    const p = pipe(src).mask(mask);
+    const stage = p._stages[0];
+    expect(stage._canvas).toBeTruthy();
+    stage._start();
+    expect(stage._canvas.width).toBe(800);
+    expect(stage._canvas.height).toBe(600);
+  });
+
+  it('read() composites without throwing (destination-in + luminance→alpha)', () => {
+    const src = makeCanvas(64, 64).canvas;
+    const mask = makeCanvas(64, 64).canvas;
+    const stage = pipe(src).mask(mask, { channel: 'luminance' })._stages[0];
+    stage._start();
+    expect(() => stage.read()).not.toThrow();
+  });
+
+  it('set() updates source/channel/invert live', () => {
+    const src = makeCanvas().canvas;
+    const stage = pipe(src).mask(makeCanvas().canvas)._stages[0];
+    const newMask = makeCanvas().canvas;
+    stage.set({ source: newMask, channel: 'alpha', invert: true });
+    expect(stage._source).toBe(newMask);
+    expect(stage._channel).toBe('alpha');
+    expect(stage._invert).toBe(true);
+  });
+});
 
 describe('AsciiStage', () => {
   it('creates a canvas on _start()', () => {

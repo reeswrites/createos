@@ -11,6 +11,7 @@ import {
   wireCaptureButton,
 } from './widget-shell.js';
 import { onReset } from '../../runtime/reset-registry.js';
+import { registerDesktopFileType } from '../platform/desktop-file-registry.js';
 import { Take } from '../signal/performance-recorder.js';
 import { replayActions } from '../signal/replay-clock.js';
 
@@ -1152,3 +1153,33 @@ export class SpriteEditor {
 
 // Register teardown with the reset registry (ADR 008).
 onReset(cleanupSpriteEditors);
+
+// Desktop File-Type Adapter (ADR 055) — owns 'sprite' icon glyph + restore.
+// Frame reconstruction lives here (drawImageToFrame keeps Sprite._frames private).
+registerDesktopFileType('sprite', {
+  glyph: 'fa-solid fa-border-all',
+  cssClass: 'dt-sprite-icon',
+  open: (data, pos) => {
+    const sp = new Sprite({
+      width: data.width,
+      height: data.height,
+      scale: data.scale,
+      frames: data.frames?.length ?? 1,
+    });
+    const frameUrls = data.frames ?? [];
+    const open = () => new SpriteEditor({ sprite: sp, title: data.title, ...pos });
+    if (!frameUrls.length) return open();
+    let loaded = 0;
+    frameUrls.forEach((url, i) => {
+      const img = new Image();
+      img.onload = () => {
+        sp.drawImageToFrame(i, img);
+        if (++loaded === frameUrls.length) open();
+      };
+      img.onerror = () => {
+        if (++loaded === frameUrls.length) open();
+      };
+      img.src = url;
+    });
+  },
+});

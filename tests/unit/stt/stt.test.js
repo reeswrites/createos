@@ -11,9 +11,9 @@ describe('WordDiffer', () => {
 
   it('commits a word as final after STABLE_AFTER stable repeats', () => {
     const wd = new WordDiffer(3);
-    wd.update(['hello']);            // interim (appears)
-    wd.update(['hello']);            // count 1
-    wd.update(['hello']);            // count 2
+    wd.update(['hello']); // interim (appears)
+    wd.update(['hello']); // count 1
+    wd.update(['hello']); // count 2
     const ev = wd.update(['hello']); // count 3 → final
     expect(ev).toEqual([{ word: 'hello', final: true, index: 0 }]);
     expect(wd.committed).toEqual(['hello']);
@@ -21,8 +21,8 @@ describe('WordDiffer', () => {
 
   it('uses a global monotonic index across committed + frontier', () => {
     const wd = new WordDiffer(1);
-    wd.update(['the']);              // interim the@0
-    wd.update(['the']);              // final the@0 (stableAfter 1)
+    wd.update(['the']); // interim the@0
+    wd.update(['the']); // final the@0 (stableAfter 1)
     const ev = wd.update(['the', 'cat']);
     // 'the' already committed at 0; 'cat' is new frontier at index 1
     expect(ev).toContainEqual({ word: 'cat', final: false, index: 1 });
@@ -48,7 +48,8 @@ describe('WordDiffer', () => {
 
   it('transcript() joins committed + frontier', () => {
     const wd = new WordDiffer(1);
-    wd.update(['a']); wd.update(['a']); // commit a
+    wd.update(['a']);
+    wd.update(['a']); // commit a
     wd.update(['a', 'b']);
     expect(wd.transcript()).toBe('a b');
   });

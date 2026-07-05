@@ -20,13 +20,13 @@ vi.mock('../../../../src/runtime/reset-registry.js', () => ({
 }));
 
 vi.mock('../../../../src/events/bus.js', () => ({
-  notify:            vi.fn(),
-  subscribe:         vi.fn(() => () => {}),
-  registerCommand:   vi.fn(),
-  clearRunScoped:    vi.fn(),
-  registerSource:    vi.fn(),
-  getLastPayload:    vi.fn(),
-  addBusTap:        vi.fn(),
+  notify: vi.fn(),
+  subscribe: vi.fn(() => () => {}),
+  registerCommand: vi.fn(),
+  clearRunScoped: vi.fn(),
+  registerSource: vi.fn(),
+  getLastPayload: vi.fn(),
+  addBusTap: vi.fn(),
 }));
 
 // ── Test stub ─────────────────────────────────────────────────────────────────
@@ -278,7 +278,9 @@ describe('style setters', () => {
 // ── liveness ──────────────────────────────────────────────────────────────────
 
 describe('_registerLive / _releaseLive', () => {
-  beforeEach(() => { vi.clearAllMocks(); });
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
   it('_registerLive calls liveOutput with this', () => {
     const s = make();

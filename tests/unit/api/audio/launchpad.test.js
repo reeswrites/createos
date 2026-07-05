@@ -6,24 +6,64 @@ vi.mock('tone', () => {
       triggerAttackRelease: vi.fn(),
       triggerAttack: vi.fn(),
       triggerRelease: vi.fn(),
-      connect: vi.fn(function () { return this; }),
-      chain: vi.fn(function () { return this; }),
-      toDestination: vi.fn(function () { return this; }),
+      connect: vi.fn(function () {
+        return this;
+      }),
+      chain: vi.fn(function () {
+        return this;
+      }),
+      toDestination: vi.fn(function () {
+        return this;
+      }),
       start: vi.fn(),
       dispose: vi.fn(),
     };
   }
-  const mk = () => vi.fn(function () { return makeNode(); });
+  const mk = () =>
+    vi.fn(function () {
+      return makeNode();
+    });
   return {
     default: {},
-    Synth: mk(), FMSynth: mk(), AMSynth: mk(), MonoSynth: mk(), DuoSynth: mk(),
-    PluckSynth: mk(), MembraneSynth: mk(), MetalSynth: mk(), NoiseSynth: mk(),
-    PolySynth: vi.fn(function () { return makeNode(); }),
-    Sampler: vi.fn(function (o) { const n = makeNode(); o?.onload?.(); n.buffer = { duration: 4 }; return n; }),
-    Player: vi.fn(function (o) { const n = makeNode(); n.start = vi.fn(); o?.onload?.(); n.buffer = { duration: 8 }; return n; }),
-    GrainPlayer: vi.fn(function (o) { const n = makeNode(); n.start = vi.fn(); o?.onload?.(); n.buffer = { duration: 8 }; return n; }),
-    Gain: mk(), Reverb: mk(), Chorus: mk(), FeedbackDelay: mk(),
-    Distortion: mk(), Filter: mk(), Compressor: mk(),
+    Synth: mk(),
+    FMSynth: mk(),
+    AMSynth: mk(),
+    MonoSynth: mk(),
+    DuoSynth: mk(),
+    PluckSynth: mk(),
+    MembraneSynth: mk(),
+    MetalSynth: mk(),
+    NoiseSynth: mk(),
+    PolySynth: vi.fn(function () {
+      return makeNode();
+    }),
+    Sampler: vi.fn(function (o) {
+      const n = makeNode();
+      o?.onload?.();
+      n.buffer = { duration: 4 };
+      return n;
+    }),
+    Player: vi.fn(function (o) {
+      const n = makeNode();
+      n.start = vi.fn();
+      o?.onload?.();
+      n.buffer = { duration: 8 };
+      return n;
+    }),
+    GrainPlayer: vi.fn(function (o) {
+      const n = makeNode();
+      n.start = vi.fn();
+      o?.onload?.();
+      n.buffer = { duration: 8 };
+      return n;
+    }),
+    Gain: mk(),
+    Reverb: mk(),
+    Chorus: mk(),
+    FeedbackDelay: mk(),
+    Distortion: mk(),
+    Filter: mk(),
+    Compressor: mk(),
     Frequency: vi.fn(() => ({ toNote: () => 'C4' })),
     now: () => 0,
     getTransport: () => ({ bpm: { value: 120 }, start: vi.fn(), stop: vi.fn(), pause: vi.fn() }),
@@ -117,7 +157,9 @@ describe('Launchpad bindings', () => {
   it('bindAction fires a named bus event with cell coords', () => {
     const lp = new Launchpad({ rows: 4, cols: 4 });
     let got = null;
-    on('zap').do((p) => { got = p; });
+    on('zap').do((p) => {
+      got = p;
+    });
     lp.bindAction('1,1', 'zap');
     lp._strike(5, 'pad'); // 1*4+1 = 5
     expect(got).toMatchObject({ cell: 5, row: 1, col: 1 });
@@ -126,7 +168,9 @@ describe('Launchpad bindings', () => {
   it('a silent action suppresses sound but fires the event', () => {
     const lp = new Launchpad({ rows: 2, cols: 2 });
     let fired = false;
-    on('q').do(() => { fired = true; });
+    on('q').do(() => {
+      fired = true;
+    });
     lp.bindAction(0, 'q', { silent: true });
     lp._strike(0, 'pad');
     const h = lp._ensureDefault();

@@ -6,19 +6,46 @@ import { buildFrameStrip, buildTransport } from '../../../../src/api/widgets/wid
 function fakeController() {
   const listeners = {};
   return {
-    count: 3, index: 0, fps: 8, onion: false, isPlaying: false,
+    count: 3,
+    index: 0,
+    fps: 8,
+    onion: false,
+    isPlaying: false,
     calls: [],
-    on(evt, fn) { (listeners[evt] ??= []).push(fn); },
-    emit(evt, p) { (listeners[evt] ?? []).forEach(fn => fn(p)); },
-    drawThumb(tc) { tc.width = 10; tc.height = 10; },
-    add()         { this.calls.push('add'); },
-    duplicate()   { this.calls.push('duplicate'); },
-    clearCurrent(){ this.calls.push('clear'); },
-    remove()      { this.calls.push('remove'); },
-    move(d)       { this.calls.push('move:' + d); },
-    go(i)         { this.calls.push('go:' + i); },
-    play(f)       { this.calls.push('play:' + f); },
-    stop()        { this.calls.push('stop'); },
+    on(evt, fn) {
+      (listeners[evt] ??= []).push(fn);
+    },
+    emit(evt, p) {
+      (listeners[evt] ?? []).forEach((fn) => fn(p));
+    },
+    drawThumb(tc) {
+      tc.width = 10;
+      tc.height = 10;
+    },
+    add() {
+      this.calls.push('add');
+    },
+    duplicate() {
+      this.calls.push('duplicate');
+    },
+    clearCurrent() {
+      this.calls.push('clear');
+    },
+    remove() {
+      this.calls.push('remove');
+    },
+    move(d) {
+      this.calls.push('move:' + d);
+    },
+    go(i) {
+      this.calls.push('go:' + i);
+    },
+    play(f) {
+      this.calls.push('play:' + f);
+    },
+    stop() {
+      this.calls.push('stop');
+    },
   };
 }
 
@@ -36,8 +63,10 @@ describe('buildFrameStrip', () => {
     const ctrl = fakeController();
     const { el } = buildFrameStrip(ctrl);
     const btns = el.querySelectorAll('button');
-    btns.forEach(b => b.dispatchEvent(new Event('click')));
-    expect(ctrl.calls).toEqual(expect.arrayContaining(['add', 'duplicate', 'clear', 'remove', 'move:-1', 'move:1']));
+    btns.forEach((b) => b.dispatchEvent(new Event('click')));
+    expect(ctrl.calls).toEqual(
+      expect.arrayContaining(['add', 'duplicate', 'clear', 'remove', 'move:-1', 'move:1']),
+    );
   });
 
   it('refreshes thumbnails when the model emits mutate/select', () => {
@@ -67,6 +96,6 @@ describe('buildTransport', () => {
     input.dispatchEvent(new Event('change'));
     expect(ctrl.fps).toBe(24);
     expect(onFpsChange).toHaveBeenCalledWith(24);
-    expect([...row.querySelectorAll('button')].some(b => b.textContent === 'Code')).toBe(true);
+    expect([...row.querySelectorAll('button')].some((b) => b.textContent === 'Code')).toBe(true);
   });
 });

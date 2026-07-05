@@ -7,14 +7,23 @@ vi.mock('tone', () => {
       triggerAttackRelease: vi.fn(),
       triggerAttack: vi.fn(),
       triggerRelease: vi.fn(),
-      connect: vi.fn(function () { return this; }),
-      chain: vi.fn(function () { return this; }),
-      toDestination: vi.fn(function () { return this; }),
+      connect: vi.fn(function () {
+        return this;
+      }),
+      chain: vi.fn(function () {
+        return this;
+      }),
+      toDestination: vi.fn(function () {
+        return this;
+      }),
       start: vi.fn(),
       dispose: vi.fn(),
     };
   }
-  const mk = (tag) => vi.fn(function () { return makeNode(tag); });
+  const mk = (tag) =>
+    vi.fn(function () {
+      return makeNode(tag);
+    });
   return {
     default: {},
     start: vi.fn(),
@@ -27,7 +36,9 @@ vi.mock('tone', () => {
     MembraneSynth: mk('MembraneSynth'),
     MetalSynth: mk('MetalSynth'),
     NoiseSynth: mk('NoiseSynth'),
-    PolySynth: vi.fn(function () { return makeNode('Poly'); }),
+    PolySynth: vi.fn(function () {
+      return makeNode('Poly');
+    }),
     Gain: mk('Gain'),
     Reverb: mk('Reverb'),
     Chorus: mk('Chorus'),
@@ -38,7 +49,10 @@ vi.mock('tone', () => {
   };
 });
 
-import { openSynthDesigner, _resetDesignerForTesting } from '../../../../src/api/audio/synth-designer.js';
+import {
+  openSynthDesigner,
+  _resetDesignerForTesting,
+} from '../../../../src/api/audio/synth-designer.js';
 import { Voice, _resetVoicesForTesting } from '../../../../src/api/audio/voice.js';
 
 function makeWmWindow(id) {

@@ -28,15 +28,45 @@ const KNOWN_GLOBALS = new Set(
 
 // Standard JS built-ins + DOM APIs + patterns OK in snippets (not createOS APIs).
 const JS_BUILTINS = new Set([
-  'Math', 'Array', 'Date', 'JSON', 'Object', 'console', 'document', 'window',
-  'setInterval', 'setTimeout', 'clearInterval', 'clearTimeout',
-  'Float32Array', 'Uint8Array', 'Uint8ClampedArray', 'Int16Array',
-  'Image', 'Promise', 'fetch', 'URL', 'Blob',
-  'performance', 'navigator', 'AudioContext', 'Tone',
-  'Symbol', 'Map', 'Set', 'WeakMap', 'WeakSet',
-  'parseInt', 'parseFloat', 'isNaN', 'isFinite', 'decodeURIComponent',
-  'requestAnimationFrame', 'cancelAnimationFrame',
-  'Event', 'EventTarget',
+  'Math',
+  'Array',
+  'Date',
+  'JSON',
+  'Object',
+  'console',
+  'document',
+  'window',
+  'setInterval',
+  'setTimeout',
+  'clearInterval',
+  'clearTimeout',
+  'Float32Array',
+  'Uint8Array',
+  'Uint8ClampedArray',
+  'Int16Array',
+  'Image',
+  'Promise',
+  'fetch',
+  'URL',
+  'Blob',
+  'performance',
+  'navigator',
+  'AudioContext',
+  'Tone',
+  'Symbol',
+  'Map',
+  'Set',
+  'WeakMap',
+  'WeakSet',
+  'parseInt',
+  'parseFloat',
+  'isNaN',
+  'isFinite',
+  'decodeURIComponent',
+  'requestAnimationFrame',
+  'cancelAnimationFrame',
+  'Event',
+  'EventTarget',
   // Commonly used in snippet examples as local variable names for results
   'Serial',
 ]);
@@ -46,11 +76,36 @@ const JS_BUILTINS = new Set([
 // — only add when the snippet structure genuinely prevents local-var detection.
 const ALLOWED_SNIPPET_LOCALS = new Set([
   // Frequently used as loop vars or destructured locals
-  'i', 'j', 'k', 'n', 'x', 'y', 'z', 'w', 'h', 'r', 's', 't', 'v',
+  'i',
+  'j',
+  'k',
+  'n',
+  'x',
+  'y',
+  'z',
+  'w',
+  'h',
+  'r',
+  's',
+  't',
+  'v',
   // Common result aliases in multi-line snippets
-  'p', 'c', 'm', 'g', 'b', 'f', 'e', 'd', 'l', 'a', 'u',
+  'p',
+  'c',
+  'm',
+  'g',
+  'b',
+  'f',
+  'e',
+  'd',
+  'l',
+  'a',
+  'u',
   // Params in callback bodies
-  'pts', 'col', 'val', 'idx',
+  'pts',
+  'col',
+  'val',
+  'idx',
   // ADR 040: the conventional example drawing surface (snippets use `canvas.*`
   // against an implicit `const canvas = new Canvas()` the learner adds).
   'canvas',
@@ -110,7 +165,9 @@ const snippets = TOOLKIT_CATEGORIES.flatMap((cat) =>
 
 describe('completion snippet coherence — API identifier gate', () => {
   it('every category has at least one item with a code snippet', () => {
-    const missing = TOOLKIT_CATEGORIES.filter((c) => !(c.items ?? []).some((i) => i.code)).map((c) => c.name);
+    const missing = TOOLKIT_CATEGORIES.filter((c) => !(c.items ?? []).some((i) => i.code)).map(
+      (c) => c.name,
+    );
     // Some categories intentionally have no code (e.g. header-only) — only warn
     if (missing.length > 0) {
       console.warn('[completion-coherence] categories with no code snippets:', missing.join(', '));
@@ -154,15 +211,17 @@ describe('completion snippet coherence — API identifier gate', () => {
         if (KNOWN_GLOBALS.has(name)) continue;
         if (JS_BUILTINS.has(name)) continue;
         if (ALLOWED_SNIPPET_LOCALS.has(name)) continue;
-        violations.push(`[${cat}] "${label}": unknown identifier '${name}' in: ${code.slice(0, 80).replace(/\n/g, '↵')}`);
+        violations.push(
+          `[${cat}] "${label}": unknown identifier '${name}' in: ${code.slice(0, 80).replace(/\n/g, '↵')}`,
+        );
       }
     }
 
     expect(
       violations,
       `Snippets reference unknown window globals. Either add to KNOWN_GLOBALS (if it's a real API), ` +
-      `JS_BUILTINS (if it's a JS built-in), or ALLOWED_SNIPPET_LOCALS (if it's a local result alias):\n` +
-      violations.join('\n'),
+        `JS_BUILTINS (if it's a JS built-in), or ALLOWED_SNIPPET_LOCALS (if it's a local result alias):\n` +
+        violations.join('\n'),
     ).toEqual([]);
   });
 });

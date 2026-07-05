@@ -4,7 +4,7 @@ import { describe, test, expect, beforeEach, vi } from 'vitest';
 // Minimal mock that captures calls without Web Audio.
 
 const _disposed = [];
-const _chains   = [];
+const _chains = [];
 
 function makeMockNode(name = 'Node') {
   return {
@@ -13,49 +13,129 @@ function makeMockNode(name = 'Node') {
     loop: false,
     buffer: { duration: 120 },
     _connections: [],
-    toDestination() { this._connections.push('destination'); return this; },
-    disconnect() { this._connections = []; return this; },
-    chain(...args) { this._connections = [...args, 'destination']; _chains.push(args); return this; },
-    connect(node) { this._connections.push(node); return this; },
-    start() { return this; },
-    stop() { return this; },
-    dispose() { _disposed.push(name); return this; },
+    toDestination() {
+      this._connections.push('destination');
+      return this;
+    },
+    disconnect() {
+      this._connections = [];
+      return this;
+    },
+    chain(...args) {
+      this._connections = [...args, 'destination'];
+      _chains.push(args);
+      return this;
+    },
+    connect(node) {
+      this._connections.push(node);
+      return this;
+    },
+    start() {
+      return this;
+    },
+    stop() {
+      return this;
+    },
+    dispose() {
+      _disposed.push(name);
+      return this;
+    },
     loaded: Promise.resolve(),
   };
 }
 
 vi.mock('tone', () => {
   let _nowVal = 0;
-  const Player      = vi.fn(function() { return makeMockNode('Player'); });
-  const Filter      = vi.fn(function() { return makeMockNode('Filter'); });
-  const Reverb      = vi.fn(function() { return makeMockNode('Reverb'); });
-  const EQ3         = vi.fn(function() { return makeMockNode('EQ3'); });
-  const FeedbackDelay = vi.fn(function() { return makeMockNode('FeedbackDelay'); });
-  const PitchShift  = vi.fn(function() { return makeMockNode('PitchShift'); });
-  const Distortion  = vi.fn(function() { return makeMockNode('Distortion'); });
-  const Analyser    = vi.fn(function() { return { getValue: () => new Float32Array(32).fill(-80) }; });
-  const Meter       = vi.fn(function() { return makeMockNode('Meter'); });
-  const Synth       = vi.fn(function() { return { ...makeMockNode('Synth'), triggerAttackRelease: vi.fn() }; });
-  const PolySynth   = vi.fn(function() { return { ...makeMockNode('PolySynth'), triggerAttackRelease: vi.fn() }; });
+  const Player = vi.fn(function () {
+    return makeMockNode('Player');
+  });
+  const Filter = vi.fn(function () {
+    return makeMockNode('Filter');
+  });
+  const Reverb = vi.fn(function () {
+    return makeMockNode('Reverb');
+  });
+  const EQ3 = vi.fn(function () {
+    return makeMockNode('EQ3');
+  });
+  const FeedbackDelay = vi.fn(function () {
+    return makeMockNode('FeedbackDelay');
+  });
+  const PitchShift = vi.fn(function () {
+    return makeMockNode('PitchShift');
+  });
+  const Distortion = vi.fn(function () {
+    return makeMockNode('Distortion');
+  });
+  const Analyser = vi.fn(function () {
+    return { getValue: () => new Float32Array(32).fill(-80) };
+  });
+  const Meter = vi.fn(function () {
+    return makeMockNode('Meter');
+  });
+  const Synth = vi.fn(function () {
+    return { ...makeMockNode('Synth'), triggerAttackRelease: vi.fn() };
+  });
+  const PolySynth = vi.fn(function () {
+    return { ...makeMockNode('PolySynth'), triggerAttackRelease: vi.fn() };
+  });
   return {
     default: {},
-    Player, Filter, Reverb, EQ3, FeedbackDelay, PitchShift, Distortion,
-    Analyser, Meter, Synth, PolySynth,
-    FMSynth: Synth, AMSynth: Synth, PluckSynth: Synth, MetalSynth: Synth,
-    NoiseSynth: Synth, MembraneSynth: Synth, Sampler: Synth,
-    UserMedia: vi.fn(function() { return { open: vi.fn().mockResolvedValue(undefined), ...makeMockNode('UserMedia') }; }),
-    Chorus:     vi.fn(function() { return { ...makeMockNode('Chorus'),     start: vi.fn() }; }),
-    AutoFilter: vi.fn(function() { return { ...makeMockNode('AutoFilter'), start: vi.fn() }; }),
-    Tremolo:    vi.fn(function() { return { ...makeMockNode('Tremolo'),    start: vi.fn() }; }),
-    Vibrato:    vi.fn(function() { return makeMockNode('Vibrato'); }),
-    Compressor: vi.fn(function() { return makeMockNode('Compressor'); }),
-    Loop:       vi.fn(function(_fn) { return { start: vi.fn(), stop: vi.fn(), dispose: vi.fn() }; }),
-    Sequence:   vi.fn(function() { return { dispose: vi.fn() }; }),
-    LFO:        vi.fn(function() { return { ...makeMockNode('LFO'), start: vi.fn() }; }),
-    AutoWah:    vi.fn(function() { return makeMockNode('AutoWah'); }),
-    Phaser:     vi.fn(function() { return makeMockNode('Phaser'); }),
+    Player,
+    Filter,
+    Reverb,
+    EQ3,
+    FeedbackDelay,
+    PitchShift,
+    Distortion,
+    Analyser,
+    Meter,
+    Synth,
+    PolySynth,
+    FMSynth: Synth,
+    AMSynth: Synth,
+    PluckSynth: Synth,
+    MetalSynth: Synth,
+    NoiseSynth: Synth,
+    MembraneSynth: Synth,
+    Sampler: Synth,
+    UserMedia: vi.fn(function () {
+      return { open: vi.fn().mockResolvedValue(undefined), ...makeMockNode('UserMedia') };
+    }),
+    Chorus: vi.fn(function () {
+      return { ...makeMockNode('Chorus'), start: vi.fn() };
+    }),
+    AutoFilter: vi.fn(function () {
+      return { ...makeMockNode('AutoFilter'), start: vi.fn() };
+    }),
+    Tremolo: vi.fn(function () {
+      return { ...makeMockNode('Tremolo'), start: vi.fn() };
+    }),
+    Vibrato: vi.fn(function () {
+      return makeMockNode('Vibrato');
+    }),
+    Compressor: vi.fn(function () {
+      return makeMockNode('Compressor');
+    }),
+    Loop: vi.fn(function (_fn) {
+      return { start: vi.fn(), stop: vi.fn(), dispose: vi.fn() };
+    }),
+    Sequence: vi.fn(function () {
+      return { dispose: vi.fn() };
+    }),
+    LFO: vi.fn(function () {
+      return { ...makeMockNode('LFO'), start: vi.fn() };
+    }),
+    AutoWah: vi.fn(function () {
+      return makeMockNode('AutoWah');
+    }),
+    Phaser: vi.fn(function () {
+      return makeMockNode('Phaser');
+    }),
     now: () => _nowVal,
-    _setNow: (v) => { _nowVal = v; },
+    _setNow: (v) => {
+      _nowVal = v;
+    },
     start: vi.fn().mockResolvedValue(undefined),
     getDestination: () => ({ volume: { value: 0 } }),
     getTransport: () => ({
@@ -266,7 +346,9 @@ describe('AudioFile onTime', () => {
     file.onTime(1, fn);
     file.play();
     ToneMock._setNow(2);
-    file._tick(); file._tick(); file._tick();
+    file._tick();
+    file._tick();
+    file._tick();
     expect(fn).toHaveBeenCalledOnce();
   });
 

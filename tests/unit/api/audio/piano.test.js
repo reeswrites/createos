@@ -6,26 +6,68 @@ vi.mock('tone', () => {
       triggerAttack: vi.fn(),
       triggerRelease: vi.fn(),
       triggerAttackRelease: vi.fn(),
-      connect: vi.fn(function () { return this; }),
-      chain: vi.fn(function () { return this; }),
-      toDestination: vi.fn(function () { return this; }),
+      connect: vi.fn(function () {
+        return this;
+      }),
+      chain: vi.fn(function () {
+        return this;
+      }),
+      toDestination: vi.fn(function () {
+        return this;
+      }),
       start: vi.fn(),
       dispose: vi.fn(),
       volume: { value: 0 },
     };
   }
-  const mk = () => vi.fn(function () { return makeNode(); });
+  const mk = () =>
+    vi.fn(function () {
+      return makeNode();
+    });
   return {
     default: {},
-    Synth: mk(), FMSynth: mk(), AMSynth: mk(), MonoSynth: mk(), DuoSynth: mk(),
-    PluckSynth: mk(), MembraneSynth: mk(), MetalSynth: mk(), NoiseSynth: mk(),
-    PolySynth: vi.fn(function () { return makeNode(); }),
-    Sampler: vi.fn(function (o) { const n = makeNode(); o?.onload?.(); n.buffer = { duration: 4 }; return n; }),
-    Player: vi.fn(function (o) { const n = makeNode(); n.start = vi.fn(); o?.onload?.(); n.buffer = { duration: 8 }; return n; }),
-    GrainPlayer: vi.fn(function (o) { const n = makeNode(); n.start = vi.fn(); o?.onload?.(); n.buffer = { duration: 8 }; return n; }),
-    Gain: mk(), Reverb: mk(), Chorus: mk(), FeedbackDelay: mk(),
-    Distortion: mk(), Filter: mk(), Compressor: mk(),
-    Sequence: vi.fn(function () { return { start: vi.fn(), stop: vi.fn(), dispose: vi.fn() }; }),
+    Synth: mk(),
+    FMSynth: mk(),
+    AMSynth: mk(),
+    MonoSynth: mk(),
+    DuoSynth: mk(),
+    PluckSynth: mk(),
+    MembraneSynth: mk(),
+    MetalSynth: mk(),
+    NoiseSynth: mk(),
+    PolySynth: vi.fn(function () {
+      return makeNode();
+    }),
+    Sampler: vi.fn(function (o) {
+      const n = makeNode();
+      o?.onload?.();
+      n.buffer = { duration: 4 };
+      return n;
+    }),
+    Player: vi.fn(function (o) {
+      const n = makeNode();
+      n.start = vi.fn();
+      o?.onload?.();
+      n.buffer = { duration: 8 };
+      return n;
+    }),
+    GrainPlayer: vi.fn(function (o) {
+      const n = makeNode();
+      n.start = vi.fn();
+      o?.onload?.();
+      n.buffer = { duration: 8 };
+      return n;
+    }),
+    Gain: mk(),
+    Reverb: mk(),
+    Chorus: mk(),
+    FeedbackDelay: mk(),
+    Distortion: mk(),
+    Filter: mk(),
+    Compressor: mk(),
+    Sequence: vi.fn(function () {
+      return { start: vi.fn(), stop: vi.fn(), dispose: vi.fn() };
+    }),
     Frequency: vi.fn(() => ({ toNote: () => 'C4' })),
     now: () => 0,
     getDestination: vi.fn(() => makeNode()),
@@ -40,7 +82,7 @@ vi.mock('../../../../src/api/audio/mixer.js', () => ({
 
 import { Piano, cleanupPianos } from '../../../../src/api/audio/piano.js';
 import { connectSurfaceStrip, releaseStrip } from '../../../../src/api/audio/mixer.js';
-import { Voice, _resetVoicesForTesting } from '../../../../src/api/audio/voice.js';
+import { _resetVoicesForTesting } from '../../../../src/api/audio/voice.js';
 import { on } from '../../../../src/events/index.js';
 
 let _n = 0;
@@ -104,7 +146,9 @@ describe('Piano per-key bindings', () => {
   it('a bound action fires a named bus event on the key', () => {
     const p = new Piano();
     let got = null;
-    on('drop').do((e) => { got = e; });
+    on('drop').do((e) => {
+      got = e;
+    });
     p.bindAction('E4', 'drop');
     p._triggerAttack('E4', 'kbd');
     expect(got).toMatchObject({ note: 'E4' });
@@ -113,7 +157,9 @@ describe('Piano per-key bindings', () => {
   it('a silent action suppresses the preset but fires the event', () => {
     const p = new Piano();
     let fired = false;
-    on('q').do(() => { fired = true; });
+    on('q').do(() => {
+      fired = true;
+    });
     p.bindAction('G4', 'q', { silent: true });
     p._triggerAttack('G4', 'kbd');
     expect(p._synth.triggerAttack).not.toHaveBeenCalled();

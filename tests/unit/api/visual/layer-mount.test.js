@@ -1,7 +1,9 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { mountLayerCanvas } from '../../../../src/api/visual/layer.js';
 
-afterEach(() => { document.body.innerHTML = ''; });
+afterEach(() => {
+  document.body.innerHTML = '';
+});
 
 describe('mountLayerCanvas', () => {
   it('creates a canvas, styles it as an absolute fill, and appends to the container', () => {

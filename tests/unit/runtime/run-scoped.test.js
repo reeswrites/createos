@@ -19,8 +19,8 @@ describe('runScoped — owner filtering', () => {
     runScoped({ onStop: () => stops.push('B') });
 
     runResetHandlers(2);
-    expect(stops).toEqual(['B']);        // only B's owner matched
-    expect(_scopedCount()).toBe(1);      // A survives
+    expect(stops).toEqual(['B']); // only B's owner matched
+    expect(_scopedCount()).toBe(1); // A survives
 
     runResetHandlers(1);
     expect(stops).toEqual(['B', 'A']);
@@ -36,8 +36,12 @@ describe('runScoped — owner filtering', () => {
   it('null owner (no editor context) is disposed by any reset', () => {
     window.__ar_active_editor_id = undefined;
     let stopped = false;
-    runScoped({ onStop: () => { stopped = true; } });
-    runResetHandlers(99);                // unrelated editor id
+    runScoped({
+      onStop: () => {
+        stopped = true;
+      },
+    });
+    runResetHandlers(99); // unrelated editor id
     expect(stopped).toBe(true);
   });
 });
@@ -46,7 +50,11 @@ describe('dispose — idempotent, one teardown path', () => {
   it('onStop runs exactly once across double dispose + reset', () => {
     window.__ar_active_editor_id = 1;
     let count = 0;
-    const h = runScoped({ onStop: () => { count++; } });
+    const h = runScoped({
+      onStop: () => {
+        count++;
+      },
+    });
     h.dispose();
     h.dispose();
     runResetHandlers(1);
@@ -61,13 +69,13 @@ describe('runScopedOutput — keep-alive membership', () => {
     expect(liveCount()).toBe(0);
 
     const out = runScopedOutput({ onStop() {} });
-    expect(liveCount()).toBe(1);         // output joined keep-alive
+    expect(liveCount()).toBe(1); // output joined keep-alive
 
     runScoped({ onStop() {} });
-    expect(liveCount()).toBe(1);         // core variant did NOT join
+    expect(liveCount()).toBe(1); // core variant did NOT join
 
     out.dispose();
-    expect(liveCount()).toBe(0);         // released in the same idempotent step
+    expect(liveCount()).toBe(0); // released in the same idempotent step
   });
 
   it('caller onStop runs before keep-alive release', () => {

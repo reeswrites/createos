@@ -231,9 +231,7 @@ describe('vision_on_gesture', () => {
   });
   test('empty body', () => {
     const b = makeBlock({ GESTURE: 'Open_Palm' });
-    expect(gen('vision_on_gesture', b)).toBe(
-      'vision.onGesture("Open_Palm", () => {\n});\n',
-    );
+    expect(gen('vision_on_gesture', b)).toBe('vision.onGesture("Open_Palm", () => {\n});\n');
   });
 });
 

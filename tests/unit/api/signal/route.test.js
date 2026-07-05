@@ -12,8 +12,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 let _audioLevel = 0;
 vi.mock('../../../../src/api/audio/audio.js', () => ({
   audio: {
-    get level() { return _audioLevel; },
-    get fft()   { return { fft: [0.1, 0.2, 0.3], getValue: () => [0.1, 0.2, 0.3] }; },
+    get level() {
+      return _audioLevel;
+    },
+    get fft() {
+      return { fft: [0.1, 0.2, 0.3], getValue: () => [0.1, 0.2, 0.3] };
+    },
   },
 }));
 
@@ -21,8 +25,12 @@ vi.mock('../../../../src/api/audio/audio.js', () => ({
 vi.mock('../../../../src/api/signal/video-signal.js', () => ({
   VideoSignalAPI: {
     signal: (_src, _opts) => ({
-      get brightness() { return 0.5; },
-      get motion()     { return 0.3; },
+      get brightness() {
+        return 0.5;
+      },
+      get motion() {
+        return 0.3;
+      },
     }),
   },
 }));
@@ -43,38 +51,76 @@ vi.mock('../../../../src/api/visual/render-pipeline.js', () => {
   const pipelineObj = {
     _stages,
     _stageArgCache,
-    _rafId: null,  // null until show()/layer() called = not started
+    _rafId: null, // null until show()/layer() called = not started
     _id: 'pipe-1',
-    show:    vi.fn(function() { this._rafId = 1; return this; }),
-    layer:   vi.fn(function() { this._rafId = 1; return this; }),
-    start:   vi.fn(function() { this._rafId = 1; return this; }),
-    stop:    vi.fn(),
-    tint:    vi.fn(function()  { return this; }),
-    negative:vi.fn(function()  { return this; }),
-    solarize:vi.fn(function()  { return this; }),
-    posterize:vi.fn(function() { return this; }),
-    duotone: vi.fn(function()  { return this; }),
-    grain:   vi.fn(function()  { return this; }),
-    strobe:  vi.fn(function()  { return this; }),
-    blur:    vi.fn(function()  { return this; }),
-    hue:     vi.fn(function()  { return this; }),
-    ascii:   vi.fn(function()  { return this; }),
-    pixelate:vi.fn(function()  { return this; }),
-    fx:      vi.fn(function()  { return this; }),
-    glshader:vi.fn(function()  { return this; }),
-    _addNamedStage:    vi.fn(function(type, args) { _stageArgCache.set(type, args); return {}; }),
+    show: vi.fn(function () {
+      this._rafId = 1;
+      return this;
+    }),
+    layer: vi.fn(function () {
+      this._rafId = 1;
+      return this;
+    }),
+    start: vi.fn(function () {
+      this._rafId = 1;
+      return this;
+    }),
+    stop: vi.fn(),
+    tint: vi.fn(function () {
+      return this;
+    }),
+    negative: vi.fn(function () {
+      return this;
+    }),
+    solarize: vi.fn(function () {
+      return this;
+    }),
+    posterize: vi.fn(function () {
+      return this;
+    }),
+    duotone: vi.fn(function () {
+      return this;
+    }),
+    grain: vi.fn(function () {
+      return this;
+    }),
+    strobe: vi.fn(function () {
+      return this;
+    }),
+    blur: vi.fn(function () {
+      return this;
+    }),
+    hue: vi.fn(function () {
+      return this;
+    }),
+    ascii: vi.fn(function () {
+      return this;
+    }),
+    pixelate: vi.fn(function () {
+      return this;
+    }),
+    fx: vi.fn(function () {
+      return this;
+    }),
+    glshader: vi.fn(function () {
+      return this;
+    }),
+    _addNamedStage: vi.fn(function (type, args) {
+      _stageArgCache.set(type, args);
+      return {};
+    }),
     _removeNamedStage: vi.fn(),
     _toggleNamedStage: vi.fn(),
     _clearNamedStages: vi.fn(),
   };
 
   return {
-    pipe:   vi.fn(() => pipelineObj),
+    pipe: vi.fn(() => pipelineObj),
     Source: Object.freeze({
       camera: Object.freeze({ _src: 'camera' }),
-      mic:    Object.freeze({ _src: 'mic' }),
+      mic: Object.freeze({ _src: 'mic' }),
     }),
-    sourceKind:  (x) => (x && typeof x === 'object' && typeof x._src === 'string') ? x._src : null,
+    sourceKind: (x) => (x && typeof x === 'object' && typeof x._src === 'string' ? x._src : null),
     sourceField: (x) => x?.field,
     __pipelineObj: pipelineObj,
   };
@@ -88,7 +134,9 @@ vi.mock('../../../../src/runtime/keep-alive.js', () => ({
 // reset-registry stub — capture the onReset callback
 let _onResetCb = null;
 vi.mock('../../../../src/runtime/reset-registry.js', () => ({
-  onReset: vi.fn(fn => { _onResetCb = fn; }),
+  onReset: vi.fn((fn) => {
+    _onResetCb = fn;
+  }),
 }));
 
 // event bus stub
@@ -106,7 +154,7 @@ vi.mock('../../../../src/events/bus.js', () => ({
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function fire(event, payload = {}) {
-  for (const { fn } of (_subscribers.get(event) ?? [])) fn(payload);
+  for (const { fn } of _subscribers.get(event) ?? []) fn(payload);
 }
 
 // Shader stub implementing the ShaderLayerBase interface: setUniform/_uniforms/_custom.
@@ -124,7 +172,10 @@ function makeShaderStub(id = 'test-shader') {
       if (name === 'uCustom' || name === 'custom') {
         const v = { x: 0, y: 0, z: 0, w: 0, ...val };
         _uniforms.uCustom = v;
-        _custom[0] = v.x; _custom[1] = v.y; _custom[2] = v.z; _custom[3] = v.w;
+        _custom[0] = v.x;
+        _custom[1] = v.y;
+        _custom[2] = v.z;
+        _custom[3] = v.w;
       } else {
         _uniforms[name] = val;
       }
@@ -154,10 +205,11 @@ beforeEach(async () => {
 
   vi.resetModules();
   // Re-import after module reset so each test starts fresh
-  ({ route, getLiveRoutes }            = await import('../../../../src/api/signal/route.js'));
-  ({ liveOutput }                      = await import('../../../../src/runtime/keep-alive.js'));
-  ({ __pipelineObj: _pipelineObj, Source } = await import('../../../../src/api/visual/render-pipeline.js'));
-  ({ notify }                          = await import('../../../../src/events/bus.js'));
+  ({ route, getLiveRoutes } = await import('../../../../src/api/signal/route.js'));
+  ({ liveOutput } = await import('../../../../src/runtime/keep-alive.js'));
+  ({ __pipelineObj: _pipelineObj, Source } =
+    await import('../../../../src/api/visual/render-pipeline.js'));
+  ({ notify } = await import('../../../../src/events/bus.js'));
   // Re-import onReset mock to capture new callback
   await import('../../../../src/runtime/reset-registry.js');
 });
@@ -241,16 +293,16 @@ describe('transform chain', () => {
 
   it('filter() swallows values not matching predicate', () => {
     const r = route(() => 0);
-    r.filter(v => v > 0.5);
+    r.filter((v) => v > 0.5);
     r._eval(0.3);
     // SKIP is the internal sentinel — to() would not write this
     // We verify by checking the sink is not called
     const writes = [];
-    r.to(v => writes.push(v));
+    r.to((v) => writes.push(v));
     fire('does_not_matter'); // continuous source — need RAF tick
     // For a fn-source route, just test _eval directly
     const r2 = route(() => 0);
-    r2.filter(v => v > 0.5);
+    r2.filter((v) => v > 0.5);
     // eval 0.3 → SKIP (not undefined, not a number)
     const result = r2._eval(0.3);
     expect(typeof result).toBe('symbol'); // SKIP sentinel
@@ -318,65 +370,75 @@ describe('structural guards', () => {
 describe('sink resolution', () => {
   it('fn sink: writes value directly', () => {
     const writes = [];
-    route(() => 0.7).to(v => writes.push(v));
+    route(() => 0.7).to((v) => writes.push(v));
     // Continuous source — tick via RAF mock
     // setUp fires RAF immediately (16ms setTimeout in setup.js)
-    return new Promise(resolve => setTimeout(() => {
-      expect(writes.length).toBeGreaterThan(0);
-      expect(writes[0]).toBeCloseTo(0.7);
-      resolve();
-    }, 50));
+    return new Promise((resolve) =>
+      setTimeout(() => {
+        expect(writes.length).toBeGreaterThan(0);
+        expect(writes[0]).toBeCloseTo(0.7);
+        resolve();
+      }, 50),
+    );
   });
 
   it('string sink: emits bus event', async () => {
     route(() => 42).to('test:event');
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, 50));
     expect(notify).toHaveBeenCalledWith('test:event', expect.objectContaining({ value: 42 }));
   });
 
   it('Tone.Signal sink: writes .value directly', () => {
     const param = { value: 0 };
     route(() => 0.5).to(param);
-    return new Promise(resolve => setTimeout(() => {
-      expect(param.value).toBeCloseTo(0.5);
-      resolve();
-    }, 50));
+    return new Promise((resolve) =>
+      setTimeout(() => {
+        expect(param.value).toBeCloseTo(0.5);
+        resolve();
+      }, 50),
+    );
   });
 
   it('Tone.Signal with {ramp:ms}: calls .rampTo', () => {
     const param = { value: 0, rampTo: vi.fn() };
     route(() => 0.5).to(param, { ramp: 100 });
-    return new Promise(resolve => setTimeout(() => {
-      expect(param.rampTo).toHaveBeenCalledWith(0.5, 0.1);
-      resolve();
-    }, 50));
+    return new Promise((resolve) =>
+      setTimeout(() => {
+        expect(param.rampTo).toHaveBeenCalledWith(0.5, 0.1);
+        resolve();
+      }, 50),
+    );
   });
 
   it('shader+path sink: setUniform stores value in _uniforms', () => {
     const shader = makeShaderStub();
     route(() => 0.5).to(shader, 'uColor');
-    return new Promise(resolve => setTimeout(() => {
-      // Non-uCustom names are stored in _uniforms (fwd-compat storage)
-      expect(shader._uniforms.uColor).toBe(0.5);
-      resolve();
-    }, 50));
+    return new Promise((resolve) =>
+      setTimeout(() => {
+        // Non-uCustom names are stored in _uniforms (fwd-compat storage)
+        expect(shader._uniforms.uColor).toBe(0.5);
+        resolve();
+      }, 50),
+    );
   });
 
   it('shader+dotted path: RMW swizzle writes to _custom and _uniforms', () => {
     const shader = makeShaderStub();
     shader.setUniform('uCustom', { x: 0, y: 1, z: 0, w: 0 }); // set initial state
     route(() => 0.8).to(shader, 'uCustom.x');
-    return new Promise(resolve => setTimeout(() => {
-      // x channel updated to 0.8; y channel preserved from initial write
-      expect(shader._custom[0]).toBeCloseTo(0.8);
-      expect(shader._custom[1]).toBeCloseTo(1.0);
-      expect(shader._uniforms.uCustom).toMatchObject({ x: 0.8, y: 1 });
-      resolve();
-    }, 50));
+    return new Promise((resolve) =>
+      setTimeout(() => {
+        // x channel updated to 0.8; y channel preserved from initial write
+        expect(shader._custom[0]).toBeCloseTo(0.8);
+        expect(shader._custom[1]).toBeCloseTo(1.0);
+        expect(shader._uniforms.uCustom).toMatchObject({ x: 0.8, y: 1 });
+        resolve();
+      }, 50),
+    );
   });
 
   it('unsupported sink throws', () => {
-    expect(() => route(() => 0).to(12345)).toThrow("route().to(): unsupported sink");
+    expect(() => route(() => 0).to(12345)).toThrow('route().to(): unsupported sink');
   });
 });
 
@@ -385,7 +447,9 @@ describe('sink resolution', () => {
 describe('clock election', () => {
   it('discrete + stateless + immediate sink → push driver (no RAF registered)', async () => {
     const writes = [];
-    const r = route('beat:bar').filter(p => p.count > 0).to(v => writes.push(v));
+    const r = route('beat:bar')
+      .filter((p) => p.count > 0)
+      .to((v) => writes.push(v));
 
     // RAF should NOT be registered (push driver handles it)
     expect(r._raf).toBeNull();
@@ -397,13 +461,16 @@ describe('clock election', () => {
 
   it('discrete + stateful chain → RAF driver', () => {
     const writes = [];
-    const r = route('midi:cc').get('value').smooth(0.8).to(v => writes.push(v));
+    const r = route('midi:cc')
+      .get('value')
+      .smooth(0.8)
+      .to((v) => writes.push(v));
     // Stateful → RAF
     expect(r._raf).not.toBeNull();
   });
 
   it('continuous source → RAF driver', () => {
-    const r = route(() => 0.5).to(v => v);
+    const r = route(() => 0.5).to((v) => v);
     expect(r._raf).not.toBeNull();
   });
 
@@ -426,7 +493,7 @@ describe('sample-and-hold', () => {
     fire('midi:cc', { value: 64 });
 
     // RAF tick should write held value to shader via real setUniform
-    await new Promise(r => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 50));
     expect(shader._uniforms.uMidi).toBe(64);
   });
 });
@@ -460,8 +527,8 @@ describe('bridges', () => {
     const writes = [];
     const r = route(Source.mic);
     r.amplitude;
-    r.to(v => writes.push(v));
-    await new Promise(resolve => setTimeout(resolve, 50));
+    r.to((v) => writes.push(v));
+    await new Promise((resolve) => setTimeout(resolve, 50));
     expect(writes[0]).toBeCloseTo(0.42);
   });
 });
@@ -472,15 +539,22 @@ describe('fan-in (.mix)', () => {
   it('mixes two sources with default average', async () => {
     const writes = [];
     // Route A returns 0.6, route B returns 0.4 → average = 0.5
-    route(() => 0.6).mix(route(() => 0.4)).to(v => writes.push(v));
-    await new Promise(r => setTimeout(r, 50));
+    route(() => 0.6)
+      .mix(route(() => 0.4))
+      .to((v) => writes.push(v));
+    await new Promise((r) => setTimeout(r, 50));
     expect(writes[0]).toBeCloseTo(0.5);
   });
 
   it('uses custom combine fn', async () => {
     const writes = [];
-    route(() => 3).mix(route(() => 2), (a, b) => a * b).to(v => writes.push(v));
-    await new Promise(r => setTimeout(r, 50));
+    route(() => 3)
+      .mix(
+        route(() => 2),
+        (a, b) => a * b,
+      )
+      .to((v) => writes.push(v));
+    await new Promise((r) => setTimeout(r, 50));
     expect(writes[0]).toBeCloseTo(6);
   });
 
@@ -502,7 +576,7 @@ describe('fan-in (.mix)', () => {
 describe('route-scoped .on()', () => {
   it('calls cb with (route, payload)', () => {
     const cb = vi.fn();
-    const r = route(() => 0).to(v => v);
+    const r = route(() => 0).to((v) => v);
     r.on('beat:bar', cb);
     fire('beat:bar', { count: 1 });
     expect(cb).toHaveBeenCalledWith(r, { count: 1 });
@@ -510,7 +584,7 @@ describe('route-scoped .on()', () => {
 
   it('cleans up subscriptions on _destroy()', () => {
     const cb = vi.fn();
-    const r = route(() => 0).to(v => v);
+    const r = route(() => 0).to((v) => v);
     r.on('beat:bar', cb);
     r._destroy();
     fire('beat:bar', { count: 2 });
@@ -522,20 +596,20 @@ describe('route-scoped .on()', () => {
 
 describe('lifecycle', () => {
   it('registers liveOutput when route starts', () => {
-    route(() => 0.5).to(v => v);
+    route(() => 0.5).to((v) => v);
     expect(liveOutput).toHaveBeenCalled();
   });
 
   it('releases liveOutput on _destroy()', () => {
-    const r = route(() => 0.5).to(v => v);
+    const r = route(() => 0.5).to((v) => v);
     const handle = liveOutput.mock.results[0].value;
     r._destroy();
     expect(handle.release).toHaveBeenCalled();
   });
 
   it('onReset callback clears all routes', () => {
-    route(() => 0).to(v => v);
-    route(() => 1).to(v => v);
+    route(() => 0).to((v) => v);
+    route(() => 1).to((v) => v);
     expect(getLiveRoutes().size).toBeGreaterThanOrEqual(2);
     _onResetCb?.();
     expect(getLiveRoutes().size).toBe(0);
@@ -544,36 +618,39 @@ describe('lifecycle', () => {
   it('onReset(editorId) only destroys routes owned by that editor', () => {
     const prev = window.__ar_active_editor_id;
     window.__ar_active_editor_id = 1;
-    const rA = route(() => 0).to(v => v);   // owned by editor 1
+    const rA = route(() => 0).to((v) => v); // owned by editor 1
     window.__ar_active_editor_id = 2;
-    const rB = route(() => 1).to(v => v);   // owned by editor 2
+    const rB = route(() => 1).to((v) => v); // owned by editor 2
     window.__ar_active_editor_id = prev;
 
-    _onResetCb?.(2);                         // editor 2 resets
-    expect(rB._destroyed).toBe(true);        // its own route torn down
-    expect(rA._destroyed).toBe(false);       // editor 1's route survives
+    _onResetCb?.(2); // editor 2 resets
+    expect(rB._destroyed).toBe(true); // its own route torn down
+    expect(rA._destroyed).toBe(false); // editor 1's route survives
     expect(getLiveRoutes().has(rA)).toBe(true);
     expect(getLiveRoutes().has(rB)).toBe(false);
   });
 
   it('onReset() with no editorId still clears everything (global reset)', () => {
     window.__ar_active_editor_id = 1;
-    route(() => 0).to(v => v);
+    route(() => 0).to((v) => v);
     window.__ar_active_editor_id = 2;
-    route(() => 1).to(v => v);
+    route(() => 1).to((v) => v);
     window.__ar_active_editor_id = undefined;
 
-    _onResetCb?.();                          // no id → full teardown
+    _onResetCb?.(); // no id → full teardown
     expect(getLiveRoutes().size).toBe(0);
   });
 
   it('_destroy() is idempotent', () => {
-    const r = route(() => 0).to(v => v);
-    expect(() => { r._destroy(); r._destroy(); }).not.toThrow();
+    const r = route(() => 0).to((v) => v);
+    expect(() => {
+      r._destroy();
+      r._destroy();
+    }).not.toThrow();
   });
 
   it('RAF is cleared on _destroy() (._raf set to null)', () => {
-    const r = route(() => 0).to(v => v);
+    const r = route(() => 0).to((v) => v);
     expect(r._raf).not.toBeNull();
     r._destroy();
     expect(r._raf).toBeNull();
@@ -584,7 +661,9 @@ describe('lifecycle', () => {
 
 describe('signalGraph auto-population', () => {
   it('_descriptor() returns source/chain/sinks shape', () => {
-    const r = route('midi:cc').norm(0, 127).to(v => v);
+    const r = route('midi:cc')
+      .norm(0, 127)
+      .to((v) => v);
     const d = r._descriptor();
     expect(d.source).toBe('midi:cc');
     expect(d.chain[0].op).toBe('norm');
@@ -593,14 +672,16 @@ describe('signalGraph auto-population', () => {
 
   it('registers to __ar_signalRoutes on start', () => {
     window.__ar_signalRoutes = [];
-    route('midi:cc').norm(0, 127).to(v => v);
+    route('midi:cc')
+      .norm(0, 127)
+      .to((v) => v);
     expect(window.__ar_signalRoutes.length).toBeGreaterThan(0);
     expect(window.__ar_signalRoutes[0].source).toBe('midi:cc');
   });
 
   it('getLiveRoutes() returns all active routes', () => {
-    const r1 = route(() => 0).to(v => v);
-    const r2 = route(() => 1).to(v => v);
+    const r1 = route(() => 0).to((v) => v);
+    const r2 = route(() => 1).to((v) => v);
     expect(getLiveRoutes().has(r1)).toBe(true);
     expect(getLiveRoutes().has(r2)).toBe(true);
   });
@@ -612,8 +693,10 @@ describe('frame-route visual chain', () => {
   it('show() delegates to pipeline.show()', () => {
     route(Source.camera).show('Test Route', { w: 700, h: 500 });
     // onClose is injected so closing the output window tears down the route (releases keep-alive).
-    expect(_pipelineObj.show).toHaveBeenCalledWith('Test Route',
-      expect.objectContaining({ w: 700, h: 500, onClose: expect.any(Function) }));
+    expect(_pipelineObj.show).toHaveBeenCalledWith(
+      'Test Route',
+      expect.objectContaining({ w: 700, h: 500, onClose: expect.any(Function) }),
+    );
   });
 
   it('stages queued before show() are added pre-start via chain methods', () => {
@@ -658,7 +741,7 @@ describe('temporal control', () => {
     _pipelineObj._rafId = 1; // mark pipeline as running for _addNamedStage
     route(Source.camera).tint('#4a0').wait(1).negative().show('Timeline');
     // First segment (t=0) fires immediately via setTimeout(fn, 0)
-    await new Promise(r => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 50));
     // tint should be applied (either via chain method or _addNamedStage)
     // pipeline.show was called
     expect(_pipelineObj.show).toHaveBeenCalled();

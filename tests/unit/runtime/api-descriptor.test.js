@@ -1,7 +1,11 @@
 import { describe, test, expect } from 'vitest';
 import {
-  _registerBuiltin, registerAPI, getDescriptor, deriveParamHints,
-  _beginRun, _endRun,
+  _registerBuiltin,
+  registerAPI,
+  getDescriptor,
+  deriveParamHints,
+  _beginRun,
+  _endRun,
 } from '../../../src/runtime/api-registry.js';
 import { resolveParamHint } from '../../../src/editor/param-hints.js';
 

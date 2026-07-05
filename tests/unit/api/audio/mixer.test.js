@@ -5,11 +5,21 @@ vi.mock('tone', () => {
   const node = () => ({ connect: vi.fn(), disconnect: vi.fn(), chain: vi.fn(), dispose: vi.fn() });
   return {
     default: {},
-    Gain:    vi.fn(function () { return node(); }),
-    Volume:  vi.fn(function () { return { ...node(), volume: { value: 0 } }; }),
-    Meter:   vi.fn(function () { return { ...node(), getValue: () => -80 }; }),
-    Channel: vi.fn(function () { return { ...node(), volume: { value: 0 }, pan: { value: 0 }, mute: false }; }),
-    Filter:  vi.fn(function () { return { ...node(), frequency: { value: 0 }, gain: { value: 0 }, Q: { value: 0 } }; }),
+    Gain: vi.fn(function () {
+      return node();
+    }),
+    Volume: vi.fn(function () {
+      return { ...node(), volume: { value: 0 } };
+    }),
+    Meter: vi.fn(function () {
+      return { ...node(), getValue: () => -80 };
+    }),
+    Channel: vi.fn(function () {
+      return { ...node(), volume: { value: 0 }, pan: { value: 0 }, mute: false };
+    }),
+    Filter: vi.fn(function () {
+      return { ...node(), frequency: { value: 0 }, gain: { value: 0 }, Q: { value: 0 } };
+    }),
     connect: vi.fn(),
     getDestination: () => ({ connect: vi.fn(), disconnect: vi.fn(), volume: { value: 0 } }),
   };
@@ -20,7 +30,10 @@ const { mixer, acquireStrip, getStrip, cleanupMixer, serializeMixer, restoreMixe
 
 // localStorage is non-functional in this jsdom env (mixer guards it with try/catch);
 // assert persisted settings via serializeMixer() instead.
-beforeEach(() => { cleanupMixer(null); restoreMixer({}); });
+beforeEach(() => {
+  cleanupMixer(null);
+  restoreMixer({});
+});
 
 describe('Mixer strips', () => {
   test('acquireStrip creates + getStrip returns it', () => {
@@ -44,16 +57,17 @@ describe('Mixer strips', () => {
   });
 
   test('setting a strip before it exists is applied on creation', () => {
-    mixer.strip('bass').pan(-0.5);          // no live strip yet
+    mixer.strip('bass').pan(-0.5); // no live strip yet
     const s = acquireStrip('bass');
     expect(s._channel.pan.value).toBe(-0.5); // applied from persisted settings
   });
 
   test('solo ducks non-soloed strips (deterministic, our own logic)', () => {
-    const a = acquireStrip('a'), b = acquireStrip('b');
+    const a = acquireStrip('a'),
+      b = acquireStrip('b');
     mixer.strip('a').solo(true);
     expect(a._channel.mute).toBe(false); // soloed plays
-    expect(b._channel.mute).toBe(true);  // others duck
+    expect(b._channel.mute).toBe(true); // others duck
     mixer.strip('a').solo(false);
     expect(b._channel.mute).toBe(false); // un-solo restores
   });
@@ -75,7 +89,7 @@ describe('Mixer strips', () => {
     expect(s2._channel.volume.value).toBe(-9);
   });
 
-  test('cleanupMixer(editorId) spares another editor\'s run strip', () => {
+  test("cleanupMixer(editorId) spares another editor's run strip", () => {
     acquireStrip('mine', { owner: 1, lifecycle: 'run' });
     acquireStrip('yours', { owner: 2, lifecycle: 'run' });
     cleanupMixer(1);
@@ -99,7 +113,7 @@ describe('Mixer strips', () => {
   });
 
   test('mixer.add inserts an arbitrary node and returns a handle', () => {
-    const fakeNode = { connect: vi.fn() };  // raw AudioNode (no toDestination)
+    const fakeNode = { connect: vi.fn() }; // raw AudioNode (no toDestination)
     const h = mixer.add(fakeNode, { name: 'fx' });
     expect(h.name).toBe('fx');
     expect(getStrip('fx')).not.toBeNull();

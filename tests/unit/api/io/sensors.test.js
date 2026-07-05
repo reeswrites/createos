@@ -58,11 +58,13 @@ describe('registerSource lifecycle', () => {
   });
 
   it('stop fires when last subscriber leaves', () => {
-    const stop  = vi.fn();
+    const stop = vi.fn();
     registerSource('test:ds-stop', { start: () => null, stop });
     const u1 = subscribe('test:ds-stop', () => {});
     const u2 = subscribe('test:ds-stop', () => {});
-    u1(); expect(stop).not.toHaveBeenCalled();
-    u2(); expect(stop).toHaveBeenCalledTimes(1);
+    u1();
+    expect(stop).not.toHaveBeenCalled();
+    u2();
+    expect(stop).toHaveBeenCalledTimes(1);
   });
 });

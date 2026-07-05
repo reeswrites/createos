@@ -13,7 +13,9 @@ describe('detectAPIUsage — API presence', () => {
     expect(detectAPIUsage('const s = new Shader(({uv}) => [uv.x,0,0,1])').usesShader).toBe(true);
   });
   test('detects GLShader construction', () => {
-    expect(detectAPIUsage('const s = new GLShader("void main(){gl_FragColor=vec4(1);}");').usesGLShader).toBe(true);
+    expect(
+      detectAPIUsage('const s = new GLShader("void main(){gl_FragColor=vec4(1);}");').usesGLShader,
+    ).toBe(true);
   });
   test('detects ShaderFX', () => {
     expect(detectAPIUsage('ShaderFX.presetShader("gradient")').usesShaderFX).toBe(true);
@@ -109,8 +111,13 @@ describe('detectAPIUsage — shaderStartCalled', () => {
 describe('detectAPIUsage — smart output detection', () => {
   function needsCanvas(code) {
     const r = detectAPIUsage(code);
-    return r.usesDraw || r.usesLayer || r.usesPixi || r.usesShaderFX ||
-      ((r.usesShader || r.usesGLShader) && r.shaderStartCalled);
+    return (
+      r.usesDraw ||
+      r.usesLayer ||
+      r.usesPixi ||
+      r.usesShaderFX ||
+      ((r.usesShader || r.usesGLShader) && r.shaderStartCalled)
+    );
   }
 
   test('draw.* → needsCanvas', () => {

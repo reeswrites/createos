@@ -1,7 +1,9 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { liveOutput, forEachLive, liveCount } from '../../../src/runtime/keep-alive.js';
 
-afterEach(() => { delete window.__ar_keepAlive; });
+afterEach(() => {
+  delete window.__ar_keepAlive;
+});
 
 describe('liveOutput', () => {
   it('adds the token to the active keepAlive set', () => {
@@ -36,12 +38,12 @@ describe('liveOutput', () => {
     const token = {};
     const h = liveOutput(token);
 
-    const editor2 = new Set();        // another editor runs → active set swapped
+    const editor2 = new Set(); // another editor runs → active set swapped
     window.__ar_keepAlive = editor2;
 
     h.release();
-    expect(editor1.has(token)).toBe(false);   // cleaned from the original set
-    expect(editor2.size).toBe(0);             // untouched
+    expect(editor1.has(token)).toBe(false); // cleaned from the original set
+    expect(editor2.size).toBe(0); // untouched
   });
 });
 
@@ -50,11 +52,15 @@ describe('liveOutput', () => {
 describe('forEachLive', () => {
   it('iterates all live tokens', () => {
     window.__ar_keepAlive = new Set();
-    const a = {}, b = {}, c = {};
-    liveOutput(a); liveOutput(b); liveOutput(c);
+    const a = {},
+      b = {},
+      c = {};
+    liveOutput(a);
+    liveOutput(b);
+    liveOutput(c);
 
     const seen = [];
-    forEachLive(obj => seen.push(obj));
+    forEachLive((obj) => seen.push(obj));
     expect(seen).toContain(a);
     expect(seen).toContain(b);
     expect(seen).toContain(c);
@@ -63,7 +69,11 @@ describe('forEachLive', () => {
 
   it('is a no-op when no set exists', () => {
     delete window.__ar_keepAlive;
-    expect(() => forEachLive(() => { throw new Error('should not call'); })).not.toThrow();
+    expect(() =>
+      forEachLive(() => {
+        throw new Error('should not call');
+      }),
+    ).not.toThrow();
   });
 });
 

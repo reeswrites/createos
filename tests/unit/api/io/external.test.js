@@ -16,7 +16,14 @@ afterEach(() => {
 
 describe('external.weather()', () => {
   it('fetches open-meteo and returns temperature', async () => {
-    mockFetch({ current: { temperature_2m: 18.5, wind_speed_10m: 12, precipitation: 0, relative_humidity_2m: 60 } });
+    mockFetch({
+      current: {
+        temperature_2m: 18.5,
+        wind_speed_10m: 12,
+        precipitation: 0,
+        relative_humidity_2m: 60,
+      },
+    });
     const w = await external.weather(37.77, -122.41);
     expect(global.fetch).toHaveBeenCalledOnce();
     expect(w.temperature).toBe(18.5);
@@ -49,7 +56,11 @@ describe('external.weather()', () => {
 describe('external.signal()', () => {
   it('fetches URL and applies selector', async () => {
     mockFetch({ data: { amount: '50000.00' } });
-    const sig = await external.signal('https://example.com/price', json => parseFloat(json.data.amount), 0);
+    const sig = await external.signal(
+      'https://example.com/price',
+      (json) => parseFloat(json.data.amount),
+      0,
+    );
     expect(sig.value).toBe(50000);
   });
 
@@ -78,7 +89,7 @@ describe('WeatherSignal.stream()', () => {
     mockFetch({ current: { temperature_2m: 22 } });
     const w = await external.weather(0, 0);
     const fn = vi.fn();
-    w.stream(fn, 999999);  // very long interval — won't fire again in test
+    w.stream(fn, 999999); // very long interval — won't fire again in test
     expect(fn).toHaveBeenCalledOnce();
     expect(fn).toHaveBeenCalledWith(w);
   });

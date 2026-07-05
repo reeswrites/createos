@@ -5,37 +5,41 @@ import { DrawTarget, cleanupBackdrops } from '../../../../src/api/visual/draw.js
 function makeCtx() {
   const ctx = {
     strokeStyle: '',
-    lineWidth:   1,
-    font:        '',
-    textAlign:   'left',
-    textBaseline:'alphabetic',
+    lineWidth: 1,
+    font: '',
+    textAlign: 'left',
+    textBaseline: 'alphabetic',
     globalAlpha: 1,
     globalCompositeOperation: 'source-over',
-    clearRect:   vi.fn(),
-    strokeRect:  vi.fn(),
-    beginPath:   vi.fn(),
-    arc:         vi.fn(),
-    moveTo:      vi.fn(),
-    lineTo:      vi.fn(),
-    closePath:   vi.fn(),
-    fill:        vi.fn(),
-    stroke:      vi.fn(),
-    fillText:    vi.fn(),
-    drawImage:   vi.fn(),
-    save:        vi.fn(),
-    restore:     vi.fn(),
-    setTransform:vi.fn(),
+    clearRect: vi.fn(),
+    strokeRect: vi.fn(),
+    beginPath: vi.fn(),
+    arc: vi.fn(),
+    moveTo: vi.fn(),
+    lineTo: vi.fn(),
+    closePath: vi.fn(),
+    fill: vi.fn(),
+    stroke: vi.fn(),
+    fillText: vi.fn(),
+    drawImage: vi.fn(),
+    save: vi.fn(),
+    restore: vi.fn(),
+    setTransform: vi.fn(),
     shadowColor: '',
-    shadowBlur:  0,
+    shadowBlur: 0,
     // fillStyle tracking — bg() restores it after painting, so capture at call time
-    _fillStyle:  '',
+    _fillStyle: '',
     _fillRectColors: [],
   };
   // Make fillRect record fillStyle at the time it is called
-  ctx.fillRect = vi.fn().mockImplementation(() => { ctx._fillRectColors.push(ctx._fillStyle); });
+  ctx.fillRect = vi.fn().mockImplementation(() => {
+    ctx._fillRectColors.push(ctx._fillStyle);
+  });
   Object.defineProperty(ctx, 'fillStyle', {
     get: () => ctx._fillStyle,
-    set: (v) => { ctx._fillStyle = v; },
+    set: (v) => {
+      ctx._fillStyle = v;
+    },
     configurable: true,
   });
   return ctx;
@@ -170,7 +174,14 @@ describe('DrawTarget.text', () => {
 describe('DrawTarget.poly', () => {
   test('calls moveTo + lineTo per point', () => {
     const { draw, ctx } = freshDraw();
-    draw.poly([[0,0],[50,50],[100,0]], 'green');
+    draw.poly(
+      [
+        [0, 0],
+        [50, 50],
+        [100, 0],
+      ],
+      'green',
+    );
     expect(ctx.moveTo).toHaveBeenCalledWith(0, 0);
     expect(ctx.lineTo).toHaveBeenCalledWith(50, 50);
     expect(ctx.lineTo).toHaveBeenCalledWith(100, 0);
@@ -178,12 +189,17 @@ describe('DrawTarget.poly', () => {
   });
   test('no-ops when fewer than 2 points', () => {
     const { draw, ctx } = freshDraw();
-    draw.poly([[0,0]]);
+    draw.poly([[0, 0]]);
     expect(ctx.fill).not.toHaveBeenCalled();
   });
   test('returns this', () => {
     const { draw } = freshDraw();
-    expect(draw.poly([[0,0],[1,1]])).toBe(draw);
+    expect(
+      draw.poly([
+        [0, 0],
+        [1, 1],
+      ]),
+    ).toBe(draw);
   });
 });
 
@@ -264,7 +280,8 @@ describe('DrawTarget.pixelate', () => {
   test('calls drawImage to downsample then upscale', () => {
     const { draw, ctx } = freshDraw();
     const src = document.createElement('canvas');
-    src.width = 800; src.height = 600;
+    src.width = 800;
+    src.height = 600;
     draw.pixelate(src, 8);
     expect(ctx.drawImage).toHaveBeenCalled();
   });
@@ -308,7 +325,8 @@ describe('DrawTarget.toASCII', () => {
   test('custom charset respected in output length', () => {
     const { draw } = freshDraw();
     const src = document.createElement('canvas');
-    const cols = 5, rows = 3;
+    const cols = 5,
+      rows = 3;
     const art = draw.toASCII(src, { cols, rows, charset: '@#.' });
     // rows lines each cols chars + newline
     expect(art.el.textContent.length).toBe(rows * (cols + 1));
@@ -337,20 +355,20 @@ describe('DrawTarget.backdrop', () => {
     const draw = new DrawTarget(2000, getLayerCanvas);
 
     const img = new Image();
-    Object.defineProperty(img, 'complete',     { get: () => true  });
-    Object.defineProperty(img, 'naturalWidth', { get: () => 200   });
+    Object.defineProperty(img, 'complete', { get: () => true });
+    Object.defineProperty(img, 'naturalWidth', { get: () => 200 });
 
     const handle = draw.backdrop(img);
     expect(handle).toHaveProperty('stop');
     expect(handle).toHaveProperty('layer');
-    expect(handle.layer).toBe(1999);  // this.#z - 1 = 2000 - 1
+    expect(handle.layer).toBe(1999); // this.#z - 1 = 2000 - 1
   });
 
   test('cleanupBackdrops stops all backdrops', () => {
     window.__ar_keepAlive = new Set();
     const { canvas } = makeCanvas(200, 100);
-    const bdCanvas   = makeCanvas(200, 100).canvas;
-    const getLayerCanvas = (z) => z === 0 ? canvas : bdCanvas;
+    const bdCanvas = makeCanvas(200, 100).canvas;
+    const getLayerCanvas = (z) => (z === 0 ? canvas : bdCanvas);
     const draw = new DrawTarget(2001, getLayerCanvas);
 
     // Live source (canvas) — starts a raf loop
@@ -365,14 +383,17 @@ describe('DrawTarget.backdrop', () => {
   });
 
   test('cleanupBackdrops is idempotent', () => {
-    expect(() => { cleanupBackdrops(); cleanupBackdrops(); }).not.toThrow();
+    expect(() => {
+      cleanupBackdrops();
+      cleanupBackdrops();
+    }).not.toThrow();
   });
 
   test('stop() removes sentinel from __ar_keepAlive', () => {
     window.__ar_keepAlive = new Set();
     const { canvas } = makeCanvas(200, 100);
-    const bdCanvas   = makeCanvas(200, 100).canvas;
-    const getLayerCanvas = (z) => z === 0 ? canvas : bdCanvas;
+    const bdCanvas = makeCanvas(200, 100).canvas;
+    const getLayerCanvas = (z) => (z === 0 ? canvas : bdCanvas);
     const draw = new DrawTarget(2002, getLayerCanvas);
 
     const handle = draw.backdrop(bdCanvas, { loop: true });
@@ -403,8 +424,8 @@ describe('DrawTarget.backdrop', () => {
 
   test('URL string source creates an Image (no raf)', () => {
     const { canvas } = makeCanvas(200, 100);
-    const bdCanvas   = makeCanvas(200, 100).canvas;
-    const getLayerCanvas = (z) => z === 0 ? canvas : bdCanvas;
+    const bdCanvas = makeCanvas(200, 100).canvas;
+    const getLayerCanvas = (z) => (z === 0 ? canvas : bdCanvas);
     const draw = new DrawTarget(2003, getLayerCanvas);
 
     const handle = draw.backdrop('https://example.com/photo.jpg');

@@ -16,8 +16,12 @@ class FakeIframe {
     };
     this.isConnected = true;
   }
-  addEventListener(ev, fn) { (this._listeners[ev] ??= []).push(fn); }
-  dispatchEvent(name) { (this._listeners[name] ?? []).forEach(f => f()); }
+  addEventListener(ev, fn) {
+    (this._listeners[ev] ??= []).push(fn);
+  }
+  dispatchEvent(name) {
+    (this._listeners[name] ?? []).forEach((f) => f());
+  }
 }
 
 function mockDOM() {
@@ -125,10 +129,12 @@ describe('Plugin.on / Plugin.send', () => {
     const fn = vi.fn();
     p.on('evt', fn);
     p.off('evt', fn);
-    window.dispatchEvent(new MessageEvent('message', {
-      data: { _vlType: 'evt', _vlPayload: 1 },
-      source: iframe.contentWindow,
-    }));
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: { _vlType: 'evt', _vlPayload: 1 },
+        source: iframe.contentWindow,
+      }),
+    );
     expect(fn).not.toHaveBeenCalled();
   });
 });
@@ -165,10 +171,12 @@ describe('Plugin.canvas', () => {
 
     // Simulate frame capture from iframe
     const bmp = { width: 320, height: 240, close: vi.fn() };
-    window.dispatchEvent(new MessageEvent('message', {
-      data: { _vlFrame: true, bitmap: bmp },
-      source: iframe.contentWindow,
-    }));
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: { _vlFrame: true, bitmap: bmp },
+        source: iframe.contentWindow,
+      }),
+    );
     expect(p.canvas).toBeInstanceOf(HTMLCanvasElement);
     expect(bmp.close).toHaveBeenCalled();
   });

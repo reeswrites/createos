@@ -11,22 +11,21 @@
 // Event plumbing delegates to WidgetEvents (src/api/widgets/widget-events.js).
 
 import * as Tone from 'tone';
-import { WidgetEvents } from '../widgets/widget-events.js';
-import { BindingMap } from './binding.js';
-import { connectSurfaceStrip, releaseStrip } from './mixer.js';
+import { connectSurfaceStrip } from './mixer.js';
 import { Voice } from './voice.js';
 import { notify } from '../../events/index.js';
 import { insertSnippet } from '../../editor/active-editor.js';
 import { mountWidgetShell, wireCaptureButton } from '../widgets/widget-shell.js';
 import { onReset } from '../../runtime/reset-registry.js';
-import { Take } from '../signal/performance-recorder.js';
+import { registerDesktopFileType } from '../platform/desktop-file-registry.js';
 import { replayActions } from '../signal/replay-clock.js';
+import { wireMidiInstrument } from './midi-bind.js';
 import {
-  registerMidiInstrument,
-  unregisterMidiInstrument,
-  notifyMidiFocus,
-  wireMidiInstrument,
-} from './midi-bind.js';
+  initTriggerSurface,
+  enableSurfaceMidi,
+  detachTriggerSurface,
+  disposeTriggerSurface,
+} from './trigger-surface.js';
 
 // ── Module-level registry ─────────────────────────────────────────────────────
 
@@ -234,7 +233,6 @@ export class Piano {
     this._kbdMap = this._buildKbdMap();
     this._presetName = initPreset;
     this._heldNotes = new Set();
-    this._take = new Take(this); // Performance capture (ADR 031)
     this._recNotes = new Map(); // note → { rec, start } for dur back-fill
     this._steps = Array.from({ length: 16 }, () => new Set());
     this._selectedStep = null;
@@ -257,10 +255,11 @@ export class Piano {
     this._autoSave = () => {};
     this._history = null;
 
-    // Surface output bus → one window-scoped mixer Strip (ADR 032/046). The preset
-    // synth + bound/default Voices all sum here instead of going to Destination.
-    this._out = new Tone.Gain();
-    this._strip = null;
+    // Shared Trigger Surface chassis: output bus + Strip, BindingMap (voice→bus
+    // router), events, Take. The preset synth + bound/default Voices all sum into
+    // self._out instead of going to Destination. (ADR 032/046 — self._out must
+    // exist before _buildSynth below.)
+    initTriggerSurface(this, { registry: _pianos, bindings: initBindings });
 
     // Build synth from initial preset
     const presetDesc = Piano._presets[initPreset] ?? Piano._presets.electric;
@@ -271,31 +270,13 @@ export class Piano {
       cfg: (presetDesc.effects ?? [])[i] ?? {},
     }));
 
-    // ── Per-key Voice/Action overrides + optional custom default voice (ADR 046) ──
-    // A bound key plays its own Voice / fires an Action instead of the chromatic
-    // preset synth; a default Voice (p.voice) replaces the preset across all keys.
-    this._bindings = new BindingMap({
-      onVoice: (h) => {
-        try {
-          h.output.connect(this._out);
-        } catch (_) {}
-      },
-    });
-    if (initBindings) this._bindings.restore(initBindings);
+    // Optional custom default voice (ADR 046) — replaces the preset across all keys.
     this._defaultDesc = initVoice ?? null;
     this._defaultHandle = null;
 
-    this._events = new WidgetEvents();
-    _pianos.push(this);
-
     this._init(title, x, y, w, h);
 
-    // MIDI binding (ADR 033): register, then claim focus (the window just spawned
-    // frontmost). Permission is checked silently — no prompt unless already granted.
-    if (this._winId) {
-      registerMidiInstrument(this);
-      notifyMidiFocus(this);
-    }
+    enableSurfaceMidi(this);
 
     if (initSteps) {
       initSteps.forEach((notes, si) => {
@@ -721,9 +702,7 @@ export class Piano {
     codeBtn.title = 'Insert code snippet';
     codeBtn.style.padding = '3px 7px';
     codeBtn.addEventListener('click', () => {
-      const lines = [
-        `const p = new Piano({ title: '${this._title}', bpm: ${this._bpm}, preset: '${this._presetName}', duration: '${this._duration}' });`,
-      ];
+      const lines = [this._perfCtor().code];
       this._steps.forEach((notes, si) => {
         if (notes.size > 0) {
           [...notes].forEach((note) => lines.push(`p.note(${si}, '${note}', true);`));
@@ -1196,9 +1175,7 @@ export class Piano {
   _destroy() {
     this._stop();
     this._clearHooks();
-    unregisterMidiInstrument(this);
-    const idx = _pianos.indexOf(this);
-    if (idx >= 0) _pianos.splice(idx, 1);
+    detachTriggerSurface(this, _pianos);
     if (this._onKey) {
       document.removeEventListener('keydown', this._onKey);
       document.removeEventListener('keyup', this._onKey);
@@ -1212,23 +1189,29 @@ export class Piano {
         node?.dispose();
       } catch (_) {}
     }
-    try {
-      this._defaultHandle?.dispose?.();
-    } catch (_) {}
-    try {
-      this._bindings.dispose();
-    } catch (_) {}
-    if (this._strip) {
-      try {
-        releaseStrip(this._title);
-      } catch (_) {}
-      this._strip = null;
-    }
-    try {
-      this._out?.dispose?.();
-    } catch (_) {}
+    disposeTriggerSurface(this);
   }
 }
 
 // Register teardown with the reset registry (ADR 008).
 onReset(cleanupPianos);
+
+// Desktop File-Type Adapter (ADR 055) — owns 'piano' icon glyph + restore.
+registerDesktopFileType('piano', {
+  glyph: 'fa-solid fa-music',
+  cssClass: 'dt-piano-icon',
+  open: (data, pos) => {
+    const p = new Piano({
+      title: data.title ?? 'Piano',
+      bpm: data.bpm ?? 120,
+      preset: data.preset ?? 'electric',
+      duration: data.duration ?? '8n',
+      ...pos,
+    });
+    if (data.steps)
+      data.steps.forEach((notes, si) => {
+        if (p.note) notes.forEach((n) => p.note(si, n, true));
+      });
+    return p;
+  },
+});

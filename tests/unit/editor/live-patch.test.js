@@ -1,4 +1,11 @@
-import { friendlyError, addInfiniteLoopProtection, extractScriptLine, transformCode, makeLoopProtectionVisitor, makeTraceVisitor } from '../../../src/editor/live-patch.js';
+import {
+  friendlyError,
+  addInfiniteLoopProtection,
+  extractScriptLine,
+  transformCode,
+  makeLoopProtectionVisitor,
+  makeTraceVisitor,
+} from '../../../src/editor/live-patch.js';
 import esprima from 'esprima';
 
 // ── friendlyError ────────────────────────────────────────────────────────────
@@ -16,7 +23,7 @@ describe('friendlyError', () => {
   });
 
   test('formats not-defined error', () => {
-    const msg = friendlyError(new Error("myVar is not defined"));
+    const msg = friendlyError(new Error('myVar is not defined'));
     expect(msg).toContain('myVar');
     expect(msg).toContain('not defined');
   });
@@ -27,7 +34,7 @@ describe('friendlyError', () => {
   });
 
   test('formats cannot-read-property error without property name', () => {
-    const msg = friendlyError(new Error("Cannot read property of null"));
+    const msg = friendlyError(new Error('Cannot read property of null'));
     expect(msg).toContain("doesn't exist yet");
   });
 
@@ -42,18 +49,19 @@ describe('friendlyError', () => {
   });
 
   test('passes infinite loop message through unchanged', () => {
-    const raw = "Infinite loop detected. Please make changes and press Execute Program when you are ready to try again.";
+    const raw =
+      'Infinite loop detected. Please make changes and press Execute Program when you are ready to try again.';
     expect(friendlyError(new Error(raw))).toBe(raw);
   });
 
   test('strips TypeError prefix from unrecognised errors', () => {
-    const msg = friendlyError(new Error("TypeError: something unexpected"));
+    const msg = friendlyError(new Error('TypeError: something unexpected'));
     expect(msg).not.toMatch(/^TypeError:/);
     expect(msg).toContain('something unexpected');
   });
 
   test('accepts a plain string (not Error object)', () => {
-    const msg = friendlyError("myFunc is not defined");
+    const msg = friendlyError('myFunc is not defined');
     expect(msg).toContain('myFunc');
   });
 });

@@ -11,21 +11,20 @@
 // Event plumbing delegates to WidgetEvents (src/api/widgets/widget-events.js).
 
 import * as Tone from 'tone';
-import { WidgetEvents } from '../widgets/widget-events.js';
-import { BindingMap } from './binding.js';
-import { connectSurfaceStrip, releaseStrip } from './mixer.js';
+import { connectSurfaceStrip } from './mixer.js';
 import { notify } from '../../events/index.js';
 import { insertSnippet } from '../../editor/active-editor.js';
 import { mountWidgetShell, wireCaptureButton } from '../widgets/widget-shell.js';
 import { onReset } from '../../runtime/reset-registry.js';
-import { Take } from '../signal/performance-recorder.js';
+import { registerDesktopFileType } from '../platform/desktop-file-registry.js';
 import { replayActions } from '../signal/replay-clock.js';
+import { wireMidiInstrument } from './midi-bind.js';
 import {
-  registerMidiInstrument,
-  unregisterMidiInstrument,
-  notifyMidiFocus,
-  wireMidiInstrument,
-} from './midi-bind.js';
+  initTriggerSurface,
+  enableSurfaceMidi,
+  detachTriggerSurface,
+  disposeTriggerSurface,
+} from './trigger-surface.js';
 
 // General MIDI percussion note → voice id (ADR 033). Common aliases included.
 // Unmapped notes are ignored.
@@ -208,10 +207,11 @@ export class Drumpad {
     _desktopIconId: existingIconId,
   } = {}) {
     this._steps = Math.max(1, initSteps ?? DEFAULT_STEPS);
-    // Surface output bus — everything this pad makes (built-in kit + bound/default
-    // Voices) sums here, then routes into one window-scoped mixer Strip (ADR 032/046).
-    this._out = new Tone.Gain();
-    this._strip = null;
+    // Shared Trigger Surface chassis: output bus + Strip, BindingMap (voice→bus
+    // router), events, Take. Everything this pad makes (built-in kit + bound/default
+    // Voices) sums into self._out — which must exist before the kit voices below
+    // reroute onto it — then routes into one window-scoped mixer Strip (ADR 032/046).
+    initTriggerSurface(this, { registry: _drumpads, bindings: initBindings });
     // Pad count: a 1..8 subset of the built-in kit (>8 needs generated voices — see roadmap).
     const padCount = Math.min(VOICES.length, Math.max(1, initPads ?? VOICES.length));
     this._voices = VOICES.slice(0, padCount).map((v) => {
@@ -248,31 +248,9 @@ export class Drumpad {
     // Replaced per-instance by the shell in _init(); no-op until then.
     this._autoSave = () => {};
 
-    // ── Per-pad Voice/Action bindings (ADR 046) ───────────────────────────────
-    // A bound Voice replaces a pad's default synth; a bound Action fires a named
-    // bus event on strike (optionally silencing the pad). Bound voices route to
-    // Destination like the built-in pad synths (drumpad has no surface strip).
-    this._bindings = new BindingMap({
-      onVoice: (h) => {
-        try {
-          h.output.connect(this._out);
-        } catch (_) {}
-      },
-    });
-    if (initBindings) this._bindings.restore(initBindings);
-
-    // ── Event/signal hook state ───────────────────────────────────────────────
-    this._events = new WidgetEvents();
-    this._take = new Take(this); // Performance capture (ADR 031)
-    _drumpads.push(this);
-
     this._init(title, x, y, w, h);
 
-    // MIDI binding (ADR 033): register, then claim focus (window spawned frontmost).
-    if (this._winId) {
-      registerMidiInstrument(this);
-      notifyMidiFocus(this);
-    }
+    enableSurfaceMidi(this);
 
     if (initPatterns) {
       initPatterns.forEach((steps, vi) => {
@@ -724,7 +702,7 @@ export class Drumpad {
     codeBtn.title = 'Copy code to editor';
     codeBtn.style.padding = '3px 7px';
     codeBtn.addEventListener('click', () => {
-      const lines = [`const dp = audio.drumpad({ title: '${title}', bpm: ${this._bpm} });`];
+      const lines = [this._perfCtor().code];
       this._voices.forEach((v, vi) => {
         if (v.steps.some(Boolean)) {
           const pat = v.steps.map((on) => (on ? 'x' : '.')).join(' ');
@@ -912,9 +890,7 @@ export class Drumpad {
   _destroy(playBtn) {
     this._stop(playBtn);
     this._clearHooks();
-    unregisterMidiInstrument(this);
-    const idx = _drumpads.indexOf(this);
-    if (idx >= 0) _drumpads.splice(idx, 1);
+    detachTriggerSurface(this, _drumpads);
     if (this._onKey) {
       document.removeEventListener('keydown', this._onKey);
       this._onKey = null;
@@ -924,20 +900,16 @@ export class Drumpad {
         v.synth?.dispose();
       } catch (_) {}
     });
-    try {
-      this._bindings.dispose();
-    } catch (_) {}
-    if (this._strip) {
-      try {
-        releaseStrip(this._title);
-      } catch (_) {}
-      this._strip = null;
-    }
-    try {
-      this._out?.dispose?.();
-    } catch (_) {}
+    disposeTriggerSurface(this);
   }
 }
 
 // Register teardown with the reset registry (ADR 008).
 onReset(cleanupDrumpads);
+
+// Desktop File-Type Adapter (ADR 055) — owns 'beat' icon glyph + restore.
+registerDesktopFileType('beat', {
+  glyph: 'fa-solid fa-drum',
+  cssClass: 'dt-beat-icon',
+  open: (data, pos) => new Drumpad({ ...data, ...pos }),
+});

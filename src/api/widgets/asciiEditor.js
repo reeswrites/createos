@@ -12,6 +12,7 @@ import {
   wireCaptureButton,
 } from './widget-shell.js';
 import { onReset } from '../../runtime/reset-registry.js';
+import { registerDesktopFileType } from '../platform/desktop-file-registry.js';
 import { Take } from '../signal/performance-recorder.js';
 import { replayActions } from '../signal/replay-clock.js';
 
@@ -1190,3 +1191,21 @@ export class AsciiEditor {
 
 // Register teardown with the reset registry (ADR 008).
 onReset(cleanupAsciiEditors);
+
+// Desktop File-Type Adapter (ADR 055) — owns 'ascii' icon glyph + restore.
+registerDesktopFileType('ascii', {
+  glyph: 'fa-solid fa-font',
+  cssClass: 'dt-ascii-icon',
+  open: (data, pos) =>
+    new AsciiEditor({
+      cols: data.cols ?? 64,
+      rows: data.rows ?? 24,
+      cellW: data.cellW ?? 10,
+      cellH: data.cellH ?? 18,
+      fps: data.fps ?? 8,
+      bg: data.bg ?? '#0d0208',
+      title: data.title ?? 'ASCII Editor',
+      _frames: data.frames ?? null,
+      ...pos,
+    }),
+});

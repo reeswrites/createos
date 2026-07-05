@@ -100,6 +100,17 @@ export class Sprite {
     return this;
   }
 
+  // Paint an image (e.g. a restored PNG data URL) into frame `i`, then re-render.
+  // Inverse of drawFrameTo — the seam desktop restore reads through so it never
+  // touches the private _frames array.
+  drawImageToFrame(i, img) {
+    const frame = this._frames[i];
+    if (!frame) return this;
+    frame.getContext('2d').drawImage(img, 0, 0);
+    this._render();
+    return this;
+  }
+
   // ── Pixel drawing ────────────────────────────────────────────────────────────
 
   // Set pixel at (x,y) on current (or given) frame

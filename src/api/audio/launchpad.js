@@ -9,22 +9,21 @@
 // sticky MIDI Target rotation for input (ADR 033).
 
 import * as Tone from 'tone';
-import { WidgetEvents } from '../widgets/widget-events.js';
-import { BindingMap } from './binding.js';
-import { connectSurfaceStrip, releaseStrip } from './mixer.js';
+import { connectSurfaceStrip } from './mixer.js';
 import { Voice } from './voice.js';
 import { notify } from '../../events/index.js';
 import { insertSnippet } from '../../editor/active-editor.js';
 import { mountWidgetShell, wireCaptureButton } from '../widgets/widget-shell.js';
 import { onReset } from '../../runtime/reset-registry.js';
-import { Take } from '../signal/performance-recorder.js';
+import { registerDesktopFileType } from '../platform/desktop-file-registry.js';
 import { replayActions } from '../signal/replay-clock.js';
+import { wireMidiInstrument } from './midi-bind.js';
 import {
-  registerMidiInstrument,
-  unregisterMidiInstrument,
-  notifyMidiFocus,
-  wireMidiInstrument,
-} from './midi-bind.js';
+  initTriggerSurface,
+  enableSurfaceMidi,
+  detachTriggerSurface,
+  disposeTriggerSurface,
+} from './trigger-surface.js';
 
 const _launchpads = [];
 
@@ -69,34 +68,16 @@ export class Launchpad {
     this._desktopIconId = existingIconId ?? null;
     this._autoSave = () => {};
 
-    // Surface output bus → one window-scoped mixer Strip (ADR 032/046).
-    this._out = new Tone.Gain();
-    this._strip = null;
+    // Shared Trigger Surface chassis: output bus + Strip, BindingMap, events, Take.
+    initTriggerSurface(this, { registry: _launchpads, bindings: initBindings });
 
     // Default Voice for unbound cells (FM unless overridden).
     this._defaultDesc = initVoice ?? { engine: 'fm' };
     this._defaultHandle = null;
 
-    // Per-cell Voice/Action bindings (ADR 046).
-    this._bindings = new BindingMap({
-      onVoice: (handle) => {
-        try {
-          handle.output.connect(this._out);
-        } catch (_) {}
-      },
-    });
-    if (initBindings) this._bindings.restore(initBindings);
-
-    this._events = new WidgetEvents();
-    this._take = new Take(this); // Performance capture (ADR 031)
-    _launchpads.push(this);
-
     this._init(title, x, y, w, h);
 
-    if (this._winId) {
-      registerMidiInstrument(this);
-      notifyMidiFocus(this);
-    }
+    enableSurfaceMidi(this);
     if (!existingIconId) this._autoSave();
   }
 
@@ -349,9 +330,7 @@ export class Launchpad {
     const codeBtn = mkBtn('</>', '#cba6f7');
     codeBtn.title = 'Copy code to editor';
     codeBtn.addEventListener('click', () => {
-      const lines = [
-        `const lp = audio.launchpad({ title: '${title}', rows: ${this._rows}, cols: ${this._cols} });`,
-      ];
+      const lines = [this._perfCtor().code];
       for (const k of this._bindings.keys()) {
         const b = this._bindings.get(k);
         if (b?.voice) lines.push(`lp.bind(${k}, ${JSON.stringify(b.voice)});`);
@@ -409,26 +388,17 @@ export class Launchpad {
 
   _destroy() {
     this._clearHooks();
-    unregisterMidiInstrument(this);
-    const idx = _launchpads.indexOf(this);
-    if (idx >= 0) _launchpads.splice(idx, 1);
-    try {
-      this._defaultHandle?.dispose?.();
-    } catch (_) {}
-    try {
-      this._bindings.dispose();
-    } catch (_) {}
-    if (this._strip) {
-      try {
-        releaseStrip(this._title);
-      } catch (_) {}
-      this._strip = null;
-    }
-    try {
-      this._out?.dispose?.();
-    } catch (_) {}
+    detachTriggerSurface(this, _launchpads);
+    disposeTriggerSurface(this);
   }
 }
 
 // Register teardown with the reset registry (ADR 008).
 onReset(cleanupLaunchpads);
+
+// Desktop File-Type Adapter (ADR 055) — owns 'launchpad' icon glyph + restore.
+registerDesktopFileType('launchpad', {
+  glyph: 'fa-solid fa-table-cells',
+  cssClass: 'dt-beat-icon',
+  open: (data, pos) => new Launchpad({ ...data, ...pos }),
+});

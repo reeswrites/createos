@@ -1,5 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
-import { makeFileEntry, renderFlatFiles, renderDirContents } from '../../../../src/api/wm/file-browser.js';
+import {
+  makeFileEntry,
+  renderFlatFiles,
+  renderDirContents,
+} from '../../../../src/api/wm/file-browser.js';
 
 // The file-tree render leaf extracted from wm.js — pure DOM rendering over
 // FileSystemHandle entries, testable with fake handles and no desktop.
@@ -30,11 +34,7 @@ describe('file-browser render leaf', () => {
 
   it('renderFlatFiles sorts, skips dotfiles, and wires click', () => {
     const container = document.createElement('div');
-    const files = [
-      { name: 'b.wav' },
-      { name: '.hidden' },
-      { name: 'a.txt' },
-    ];
+    const files = [{ name: 'b.wav' }, { name: '.hidden' }, { name: 'a.txt' }];
     // jsdom: URL.createObjectURL may be undefined
     global.URL.createObjectURL ??= () => 'blob:fake';
     renderFlatFiles(container, files, vi.fn());

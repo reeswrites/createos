@@ -1,7 +1,12 @@
 import { describe, test, expect } from 'vitest';
 import { EditorView } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
-import { PARAM_HINTS, resolveParamHint, paramHintsField, paramHintsExtension } from '../../../src/editor/param-hints.js';
+import {
+  PARAM_HINTS,
+  resolveParamHint,
+  paramHintsField,
+  paramHintsExtension,
+} from '../../../src/editor/param-hints.js';
 import { registerAPI, _beginRun, _endRun } from '../../../src/runtime/api-registry.js';
 
 function makeView(doc, cursorPos) {

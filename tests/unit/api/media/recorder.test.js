@@ -17,10 +17,18 @@ class MockMediaRecorder {
     this.onstop = null;
     MockMediaRecorder.instances.push(this);
   }
-  start(timeslice) { this.state = 'recording'; this._timeslice = timeslice; }
-  stop() { this.state = 'inactive'; this.onstop?.(); }
+  start(timeslice) {
+    this.state = 'recording';
+    this._timeslice = timeslice;
+  }
+  stop() {
+    this.state = 'inactive';
+    this.onstop?.();
+  }
   // Helper: fire a data chunk
-  fireData(data) { this.ondataavailable?.({ data }); }
+  fireData(data) {
+    this.ondataavailable?.({ data });
+  }
 }
 MockMediaRecorder.instances = [];
 MockMediaRecorder.isTypeSupported = (t) => t === 'video/webm;codecs=vp9' || t === 'video/webm';
@@ -120,7 +128,8 @@ describe('cleanupRecorders', () => {
 
   it('handles multiple in-flight recordings', () => {
     const stream = { getTracks: () => [] };
-    const s1 = vi.fn(), s2 = vi.fn();
+    const s1 = vi.fn(),
+      s2 = vi.fn();
     recordStream(stream, { onStop: s1 });
     recordStream(stream, { onStop: s2 });
     MockMediaRecorder.instances[0].fireData(new Blob(['a']));
@@ -150,9 +159,7 @@ describe('compositeCanvasStream', () => {
   });
 
   it('uses first canvas dimensions for the offscreen canvas', () => {
-    const canvases = [
-      Object.assign(document.createElement('canvas'), { width: 640, height: 360 }),
-    ];
+    const canvases = [Object.assign(document.createElement('canvas'), { width: 640, height: 360 })];
     HTMLCanvasElement.prototype.captureStream = vi.fn(() => ({ getTracks: () => [] }));
     const { stream, stop } = compositeCanvasStream(canvases, 30);
     stop();

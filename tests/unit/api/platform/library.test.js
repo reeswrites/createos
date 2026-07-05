@@ -1,9 +1,16 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
-  library, initLibrary, populateLibraryToolkit, populateLibraryBlocks,
-  resolveGLSL, resolveWGSL,
-  defineGLSL, defineWGSL, defineSnippet,
-  _buildBlockDef, _buildGenerator,
+  library,
+  initLibrary,
+  populateLibraryToolkit,
+  populateLibraryBlocks,
+  resolveGLSL,
+  resolveWGSL,
+  defineGLSL,
+  defineWGSL,
+  defineSnippet,
+  _buildBlockDef,
+  _buildGenerator,
   _resetForTesting,
 } from '../../../../src/api/platform/library.js';
 
@@ -13,23 +20,33 @@ import {
 
 const _lsStore = {};
 const _mockLS = {
-  getItem:    (k) => Object.prototype.hasOwnProperty.call(_lsStore, k) ? _lsStore[k] : null,
-  setItem:    (k, v) => { _lsStore[k] = String(v); },
-  removeItem: (k) => { delete _lsStore[k]; },
-  clear:      () => { Object.keys(_lsStore).forEach(k => delete _lsStore[k]); },
+  getItem: (k) => (Object.prototype.hasOwnProperty.call(_lsStore, k) ? _lsStore[k] : null),
+  setItem: (k, v) => {
+    _lsStore[k] = String(v);
+  },
+  removeItem: (k) => {
+    delete _lsStore[k];
+  },
+  clear: () => {
+    Object.keys(_lsStore).forEach((k) => delete _lsStore[k]);
+  },
 };
-Object.defineProperty(global, 'localStorage', { value: _mockLS, writable: true, configurable: true });
+Object.defineProperty(global, 'localStorage', {
+  value: _mockLS,
+  writable: true,
+  configurable: true,
+});
 
 // ── Setup / teardown ──────────────────────────────────────────────────────────
 
 beforeEach(() => {
-  Object.keys(_lsStore).forEach(k => delete _lsStore[k]);
+  Object.keys(_lsStore).forEach((k) => delete _lsStore[k]);
   _resetForTesting();
   delete global.window.__ar_addToolkitEntry;
 });
 
 afterEach(() => {
-  Object.keys(_lsStore).forEach(k => delete _lsStore[k]);
+  Object.keys(_lsStore).forEach((k) => delete _lsStore[k]);
   _resetForTesting();
   delete global.window.__ar_addToolkitEntry;
 });
@@ -38,33 +55,45 @@ afterEach(() => {
 
 describe('initLibrary()', () => {
   it('loads glsl entries from localStorage into memory', () => {
-    localStorage.setItem('vl_library', JSON.stringify({
-      version: 1,
-      glsl: { rainbow: 'vec4 c = vec4(1.0);' },
-      wgsl: {},
-      snippets: {},
-    }));
+    localStorage.setItem(
+      'vl_library',
+      JSON.stringify({
+        version: 1,
+        glsl: { rainbow: 'vec4 c = vec4(1.0);' },
+        wgsl: {},
+        snippets: {},
+      }),
+    );
     initLibrary();
     expect(resolveGLSL('rainbow')).toBe('vec4 c = vec4(1.0);');
   });
 
   it('loads wgsl entries', () => {
-    localStorage.setItem('vl_library', JSON.stringify({
-      version: 1, glsl: {},
-      wgsl: { plasma: 'fn plasma() {}' },
-      snippets: {},
-    }));
+    localStorage.setItem(
+      'vl_library',
+      JSON.stringify({
+        version: 1,
+        glsl: {},
+        wgsl: { plasma: 'fn plasma() {}' },
+        snippets: {},
+      }),
+    );
     initLibrary();
     expect(resolveWGSL('plasma')).toBe('fn plasma() {}');
   });
 
   it('loads snippets', () => {
-    localStorage.setItem('vl_library', JSON.stringify({
-      version: 1, glsl: {}, wgsl: {},
-      snippets: { setup: 'const cam = await Camera.open();' },
-    }));
+    localStorage.setItem(
+      'vl_library',
+      JSON.stringify({
+        version: 1,
+        glsl: {},
+        wgsl: {},
+        snippets: { setup: 'const cam = await Camera.open();' },
+      }),
+    );
     initLibrary();
-    expect(library.list().find(e => e.name === 'setup')?.type).toBe('snippet');
+    expect(library.list().find((e) => e.name === 'setup')?.type).toBe('snippet');
   });
 
   it('handles missing key gracefully', () => {
@@ -161,7 +190,7 @@ describe('library.wgsl()', () => {
 describe('library.snippet()', () => {
   it('appears in list()', () => {
     library.snippet('startup', 'audio.bpm(130); audio.start();');
-    const entry = library.list().find(e => e.name === 'startup');
+    const entry = library.list().find((e) => e.name === 'startup');
     expect(entry?.type).toBe('snippet');
     expect(entry?.preview).toContain('audio');
   });
@@ -174,7 +203,7 @@ describe('library.list()', () => {
     library.snippet('c', 'code c');
     const list = library.list();
     expect(list).toHaveLength(3);
-    expect(list.map(e => e.name)).toEqual(expect.arrayContaining(['a', 'b', 'c']));
+    expect(list.map((e) => e.name)).toEqual(expect.arrayContaining(['a', 'b', 'c']));
   });
 
   it('includes type field', () => {
@@ -222,7 +251,7 @@ describe('library.export() / library.import()', () => {
 
     expect(resolveGLSL('r')).toBe('rainbow body');
     expect(resolveWGSL('p')).toBe('plasma body');
-    expect(library.list().find(e => e.name === 's')?.type).toBe('snippet');
+    expect(library.list().find((e) => e.name === 's')?.type).toBe('snippet');
   });
 
   it('export() is valid JSON', () => {
@@ -254,7 +283,7 @@ describe('populateLibraryToolkit()', () => {
     populateLibraryToolkit();
     expect(spy).toHaveBeenCalledTimes(3);
     const categories = spy.mock.calls.map(([cat]) => cat);
-    expect(categories.every(c => c === 'My Library')).toBe(true);
+    expect(categories.every((c) => c === 'My Library')).toBe(true);
   });
 
   it('is a no-op when __ar_addToolkitEntry not available', () => {
@@ -297,13 +326,13 @@ describe('_buildBlockDef()', () => {
 
   it('includes input_value for value sockets', () => {
     const def = _buildBlockDef('v', { inputs: [{ name: 'SRC', label: 'source' }] });
-    const inp = def.args0.find(a => a.name === 'SRC');
+    const inp = def.args0.find((a) => a.name === 'SRC');
     expect(inp?.type).toBe('input_value');
   });
 
   it('includes input_statement for body', () => {
     const def = _buildBlockDef('b', { body: 'CODE' });
-    const inp = def.args0.find(a => a.name === 'CODE');
+    const inp = def.args0.find((a) => a.name === 'CODE');
     expect(inp?.type).toBe('input_statement');
   });
 
@@ -325,7 +354,7 @@ describe('_buildGenerator()', () => {
       fields: [{ name: 'X', type: 'number' }],
       code: 'draw.circle({X}, 450, 50);\n',
     });
-    const block = { getFieldValue: (n) => n === 'X' ? '800' : '' };
+    const block = { getFieldValue: (n) => (n === 'X' ? '800' : '') };
     expect(gen(block, null)).toBe('draw.circle(800, 450, 50);\n');
   });
 
@@ -393,7 +422,7 @@ describe('library.block()', () => {
 
   it('appears in list() as type block', () => {
     library.block('myBlock', { label: 'my block', code: 'x;\n' });
-    expect(library.list().find(e => e.name === 'myBlock')?.type).toBe('block');
+    expect(library.list().find((e) => e.name === 'myBlock')?.type).toBe('block');
   });
 
   it('persists to localStorage', () => {
@@ -418,7 +447,7 @@ describe('library.block()', () => {
     const json = library.export();
     _resetForTesting();
     library.import(json);
-    const entry = library.list().find(e => e.name === 'roundtrip');
+    const entry = library.list().find((e) => e.name === 'roundtrip');
     expect(entry?.type).toBe('block');
   });
 });
@@ -429,7 +458,7 @@ describe('library.remove() block', () => {
   it('removes block entry', () => {
     library.block('toRemove', { code: 'x;\n' });
     library.remove('block', 'toRemove');
-    expect(library.list().find(e => e.name === 'toRemove')).toBeUndefined();
+    expect(library.list().find((e) => e.name === 'toRemove')).toBeUndefined();
   });
 });
 
@@ -456,11 +485,17 @@ describe('populateLibraryBlocks()', () => {
 
 describe('initLibrary() with blocks', () => {
   it('loads block descriptors from localStorage', () => {
-    localStorage.setItem('vl_library', JSON.stringify({
-      version: 1, glsl: {}, wgsl: {}, snippets: {},
-      blocks: { saved: { label: 'saved', code: 'saved();\n' } },
-    }));
+    localStorage.setItem(
+      'vl_library',
+      JSON.stringify({
+        version: 1,
+        glsl: {},
+        wgsl: {},
+        snippets: {},
+        blocks: { saved: { label: 'saved', code: 'saved();\n' } },
+      }),
+    );
     initLibrary();
-    expect(library.list().find(e => e.name === 'saved')?.type).toBe('block');
+    expect(library.list().find((e) => e.name === 'saved')?.type).toBe('block');
   });
 });

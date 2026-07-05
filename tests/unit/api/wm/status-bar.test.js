@@ -4,25 +4,25 @@ import { statusBar, cleanupStatusBar } from '../../../../src/api/wm/status-bar.j
 // Status bar needs wm.spawn to create its window
 function mockWm() {
   // Create a fake wm window DOM structure
-  const textEl    = document.createElement('span');
-  textEl.id       = 'sb-text';
+  const textEl = document.createElement('span');
+  textEl.id = 'sb-text';
   const contentEl = document.createElement('span');
-  contentEl.id    = 'sb-content';
-  const body      = document.createElement('div');
-  body.className  = 'wm-body';
+  contentEl.id = 'sb-content';
+  const body = document.createElement('div');
+  body.className = 'wm-body';
   body.style.cssText = '';
   body.appendChild(textEl);
   body.appendChild(contentEl);
-  const win       = document.createElement('div');
-  win.id          = 'win-statusbar';
+  const win = document.createElement('div');
+  win.id = 'win-statusbar';
   win.style.cssText = '';
   win.appendChild(body);
   document.body.appendChild(win);
 
   window.wm = {
     spawn: vi.fn(() => 'win-statusbar'),
-    show:  vi.fn(),
-    hide:  vi.fn(),
+    show: vi.fn(),
+    hide: vi.fn(),
     close: vi.fn(),
   };
   return { win, body, textEl, contentEl };

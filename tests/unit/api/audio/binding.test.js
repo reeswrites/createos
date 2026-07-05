@@ -7,23 +7,44 @@ vi.mock('tone', () => {
       triggerAttackRelease: vi.fn(),
       triggerAttack: vi.fn(),
       triggerRelease: vi.fn(),
-      connect: vi.fn(function () { return this; }),
-      chain: vi.fn(function () { return this; }),
-      toDestination: vi.fn(function () { return this; }),
+      connect: vi.fn(function () {
+        return this;
+      }),
+      chain: vi.fn(function () {
+        return this;
+      }),
+      toDestination: vi.fn(function () {
+        return this;
+      }),
       start: vi.fn(),
       dispose: vi.fn(),
     };
   }
-  const mk = (tag) => vi.fn(function () { return makeNode(tag); });
+  const mk = (tag) =>
+    vi.fn(function () {
+      return makeNode(tag);
+    });
   return {
     default: {},
-    Synth: mk('Synth'), FMSynth: mk('FMSynth'), AMSynth: mk('AMSynth'),
-    MonoSynth: mk('MonoSynth'), DuoSynth: mk('DuoSynth'), PluckSynth: mk('PluckSynth'),
-    MembraneSynth: mk('MembraneSynth'), MetalSynth: mk('MetalSynth'), NoiseSynth: mk('NoiseSynth'),
-    PolySynth: vi.fn(function () { return makeNode('Poly'); }),
-    Gain: mk('Gain'), Reverb: mk('Reverb'), Chorus: mk('Chorus'),
-    FeedbackDelay: mk('FeedbackDelay'), Distortion: mk('Distortion'),
-    Filter: mk('Filter'), Compressor: mk('Compressor'),
+    Synth: mk('Synth'),
+    FMSynth: mk('FMSynth'),
+    AMSynth: mk('AMSynth'),
+    MonoSynth: mk('MonoSynth'),
+    DuoSynth: mk('DuoSynth'),
+    PluckSynth: mk('PluckSynth'),
+    MembraneSynth: mk('MembraneSynth'),
+    MetalSynth: mk('MetalSynth'),
+    NoiseSynth: mk('NoiseSynth'),
+    PolySynth: vi.fn(function () {
+      return makeNode('Poly');
+    }),
+    Gain: mk('Gain'),
+    Reverb: mk('Reverb'),
+    Chorus: mk('Chorus'),
+    FeedbackDelay: mk('FeedbackDelay'),
+    Distortion: mk('Distortion'),
+    Filter: mk('Filter'),
+    Compressor: mk('Compressor'),
   };
 });
 

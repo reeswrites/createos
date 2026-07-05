@@ -30,7 +30,9 @@ describe('sensors.vibrate()', () => {
 });
 
 describe('sensors.haptics', () => {
-  beforeEach(() => { navigator.vibrate = vi.fn(); });
+  beforeEach(() => {
+    navigator.vibrate = vi.fn();
+  });
 
   it('tap() vibrates 40ms', () => {
     sensors.haptics.tap();

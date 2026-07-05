@@ -7,7 +7,10 @@ describe('cleanupVideoSignal', () => {
     expect(() => cleanupVideoSignal()).not.toThrow();
   });
   test('idempotent — safe to call multiple times', () => {
-    expect(() => { cleanupVideoSignal(); cleanupVideoSignal(); }).not.toThrow();
+    expect(() => {
+      cleanupVideoSignal();
+      cleanupVideoSignal();
+    }).not.toThrow();
   });
   test('stops intervals created by signal()', () => {
     vi.useFakeTimers();
@@ -61,7 +64,8 @@ describe('VideoSignalAPI.signal() — signal shape', () => {
 describe('VideoSignalAPI.signal() — source types', () => {
   test('accepts canvas element as source', () => {
     const canvas = document.createElement('canvas');
-    canvas.width = 100; canvas.height = 100;
+    canvas.width = 100;
+    canvas.height = 100;
     expect(() => VideoSignalAPI.signal(canvas)).not.toThrow();
   });
 

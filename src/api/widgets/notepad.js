@@ -14,6 +14,7 @@
 import { notify, subscribe } from '../../events/index.js';
 import { mountWidgetShell, wireCaptureButton } from './widget-shell.js';
 import { onReset } from '../../runtime/reset-registry.js';
+import { registerDesktopFileType } from '../platform/desktop-file-registry.js';
 import { Take } from '../signal/performance-recorder.js';
 import { replayActions } from '../signal/replay-clock.js';
 
@@ -807,3 +808,10 @@ export class Notepad {
 
 // Register teardown with the reset registry (ADR 008).
 onReset(cleanupNotepads);
+
+// Desktop File-Type Adapter (ADR 055) — owns 'note' icon glyph + restore.
+registerDesktopFileType('note', {
+  glyph: 'fa-solid fa-file-lines',
+  cssClass: 'dt-note-icon',
+  open: (data, pos) => new Notepad({ ...data, ...pos }),
+});

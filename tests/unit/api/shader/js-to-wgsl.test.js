@@ -148,7 +148,9 @@ describe('jsToWGSL — block bodies', () => {
   test('if statement emitted', () => {
     const { body } = compile(({ uv }) => {
       let r = 0.0;
-      if (uv.x > 0.5) { r = 1.0; }
+      if (uv.x > 0.5) {
+        r = 1.0;
+      }
       return [r, 0.0, 0.0, 1.0];
     });
     expect(body).toContain('if (');
@@ -174,7 +176,9 @@ describe('jsToWGSL — param detection', () => {
 describe('jsToWGSL — helper hoisting', () => {
   test('inner function hoisted to helpers array', () => {
     const { helpers } = compile(({ uv }) => {
-      function wave(x) { return Math.sin(x * 6.28); }
+      function wave(x) {
+        return Math.sin(x * 6.28);
+      }
       return [wave(uv.x), 0.0, 0.0, 1.0];
     });
     expect(helpers.length).toBeGreaterThan(0);
@@ -183,7 +187,9 @@ describe('jsToWGSL — helper hoisting', () => {
 
   test('helper contains WGSL sin (not Math.sin)', () => {
     const { helpers } = compile(({ uv }) => {
-      function wave(x) { return Math.sin(x); }
+      function wave(x) {
+        return Math.sin(x);
+      }
       return [wave(uv.x), 0.0, 0.0, 1.0];
     });
     expect(helpers[0]).toContain('sin(');

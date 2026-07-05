@@ -26,7 +26,7 @@ function makeWrapper() {
   el.id = 'canvasWrapper';
   el.style.width = '800px';
   el.style.height = '600px';
-  Object.defineProperty(el, 'offsetWidth',  { get: () => 800 });
+  Object.defineProperty(el, 'offsetWidth', { get: () => 800 });
   Object.defineProperty(el, 'offsetHeight', { get: () => 600 });
   document.body.appendChild(el);
   return el;

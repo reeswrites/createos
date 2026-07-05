@@ -9,12 +9,14 @@ import { readAnalyser, bands } from '../../../../src/api/audio/analyser-read.js'
 // ── readAnalyser ──────────────────────────────────────────────────────────────
 
 describe('readAnalyser', () => {
-  beforeEach(() => { window.__ar_mic_analyser = undefined; });
+  beforeEach(() => {
+    window.__ar_mic_analyser = undefined;
+  });
 
   it('returns zero array when src is null/undefined', () => {
     const out = readAnalyser(null, 8);
     expect(out).toHaveLength(8);
-    expect(Array.from(out).every(v => v === 0)).toBe(true);
+    expect(Array.from(out).every((v) => v === 0)).toBe(true);
   });
 
   it('Tone.Analyser path: normalises dB values', () => {
@@ -23,10 +25,10 @@ describe('readAnalyser', () => {
       getValue: vi.fn(() => new Float32Array([-80, -40, 0, -Infinity])),
     };
     const out = readAnalyser(tone, 4);
-    expect(out[0]).toBeCloseTo(0);     // -80 dB → 0
-    expect(out[1]).toBeCloseTo(0.5);   // -40 dB → 0.5
-    expect(out[2]).toBeCloseTo(1);     // 0 dB  → 1
-    expect(out[3]).toBe(0);            // -Infinity → 0
+    expect(out[0]).toBeCloseTo(0); // -80 dB → 0
+    expect(out[1]).toBeCloseTo(0.5); // -40 dB → 0.5
+    expect(out[2]).toBeCloseTo(1); // 0 dB  → 1
+    expect(out[3]).toBe(0); // -Infinity → 0
   });
 
   it('Tone.Analyser: downsamples to requested bin count', () => {
@@ -40,7 +42,7 @@ describe('readAnalyser', () => {
   it('Web Audio AnalyserNode path: normalises byte values', () => {
     const node = {
       frequencyBinCount: 4,
-      getByteFrequencyData: vi.fn(arr => {
+      getByteFrequencyData: vi.fn((arr) => {
         arr[0] = 0;
         arr[1] = 128;
         arr[2] = 255;
@@ -66,7 +68,7 @@ describe('readAnalyser', () => {
   it("'mic' with no analyser set returns zeros", () => {
     window.__ar_mic_analyser = undefined;
     const out = readAnalyser('mic', 4);
-    expect(Array.from(out).every(v => v === 0)).toBe(true);
+    expect(Array.from(out).every((v) => v === 0)).toBe(true);
   });
 });
 
@@ -86,7 +88,9 @@ describe('bands', () => {
   it('bass is first 10% of bins', () => {
     // 32 bins: bass = bins[0..2] (floor(32*0.1) = 3)
     const fft = new Float32Array(32).fill(0);
-    fft[0] = 1; fft[1] = 1; fft[2] = 1; // only bass bins lit
+    fft[0] = 1;
+    fft[1] = 1;
+    fft[2] = 1; // only bass bins lit
     const b = bands(fft);
     expect(b.bass).toBeGreaterThan(0.9);
     expect(b.mid).toBeCloseTo(0);
@@ -113,7 +117,7 @@ describe('bands', () => {
   it('matches shader _writeUniforms band split formula', () => {
     // Mirror the formula: e = floor(32*0.1)=3, m = floor(32*0.5)=16
     const fft = new Float32Array(32);
-    for (let i = 0; i < 3; i++)  fft[i] = 0.8; // bass
+    for (let i = 0; i < 3; i++) fft[i] = 0.8; // bass
     for (let i = 3; i < 16; i++) fft[i] = 0.4; // mid
     for (let i = 16; i < 32; i++) fft[i] = 0.2; // high
     const b = bands(fft);

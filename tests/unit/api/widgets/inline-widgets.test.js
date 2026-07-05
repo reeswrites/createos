@@ -38,7 +38,9 @@ function iterDecos(view, field) {
   return result;
 }
 
-function widgetDecos(view) { return iterDecos(view, widgetsField); }
+function widgetDecos(view) {
+  return iterDecos(view, widgetsField);
+}
 
 function settle() {
   vi.advanceTimersByTime(1000); // advance past all debounce timers
@@ -89,7 +91,7 @@ describe('initInlineWidgets', () => {
   test('color swatch widget toDOM returns ar-color-swatch span', () => {
     const view = makeView('draw.circle(0,0,10,"blue");');
     settle();
-    const swatch = widgetDecos(view).find(d => d.deco.spec.widget instanceof ColorSwatchWidget);
+    const swatch = widgetDecos(view).find((d) => d.deco.spec.widget instanceof ColorSwatchWidget);
     const dom = swatch.deco.spec.widget.toDOM(view);
     expect(dom.tagName).toBe('SPAN');
     expect(dom.className).toBe('ar-color-swatch');
@@ -125,8 +127,8 @@ describe('initInlineWidgets', () => {
     const view = makeView('draw.rect(10, 20, 100, 50, "red");');
     settle();
     const decos = widgetDecos(view);
-    const swatches = decos.filter(d => d.deco.spec.widget instanceof ColorSwatchWidget);
-    const scrubs   = decos.filter(d => d.deco.spec.widget instanceof ScrubWidget);
+    const swatches = decos.filter((d) => d.deco.spec.widget instanceof ColorSwatchWidget);
+    const scrubs = decos.filter((d) => d.deco.spec.widget instanceof ScrubWidget);
     expect(swatches).toHaveLength(1);
     expect(scrubs).toHaveLength(4);
   });
@@ -218,7 +220,7 @@ describe('initInlineWidgets', () => {
     const decos = widgetDecos(view);
     // Now has 3 scrubs + 1 swatch from circle call
     expect(decos.length).toBeGreaterThan(0);
-    const swatches = decos.filter(d => d.deco.spec.widget instanceof ColorSwatchWidget);
+    const swatches = decos.filter((d) => d.deco.spec.widget instanceof ColorSwatchWidget);
     expect(swatches).toHaveLength(1);
   });
 

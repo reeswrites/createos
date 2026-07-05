@@ -37,7 +37,10 @@ function makeWmMock() {
       win._wmCleanup = null;
       win._widgetType = null;
       win._widgetState = null;
-      win._x = x ?? 100; win._y = y ?? 100; win._w = w; win._h = h;
+      win._x = x ?? 100;
+      win._y = y ?? 100;
+      win._w = w;
+      win._h = h;
       windows[id] = win;
       return id;
     },
@@ -69,14 +72,29 @@ let subscribe;
 
 beforeEach(async () => {
   // Fresh mocks per test
-  window.wm      = makeWmMock();
+  window.wm = makeWmMock();
   window.desktop = makeDesktopMock();
 
   // Mock execCommand so formatting tests can assert on it
   document.execCommand = vi.fn(() => true);
 
   // Reset getSelection stub
-  const mockSel = { rangeCount: 0, ranges: [], removeAllRanges() { this.ranges = []; this.rangeCount = 0; }, addRange(r) { this.ranges.push(r); this.rangeCount = this.ranges.length; }, getRangeAt(i) { return this.ranges[i]; }, isCollapsed: true };
+  const mockSel = {
+    rangeCount: 0,
+    ranges: [],
+    removeAllRanges() {
+      this.ranges = [];
+      this.rangeCount = 0;
+    },
+    addRange(r) {
+      this.ranges.push(r);
+      this.rangeCount = this.ranges.length;
+    },
+    getRangeAt(i) {
+      return this.ranges[i];
+    },
+    isCollapsed: true,
+  };
   window.getSelection = vi.fn(() => mockSel);
 
   vi.useFakeTimers();
@@ -323,7 +341,7 @@ describe('note.type() animation', () => {
     vi.advanceTimersByTime(16); // resolve tick
     await p;
     unsub();
-    expect(chars.map(d => d.char)).toEqual(['a', 'b']);
+    expect(chars.map((d) => d.char)).toEqual(['a', 'b']);
     expect(chars[0].winId).toBe(note._winId);
     expect(chars[0].index).toBe(0);
     expect(chars[1].index).toBe(1);
@@ -347,7 +365,9 @@ describe('note.type() animation', () => {
     const unsub = subscribe('note:type', typeEvt);
     note.type('x', { cps: 100 });
     unsub();
-    expect(typeEvt).toHaveBeenCalledWith(expect.objectContaining({ winId: note._winId, text: 'x' }));
+    expect(typeEvt).toHaveBeenCalledWith(
+      expect.objectContaining({ winId: note._winId, text: 'x' }),
+    );
   });
 
   it('returns a Promise that resolves when done', async () => {
@@ -367,7 +387,7 @@ describe('note.backspace() animation', () => {
     note._el.textContent = 'hi';
     // Provide a mock _caretPos that decrements from 2 → 1 → 0 as deletions occur
     let caretVal = 2;
-    note._caretPos = vi.fn(() => caretVal > 0 ? caretVal-- : 0);
+    note._caretPos = vi.fn(() => (caretVal > 0 ? caretVal-- : 0));
 
     const p = note.backspace(2, { cps: 100 });
     vi.advanceTimersByTime(16); // delete char at pos 2-1=1 ('i')
@@ -497,7 +517,7 @@ describe('note.on(event, fn)', () => {
 describe('SYSTEM_EVENTS catalog', () => {
   it('includes all six note:* events', async () => {
     const { SYSTEM_EVENTS } = await import('../../../../src/events/system-events.js');
-    const noteNames = SYSTEM_EVENTS.filter(e => e.name?.startsWith('note:')).map(e => e.name);
+    const noteNames = SYSTEM_EVENTS.filter((e) => e.name?.startsWith('note:')).map((e) => e.name);
     expect(noteNames).toContain('note:type');
     expect(noteNames).toContain('note:char');
     expect(noteNames).toContain('note:done');
@@ -509,7 +529,7 @@ describe('SYSTEM_EVENTS catalog', () => {
 
   it('note:char has primary:"char"', async () => {
     const { SYSTEM_EVENTS } = await import('../../../../src/events/system-events.js');
-    const charEvt = SYSTEM_EVENTS.find(e => e.name === 'note:char');
+    const charEvt = SYSTEM_EVENTS.find((e) => e.name === 'note:char');
     expect(charEvt?.primary).toBe('char');
   });
 });

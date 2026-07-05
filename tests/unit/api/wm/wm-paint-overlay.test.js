@@ -8,12 +8,17 @@ import { initWM, cleanupPaintOverlays } from '../../../../src/api/wm/wm.js';
 
 function findPaintBtn(winId) {
   const win = document.getElementById(winId);
-  return [...win.querySelectorAll('.wm-titlebar .wm-btn')].find(b => b.innerHTML.includes('🖌️')) ?? null;
+  return (
+    [...win.querySelectorAll('.wm-titlebar .wm-btn')].find((b) => b.innerHTML.includes('🖌️')) ??
+    null
+  );
 }
 
 function pointer(type, target, { x = 0, y = 0, id = 1 } = {}) {
   const e = new Event(type, { bubbles: true });
-  e.pointerId = id; e.clientX = x; e.clientY = y;
+  e.pointerId = id;
+  e.clientX = x;
+  e.clientY = y;
   target.dispatchEvent(e);
 }
 
@@ -23,9 +28,9 @@ describe('wm paint overlay (integration)', () => {
   beforeEach(() => {
     _store = new Map();
     globalThis.localStorage = {
-      getItem: k => (_store.has(k) ? _store.get(k) : null),
+      getItem: (k) => (_store.has(k) ? _store.get(k) : null),
       setItem: (k, v) => _store.set(k, String(v)),
-      removeItem: k => _store.delete(k),
+      removeItem: (k) => _store.delete(k),
       clear: () => _store.clear(),
     };
     // jsdom lacks pointer-capture; paint onDown calls it.
@@ -56,23 +61,25 @@ describe('wm paint overlay (integration)', () => {
     const btn = findPaintBtn(id);
     expect(btn).toBeTruthy();
 
-    expect(win._getOverlay()).toBeNull();   // lazy — no overlay until activated
+    expect(win._getOverlay()).toBeNull(); // lazy — no overlay until activated
     btn.click();
-    expect(win._getOverlay()).toBeTruthy();  // overlay canvas built
+    expect(win._getOverlay()).toBeTruthy(); // overlay canvas built
     btn.click();
-    expect(win._getOverlay()).toBeNull();    // torn down on toggle off
+    expect(win._getOverlay()).toBeNull(); // torn down on toggle off
   });
 
   it('emits a stroke event (with bbox) on pointer down→up while active', () => {
     const id = wm.spawn('Pic', { type: 'image', src: 'data:,', w: 300, h: 200 });
     const win = document.getElementById(id);
     let stroke = null;
-    wm.onStroke(id, p => { stroke = p; });
+    wm.onStroke(id, (p) => {
+      stroke = p;
+    });
 
-    findPaintBtn(id).click();                 // activate
+    findPaintBtn(id).click(); // activate
     const overlay = win._getOverlay();
     pointer('pointerdown', overlay, { x: 5, y: 5 });
-    pointer('pointerup',   overlay, { x: 5, y: 5 });
+    pointer('pointerup', overlay, { x: 5, y: 5 });
 
     expect(stroke).toBeTruthy();
     expect(stroke.winId).toBe(id);
@@ -90,7 +97,7 @@ describe('wm paint overlay (integration)', () => {
 
   it('closing the window tears the overlay down — paintEvents resolves null after', () => {
     const id = wm.spawn('Pic', { type: 'image', src: 'data:,', w: 300, h: 200 });
-    findPaintBtn(id).click();                 // build overlay so cleanup has something to do
+    findPaintBtn(id).click(); // build overlay so cleanup has something to do
     wm.remove(id, { animate: false });
     expect(document.getElementById(id)).toBeNull();
     expect(wm.paintEvents(id)).toBeNull();

@@ -2,9 +2,15 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { midi, cleanupMidi } from '../../../../src/api/audio/midi.js';
 
 // MIDI message helpers
-function noteOn(note, vel, ch = 0)  { return { data: [0x90 | ch, note, vel] }; }
-function noteOff(note, vel, ch = 0) { return { data: [0x80 | ch, note, vel] }; }
-function cc(cc, val, ch = 0)        { return { data: [0xB0 | ch, cc, val] }; }
+function noteOn(note, vel, ch = 0) {
+  return { data: [0x90 | ch, note, vel] };
+}
+function noteOff(note, vel, ch = 0) {
+  return { data: [0x80 | ch, note, vel] };
+}
+function cc(cc, val, ch = 0) {
+  return { data: [0xb0 | ch, cc, val] };
+}
 
 function mockMidiAccess(inputs = []) {
   const inputMap = new Map(inputs.map((inp, i) => [String(i), inp]));
@@ -18,9 +24,9 @@ beforeEach(async () => {
   // Reset midi state between tests
   midi._access = null;
   midi._noteHandlers.length = 0;
-  midi._ccHandlers.length  = 0;
+  midi._ccHandlers.length = 0;
   midi._signals.clear();
-  midi._cleanupFns.length  = 0;
+  midi._cleanupFns.length = 0;
 });
 
 afterEach(() => {
@@ -63,7 +69,13 @@ describe('midi.inputs()', () => {
   });
 
   it('returns mapped input list after open', async () => {
-    const inp = { id: '1', name: 'Keys', manufacturer: 'Roland', state: 'connected', onmidimessage: null };
+    const inp = {
+      id: '1',
+      name: 'Keys',
+      manufacturer: 'Roland',
+      state: 'connected',
+      onmidimessage: null,
+    };
     const access = mockMidiAccess([inp]);
     navigator.requestMIDIAccess = vi.fn().mockResolvedValue(access);
     await midi.open();
@@ -98,7 +110,7 @@ describe('midi._dispatch note messages', () => {
   it('includes channel from status byte', () => {
     const fn = vi.fn();
     midi.onNote(fn);
-    midi._dispatch(noteOn(48, 80, 5));  // ch 5
+    midi._dispatch(noteOn(48, 80, 5)); // ch 5
     expect(fn).toHaveBeenCalledWith(expect.objectContaining({ channel: 5 }));
   });
 });
@@ -114,8 +126,8 @@ describe('midi._dispatch CC messages', () => {
   it('onCC only fires for matching channel+cc', () => {
     const fn = vi.fn();
     midi.onCC(0, 1, fn);
-    midi._dispatch(cc(2, 64, 0));  // different CC
-    midi._dispatch(cc(1, 64, 1));  // different channel
+    midi._dispatch(cc(2, 64, 0)); // different CC
+    midi._dispatch(cc(1, 64, 1)); // different channel
     expect(fn).not.toHaveBeenCalled();
   });
 });

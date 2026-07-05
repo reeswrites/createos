@@ -8,11 +8,14 @@ import { PauseController } from '../../../src/runtime/pause-controller.js';
 
 function makeController({ intervals = new Map(), timeouts = new Map(), trackedSetters } = {}) {
   const clearInterval = vi.fn();
-  const clearTimeout  = vi.fn();
-  const setInterval   = vi.fn();
-  const setTimeout    = vi.fn();
+  const clearTimeout = vi.fn();
+  const setInterval = vi.fn();
+  const setTimeout = vi.fn();
   const ctl = new PauseController({
-    intervals, timeouts, clearInterval, clearTimeout,
+    intervals,
+    timeouts,
+    clearInterval,
+    clearTimeout,
     trackedSetters: trackedSetters ?? (() => ({ setInterval, setTimeout })),
   });
   return { ctl, intervals, timeouts, clearInterval, clearTimeout, setInterval, setTimeout };
@@ -21,7 +24,7 @@ function makeController({ intervals = new Map(), timeouts = new Map(), trackedSe
 describe('PauseController.pause()', () => {
   test('clears tracked intervals/timeouts and reports paused', () => {
     const intervals = new Map([[1, { cb: () => {}, delay: 100, args: [] }]]);
-    const timeouts  = new Map([[7, { cb: () => {}, delay: 500, createdAt: Date.now(), args: [] }]]);
+    const timeouts = new Map([[7, { cb: () => {}, delay: 500, createdAt: Date.now(), args: [] }]]);
     const { ctl, clearInterval, clearTimeout } = makeController({ intervals, timeouts });
 
     expect(ctl.paused).toBe(false);
@@ -38,8 +41,8 @@ describe('PauseController.pause()', () => {
     const { ctl, clearInterval } = makeController({ intervals });
     ctl.pause();
     intervals.set(2, { cb: () => {}, delay: 50, args: [] }); // arrives after freeze
-    ctl.pause();                                             // no-op
-    expect(clearInterval).toHaveBeenCalledTimes(1);          // only the first id
+    ctl.pause(); // no-op
+    expect(clearInterval).toHaveBeenCalledTimes(1); // only the first id
   });
 });
 
@@ -56,14 +59,14 @@ describe('PauseController.resume()', () => {
 
   test('restores timeouts with their REMAINING delay', () => {
     const cb = () => {};
-    const createdAt = Date.now() - 300;                     // 300ms already elapsed
-    const timeouts  = new Map([[9, { cb, delay: 500, createdAt, args: [] }]]);
+    const createdAt = Date.now() - 300; // 300ms already elapsed
+    const timeouts = new Map([[9, { cb, delay: 500, createdAt, args: [] }]]);
     const { ctl, setTimeout } = makeController({ timeouts });
     ctl.pause();
     ctl.resume();
     expect(setTimeout).toHaveBeenCalledTimes(1);
     const [, remaining] = setTimeout.mock.calls[0];
-    expect(remaining).toBeGreaterThanOrEqual(150);          // ~200ms left, allow slack
+    expect(remaining).toBeGreaterThanOrEqual(150); // ~200ms left, allow slack
     expect(remaining).toBeLessThanOrEqual(250);
   });
 
@@ -72,13 +75,16 @@ describe('PauseController.resume()', () => {
     const intervals = new Map([[1, { cb, delay: 100, args: [] }]]);
     let resolved = 0;
     const lateSetInterval = vi.fn();
-    const trackedSetters = () => { resolved++; return { setInterval: lateSetInterval, setTimeout: vi.fn() }; };
+    const trackedSetters = () => {
+      resolved++;
+      return { setInterval: lateSetInterval, setTimeout: vi.fn() };
+    };
     const { ctl } = makeController({ intervals, trackedSetters });
 
     ctl.pause();
-    expect(resolved).toBe(0);          // pause must NOT resolve setters
+    expect(resolved).toBe(0); // pause must NOT resolve setters
     ctl.resume();
-    expect(resolved).toBe(1);          // resume resolves them once, then
+    expect(resolved).toBe(1); // resume resolves them once, then
     expect(lateSetInterval).toHaveBeenCalledWith(cb, 100);
   });
 
@@ -96,7 +102,7 @@ describe('PauseController.clear()', () => {
     ctl.pause();
     ctl.clear();
     expect(ctl.paused).toBe(false);
-    ctl.resume();                       // nothing to restore
+    ctl.resume(); // nothing to restore
     expect(setInterval).not.toHaveBeenCalled();
   });
 });

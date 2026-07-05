@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { emit } from '../../../src/events/index.js';
-import { registerNativeCapability, unregisterNativeCapability } from '../../../src/runtime/native.js';
+import {
+  registerNativeCapability,
+  unregisterNativeCapability,
+} from '../../../src/runtime/native.js';
 // Importing the bridge registers its bus commands/source against the real bus singleton.
 import '../../../src/api/io/native-bridge.js';
 

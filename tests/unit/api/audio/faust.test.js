@@ -3,14 +3,23 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 vi.mock('tone', () => {
   const gain = () => ({
     input: { __gainInput: true },
-    connect: vi.fn(function () { return this; }),
-    toDestination: vi.fn(function () { return this; }),
+    connect: vi.fn(function () {
+      return this;
+    }),
+    toDestination: vi.fn(function () {
+      return this;
+    }),
     dispose: vi.fn(),
   });
   return {
     default: {},
-    Gain: vi.fn(function () { return gain(); }),
-    Frequency: vi.fn((n) => ({ toMidi: () => (n === 'C4' ? 60 : n === 'E4' ? 64 : 62), toFrequency: () => 440 })),
+    Gain: vi.fn(function () {
+      return gain();
+    }),
+    Frequency: vi.fn((n) => ({
+      toMidi: () => (n === 'C4' ? 60 : n === 'E4' ? 64 : 62),
+      toFrequency: () => 440,
+    })),
     Time: vi.fn(() => ({ toMilliseconds: () => 200 })),
     getContext: () => ({ rawContext: {} }),
   };
@@ -103,7 +112,9 @@ describe('buildFaustHandle', () => {
   });
 
   it('a compile failure is swallowed (warns, no throw)', async () => {
-    _setFaustNodeFactoryForTesting(async () => { throw new Error('syntax'); });
+    _setFaustNodeFactoryForTesting(async () => {
+      throw new Error('syntax');
+    });
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const h = buildFaustHandle({ kind: 'faust', code: 'bad' });
     await vi.runAllTimersAsync();

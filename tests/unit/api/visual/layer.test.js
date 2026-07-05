@@ -202,7 +202,13 @@ describe('Layer.blendMode', () => {
 describe('Layer chaining', () => {
   test('methods chain fluently', () => {
     const { layer } = makeLayer();
-    const result = layer.blur(2).hue(45).brightness(1.2).opacity(0.8).rotate(10).blendMode('screen');
+    const result = layer
+      .blur(2)
+      .hue(45)
+      .brightness(1.2)
+      .opacity(0.8)
+      .rotate(10)
+      .blendMode('screen');
     expect(result).toBe(layer);
   });
 });

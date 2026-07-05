@@ -13,9 +13,9 @@ describe('wm.spawn id collision avoidance', () => {
   beforeEach(() => {
     _store = new Map();
     globalThis.localStorage = {
-      getItem: k => (_store.has(k) ? _store.get(k) : null),
+      getItem: (k) => (_store.has(k) ? _store.get(k) : null),
       setItem: (k, v) => _store.set(k, String(v)),
-      removeItem: k => _store.delete(k),
+      removeItem: (k) => _store.delete(k),
       clear: () => _store.clear(),
     };
     desktop = document.createElement('div');
@@ -41,7 +41,7 @@ describe('wm.spawn id collision avoidance', () => {
     expect(b).not.toBe('win-spawn-1');
     expect(a).not.toBe(b);
 
-    const allIds = [...document.querySelectorAll('.wm-win')].map(w => w.id);
+    const allIds = [...document.querySelectorAll('.wm-win')].map((w) => w.id);
     const dupes = allIds.filter((v, i, arr) => arr.indexOf(v) !== i);
     expect(dupes).toEqual([]);
 
@@ -65,7 +65,7 @@ describe('wm.spawn id collision avoidance', () => {
   it('wm.remove tears down a spawned window and removes it from the DOM', () => {
     const id = wm.spawn('Doomed', { w: 400, h: 300 });
     expect(document.getElementById(id)).toBeTruthy();
-    wm.remove(id, { animate: false });   // animate:false → synchronous removal (reset path)
+    wm.remove(id, { animate: false }); // animate:false → synchronous removal (reset path)
     expect(document.getElementById(id)).toBeNull();
   });
 
@@ -75,15 +75,15 @@ describe('wm.spawn id collision avoidance', () => {
 
   it('transient windows (pipe/route run artifacts) are not serialized to localStorage', async () => {
     const persistent = wm.spawn('Keep', { type: 'html', html: 'hi', w: 300, h: 200 });
-    const transient  = wm.spawn('Karaoke', { transient: true, html: '', w: 800, h: 450 });
+    const transient = wm.spawn('Karaoke', { transient: true, html: '', w: 800, h: 450 });
 
     // wm.move triggers the debounced _saveState → _flushState.
     wm.move(transient, 10, 10);
-    await new Promise(r => setTimeout(r, 600));
+    await new Promise((r) => setTimeout(r, 600));
 
     const saved = JSON.parse(localStorage.getItem('vl-wm-state') || '{"wins":[]}');
-    const ids = saved.wins.map(w => w.id);
-    expect(ids).toContain(persistent);     // normal spawned window persists
-    expect(ids).not.toContain(transient);  // transient run-artifact does not
+    const ids = saved.wins.map((w) => w.id);
+    expect(ids).toContain(persistent); // normal spawned window persists
+    expect(ids).not.toContain(transient); // transient run-artifact does not
   });
 });

@@ -9,40 +9,53 @@ vi.mock('tone', () => {
       triggerAttackRelease: vi.fn(),
       triggerAttack: vi.fn(),
       triggerRelease: vi.fn(),
-      connect: vi.fn(function() { return this; }),
-      chain: vi.fn(function() { return this; }),
+      connect: vi.fn(function () {
+        return this;
+      }),
+      chain: vi.fn(function () {
+        return this;
+      }),
       start: vi.fn(),
       dispose: vi.fn(),
-      toDestination() { return this; },
+      toDestination() {
+        return this;
+      },
     };
   }
-  const mk = () => vi.fn(function() { return makeSynth(); });
+  const mk = () =>
+    vi.fn(function () {
+      return makeSynth();
+    });
   return {
     default: {},
     MembraneSynth: mk(),
-    NoiseSynth:    mk(),
-    MetalSynth:    mk(),
-    Synth:         mk(),
-    FMSynth:       mk(),
-    AMSynth:       mk(),
-    MonoSynth:     mk(),
-    DuoSynth:      mk(),
-    PluckSynth:    mk(),
-    PolySynth:     vi.fn(function() { return makeSynth(); }),
-    Gain:          mk(),
-    Reverb:        mk(),
-    Chorus:        mk(),
+    NoiseSynth: mk(),
+    MetalSynth: mk(),
+    Synth: mk(),
+    FMSynth: mk(),
+    AMSynth: mk(),
+    MonoSynth: mk(),
+    DuoSynth: mk(),
+    PluckSynth: mk(),
+    PolySynth: vi.fn(function () {
+      return makeSynth();
+    }),
+    Gain: mk(),
+    Reverb: mk(),
+    Chorus: mk(),
     FeedbackDelay: mk(),
-    Distortion:    mk(),
-    Filter:        mk(),
-    Compressor:    mk(),
-    Sequence:      vi.fn(function() { return { start: vi.fn(), stop: vi.fn(), dispose: vi.fn() }; }),
-    now:           () => 0,
-    getTransport:  () => ({
-      bpm:    { value: 120 },
-      start:  vi.fn(),
-      stop:   vi.fn(),
-      pause:  vi.fn(),
+    Distortion: mk(),
+    Filter: mk(),
+    Compressor: mk(),
+    Sequence: vi.fn(function () {
+      return { start: vi.fn(), stop: vi.fn(), dispose: vi.fn() };
+    }),
+    now: () => 0,
+    getTransport: () => ({
+      bpm: { value: 120 },
+      start: vi.fn(),
+      stop: vi.fn(),
+      pause: vi.fn(),
     }),
   };
 });
@@ -80,16 +93,16 @@ beforeEach(() => {
     addHistoryControls: vi.fn(),
   };
   window.desktop = {
-    add:       vi.fn(() => ({ id: 'dt-drumpad-test-1' })),
+    add: vi.fn(() => ({ id: 'dt-drumpad-test-1' })),
     updateUrl: vi.fn(),
   };
   window.__ar_active_editor_id = null;
-  window.__ar_instances        = null;
+  window.__ar_instances = null;
 });
 
 afterEach(() => {
   cleanupDrumpads();
-  document.querySelectorAll('[id^="win-drumpad-test-"]').forEach(el => el.remove());
+  document.querySelectorAll('[id^="win-drumpad-test-"]').forEach((el) => el.remove());
   delete window.wm;
   delete window.desktop;
   delete window.__ar_active_editor_id;
@@ -139,7 +152,7 @@ describe('onHit', () => {
   it('fires on any pad trigger', () => {
     const dp = new Drumpad();
     const hits = [];
-    dp.onHit(ev => hits.push(ev));
+    dp.onHit((ev) => hits.push(ev));
 
     dp._trigger(0, 0, { source: 'pad' });
     dp._trigger(3, 0, { source: 'key' });
@@ -149,7 +162,9 @@ describe('onHit', () => {
   it('payload has correct fields', () => {
     const dp = new Drumpad();
     let captured;
-    dp.onHit(ev => { captured = ev; });
+    dp.onHit((ev) => {
+      captured = ev;
+    });
     dp._trigger(0, 0, { source: 'pad', step: null });
     expect(captured).toMatchObject({ vi: 0, id: 'kick', label: 'Kick', source: 'pad', step: null });
   });
@@ -157,7 +172,7 @@ describe('onHit', () => {
   it('fires for all voices', () => {
     const dp = new Drumpad();
     const vis = [];
-    dp.onHit(ev => vis.push(ev.vi));
+    dp.onHit((ev) => vis.push(ev.vi));
     for (let i = 0; i < 8; i++) dp._trigger(i, 0, { source: 'pad' });
     expect(vis).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
   });
@@ -174,7 +189,7 @@ describe('onPad', () => {
   it('fires only for the specified pad index', () => {
     const dp = new Drumpad();
     const hits = [];
-    dp.onPad(0, ev => hits.push(ev.vi));
+    dp.onPad(0, (ev) => hits.push(ev.vi));
 
     dp._trigger(0, 0, { source: 'pad' }); // kick — should fire
     dp._trigger(1, 0, { source: 'pad' }); // snare — should NOT
@@ -186,7 +201,7 @@ describe('onPad', () => {
   it('accepts string name', () => {
     const dp = new Drumpad();
     const labels = [];
-    dp.onPad('snare', ev => labels.push(ev.label));
+    dp.onPad('snare', (ev) => labels.push(ev.label));
     dp._trigger(0, 0, { source: 'pad' }); // kick — ignored
     dp._trigger(1, 0, { source: 'pad' }); // snare
     expect(labels).toEqual(['Snare']);
@@ -195,7 +210,7 @@ describe('onPad', () => {
   it('accepts case-insensitive label', () => {
     const dp = new Drumpad();
     const fired = [];
-    dp.onPad('Cymbal', ev => fired.push(ev.id));
+    dp.onPad('Cymbal', (ev) => fired.push(ev.id));
     dp._trigger(7, 0, { source: 'key' });
     expect(fired).toEqual(['cym']);
   });
@@ -211,7 +226,9 @@ describe('onPad', () => {
   it('source field reflects trigger context', () => {
     const dp = new Drumpad();
     let src;
-    dp.onPad(0, ev => { src = ev.source; });
+    dp.onPad(0, (ev) => {
+      src = ev.source;
+    });
     dp._trigger(0, 0, { source: 'seq', step: 4 });
     expect(src).toBe('seq');
   });
@@ -219,7 +236,9 @@ describe('onPad', () => {
   it('step field is set from sequencer context', () => {
     const dp = new Drumpad();
     let s;
-    dp.onPad(0, ev => { s = ev.step; });
+    dp.onPad(0, (ev) => {
+      s = ev.step;
+    });
     dp._trigger(0, 0, { source: 'seq', step: 7 });
     expect(s).toBe(7);
   });
@@ -236,7 +255,7 @@ describe('onStep', () => {
   it('fires step hooks with correct payload', () => {
     const dp = new Drumpad();
     const steps = [];
-    dp.onStep(ev => steps.push(ev));
+    dp.onStep((ev) => steps.push(ev));
 
     // Emit a step event directly (as the sequencer would)
     dp._events.emit('step', { step: 3, activeVoices: [0, 2] });
@@ -364,7 +383,7 @@ describe('cleanupDrumpads', () => {
   it('empties step hooks', () => {
     const dp = new Drumpad();
     const steps = [];
-    dp.onStep(ev => steps.push(ev));
+    dp.onStep((ev) => steps.push(ev));
     dp._events.emit('step', { step: 0, activeVoices: [] });
     expect(steps).toHaveLength(1);
 
@@ -376,7 +395,8 @@ describe('cleanupDrumpads', () => {
   it('works on multiple instances', () => {
     const dp1 = new Drumpad();
     const dp2 = new Drumpad();
-    const calls1 = [], calls2 = [];
+    const calls1 = [],
+      calls2 = [];
     dp1.onHit(() => calls1.push(1));
     dp2.onHit(() => calls2.push(2));
     dp2.onHit(() => calls2.push(2));
@@ -427,7 +447,9 @@ describe('drumpad bindings', () => {
   it('bindAction fires a named bus event on strike', () => {
     const dp = new Drumpad();
     let got = null;
-    on('drop').do((p) => { got = p; });
+    on('drop').do((p) => {
+      got = p;
+    });
     dp.bindAction(1, 'drop');
     dp._trigger(1, 0, { source: 'pad' });
     expect(got).toMatchObject({ vi: 1, source: 'pad' });
@@ -437,7 +459,9 @@ describe('drumpad bindings', () => {
     const dp = new Drumpad();
     const synth = dp._voices[2].synth;
     let fired = false;
-    on('mute-evt').do(() => { fired = true; });
+    on('mute-evt').do(() => {
+      fired = true;
+    });
     dp.bindAction(2, 'mute-evt', { silent: true });
     dp._trigger(2, 0, { source: 'pad' });
     expect(synth.triggerAttackRelease).not.toHaveBeenCalled();

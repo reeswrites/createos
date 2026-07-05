@@ -3,9 +3,18 @@ import { WidgetEvents } from '../../../../src/api/widgets/widget-events.js';
 
 // jsdom does not implement requestAnimationFrame; stub it globally.
 let _rafCbs = [];
-global.requestAnimationFrame  = (fn) => { const id = _rafCbs.push(fn); return id; };
-global.cancelAnimationFrame   = (id)  => { _rafCbs[id - 1] = null; };
-function _flushRaf()           { const cbs = [..._rafCbs]; _rafCbs = []; cbs.forEach(fn => fn?.()); }
+global.requestAnimationFrame = (fn) => {
+  const id = _rafCbs.push(fn);
+  return id;
+};
+global.cancelAnimationFrame = (id) => {
+  _rafCbs[id - 1] = null;
+};
+function _flushRaf() {
+  const cbs = [..._rafCbs];
+  _rafCbs = [];
+  cbs.forEach((fn) => fn?.());
+}
 
 // ── on / emit ────────────────────────────────────────────────────────────────
 
@@ -13,7 +22,7 @@ describe('on + emit', () => {
   it('fires a registered listener', () => {
     const ev = new WidgetEvents();
     const calls = [];
-    ev.on('stroke', p => calls.push(p));
+    ev.on('stroke', (p) => calls.push(p));
     ev.emit('stroke', { tool: 'pen' });
     expect(calls).toHaveLength(1);
     expect(calls[0]).toMatchObject({ tool: 'pen' });
@@ -22,9 +31,9 @@ describe('on + emit', () => {
   it('fires wildcard * listener for every event', () => {
     const ev = new WidgetEvents();
     const calls = [];
-    ev.on('*', p => calls.push(p));
+    ev.on('*', (p) => calls.push(p));
     ev.emit('stroke', { a: 1 });
-    ev.emit('color',  { b: 2 });
+    ev.emit('color', { b: 2 });
     expect(calls).toHaveLength(2);
   });
 
@@ -32,7 +41,7 @@ describe('on + emit', () => {
     const ev = new WidgetEvents();
     const log = [];
     ev.on('stroke', () => log.push('specific'));
-    ev.on('*',      () => log.push('wild'));
+    ev.on('*', () => log.push('wild'));
     ev.emit('stroke', {});
     expect(log).toEqual(['specific', 'wild']);
   });
@@ -49,7 +58,9 @@ describe('on + emit', () => {
     const ev = new WidgetEvents();
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const results = [];
-    ev.on('stroke', () => { throw new Error('boom'); });
+    ev.on('stroke', () => {
+      throw new Error('boom');
+    });
     ev.on('stroke', () => results.push('ok'));
     ev.emit('stroke', {});
     expect(results).toEqual(['ok']);
@@ -201,7 +212,7 @@ describe('signal — match predicate', () => {
     const ev = new WidgetEvents();
     let now = 0;
     vi.spyOn(performance, 'now').mockImplementation(() => now);
-    const sig = ev.signal('hit', { decay: 100, match: e => e.vi === 0 });
+    const sig = ev.signal('hit', { decay: 100, match: (e) => e.vi === 0 });
     ev.emit('hit', { vi: 0 });
     expect(sig.value).toBeCloseTo(1, 5);
     vi.restoreAllMocks();
@@ -211,7 +222,7 @@ describe('signal — match predicate', () => {
     const ev = new WidgetEvents();
     let now = 0;
     vi.spyOn(performance, 'now').mockImplementation(() => now);
-    const sig = ev.signal('hit', { decay: 100, match: e => e.vi === 0 });
+    const sig = ev.signal('hit', { decay: 100, match: (e) => e.vi === 0 });
     ev.emit('hit', { vi: 3 });
     expect(sig.value).toBe(0);
     vi.restoreAllMocks();
@@ -227,7 +238,7 @@ describe('signal.on', () => {
     vi.spyOn(performance, 'now').mockImplementation(() => now);
     const sig = ev.signal('stroke', { decay: 100, region: { x: 0, y: 0, w: 50, h: 50 } });
     const calls = [];
-    sig.on(p => calls.push(p));
+    sig.on((p) => calls.push(p));
     ev.emit('stroke', { bbox: { x: 5, y: 5, w: 10, h: 10 } }); // inside
     ev.emit('stroke', { bbox: { x: 100, y: 100, w: 10, h: 10 } }); // outside
     expect(calls).toHaveLength(1);
@@ -242,7 +253,7 @@ describe('signal.stream', () => {
     const ev = new WidgetEvents();
     const vals = [];
     const sig = ev.signal('stroke', { decay: 100 });
-    sig.stream(s => vals.push(s));
+    sig.stream((s) => vals.push(s));
     _flushRaf(); // one frame
     expect(vals).toHaveLength(1);
     expect(vals[0]).toBe(sig);

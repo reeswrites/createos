@@ -16,7 +16,9 @@ import {
 // so we register unique names per test to avoid interference.
 
 let _counter = 0;
-function uid() { return `__test_api_${_counter++}`; }
+function uid() {
+  return `__test_api_${_counter++}`;
+}
 
 // ── reassertBuiltins (ADR 035 — heals evalScope global clobber) ────────────────
 
@@ -213,7 +215,7 @@ describe('deferred hooks', () => {
     const calls = [];
     _setBlocksApplier((n, defs) => calls.push({ n, defs }));
     // The pending entry should have been flushed
-    expect(calls.some(c => c.n === name)).toBe(true);
+    expect(calls.some((c) => c.n === name)).toBe(true);
     delete window[name];
     _setBlocksApplier(null);
   });
@@ -227,7 +229,7 @@ describe('deferred hooks', () => {
 
     const calls = [];
     _setToolkitApplier((cat, entries) => calls.push({ cat, entries }));
-    expect(calls.some(c => c.cat === 'DeferredCat')).toBe(true);
+    expect(calls.some((c) => c.cat === 'DeferredCat')).toBe(true);
     delete window[name];
     _setToolkitApplier(null);
   });

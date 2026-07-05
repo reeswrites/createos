@@ -71,14 +71,16 @@ describe('ascii.play', () => {
 describe('canvasToAsciiText', () => {
   it('returns a string', () => {
     const canvas = document.createElement('canvas');
-    canvas.width = 10; canvas.height = 10;
+    canvas.width = 10;
+    canvas.height = 10;
     const result = canvasToAsciiText(canvas, { cols: 10 });
     expect(typeof result).toBe('string');
   });
 
   it('has newlines for each row', () => {
     const canvas = document.createElement('canvas');
-    canvas.width = 20; canvas.height = 20;
+    canvas.width = 20;
+    canvas.height = 20;
     const result = canvasToAsciiText(canvas, { cols: 10 });
     const rows = Math.round(10 / 2.5);
     expect(result.split('\n').length - 1).toBe(rows);
@@ -86,7 +88,8 @@ describe('canvasToAsciiText', () => {
 
   it('dark pixels map to early charset chars', () => {
     const canvas = document.createElement('canvas');
-    canvas.width = 4; canvas.height = 4;
+    canvas.width = 4;
+    canvas.height = 4;
     // Leave it all black (default)
     const result = canvasToAsciiText(canvas, { cols: 4, charset: ' .:-=+*#%@' });
     // All pixels are black → lum 0 → first char ' '
@@ -105,7 +108,8 @@ describe('colored frame playback (AsciiEditor export format)', () => {
 
   it('renders colored frame via innerHTML spans', () => {
     const frame = {
-      w: 2, h: 1,
+      w: 2,
+      h: 1,
       cells: [
         { c: 'A', f: '#ff0000', b: null },
         { c: 'B', f: '#00ff00', b: '#0000ff' },
@@ -123,7 +127,8 @@ describe('colored frame playback (AsciiEditor export format)', () => {
 
   it('HTML-escapes chars to prevent XSS', () => {
     const frame = {
-      w: 1, h: 1,
+      w: 1,
+      h: 1,
       cells: [{ c: '<', f: '#fff', b: null }],
     };
     const player = ascii.play([frame], 8);

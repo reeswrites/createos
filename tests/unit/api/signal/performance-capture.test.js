@@ -1,9 +1,17 @@
 // Performance capture / replay (ADR 031) — recorder buffer, scheduler, timeline.
 import {
-  Take, armGlobal, disarmGlobal, isGlobalArmed,
-  buildReplayCode, buildTimelineCode,
+  Take,
+  armGlobal,
+  disarmGlobal,
+  isGlobalArmed,
+  buildReplayCode,
+  buildTimelineCode,
 } from '../../../../src/api/signal/performance-recorder.js';
-import { scheduleReplay, replayActions, _activeReplayCount } from '../../../../src/api/signal/replay-clock.js';
+import {
+  scheduleReplay,
+  replayActions,
+  _activeReplayCount,
+} from '../../../../src/api/signal/replay-clock.js';
 import { runResetHandlers } from '../../../../src/runtime/reset-registry.js';
 import { timeline } from '../../../../src/api/signal/timeline.js';
 
@@ -11,8 +19,12 @@ import { timeline } from '../../../../src/api/signal/timeline.js';
 function fakeWidget(varName = 'w') {
   return {
     applied: [],
-    _applyAction(a) { this.applied.push(a); },
-    _perfCtor() { return { varName, code: `const ${varName} = make();` }; },
+    _applyAction(a) {
+      this.applied.push(a);
+    },
+    _perfCtor() {
+      return { varName, code: `const ${varName} = make();` };
+    },
   };
 }
 
@@ -37,7 +49,9 @@ describe('Take — per-widget capture buffer', () => {
 
   test('arm() resets the previous log', () => {
     const t = new Take(fakeWidget());
-    t.arm(); t.push({ vi: 1 }); t.disarm();
+    t.arm();
+    t.push({ vi: 1 });
+    t.disarm();
     t.arm();
     expect(t.disarm()).toEqual([]);
   });
@@ -52,20 +66,22 @@ describe('Take — per-widget capture buffer', () => {
 });
 
 describe('Global take — shared clock across widgets', () => {
-  afterEach(() => { if (isGlobalArmed()) disarmGlobal(); });
+  afterEach(() => {
+    if (isGlobalArmed()) disarmGlobal();
+  });
 
   test('routes pushes into per-widget tracks, ignoring solo arm state', () => {
     const w1 = new Take(fakeWidget('a'));
     const w2 = new Take(fakeWidget('b'));
     armGlobal();
     expect(isGlobalArmed()).toBe(true);
-    w1.push({ vi: 0 });          // not solo-armed, but global captures it
+    w1.push({ vi: 0 }); // not solo-armed, but global captures it
     w2.push({ op: 'pixel', x: 1, y: 2 });
     w1.push({ vi: 1 });
     const tracks = disarmGlobal();
     expect(isGlobalArmed()).toBe(false);
     expect(tracks).toHaveLength(2);
-    const byWidget = new Map(tracks.map(t => [t.widget, t.actions]));
+    const byWidget = new Map(tracks.map((t) => [t.widget, t.actions]));
     expect(byWidget.get(w1._widget)).toHaveLength(2);
     expect(byWidget.get(w2._widget)).toHaveLength(1);
   });
@@ -82,7 +98,10 @@ describe('Global take — shared clock across widgets', () => {
 describe('Code builders', () => {
   test('buildReplayCode emits ctor + one-line-per-action replay', () => {
     const w = fakeWidget('dp');
-    const code = buildReplayCode(w, [{ t: 0, vi: 0 }, { t: 100, vi: 2 }]);
+    const code = buildReplayCode(w, [
+      { t: 0, vi: 0 },
+      { t: 100, vi: 2 },
+    ]);
     expect(code).toContain('const dp = make();');
     expect(code).toContain('dp.replay([');
     expect(code).toContain('{"t":0,"vi":0}');
@@ -90,12 +109,14 @@ describe('Code builders', () => {
   });
 
   test('buildReplayCode loop option', () => {
-    expect(buildReplayCode(fakeWidget('p'), [{ t: 0 }], { loop: true }))
-      .toContain('{ loop: true }');
+    expect(buildReplayCode(fakeWidget('p'), [{ t: 0 }], { loop: true })).toContain(
+      '{ loop: true }',
+    );
   });
 
   test('buildTimelineCode composes one track per widget', () => {
-    const a = fakeWidget('p'); const b = fakeWidget('dp');
+    const a = fakeWidget('p');
+    const b = fakeWidget('dp');
     const code = buildTimelineCode([
       { widget: a, actions: [{ t: 0, note: 'C4' }] },
       { widget: b, actions: [{ t: 50, vi: 0 }] },
@@ -110,24 +131,35 @@ describe('Code builders', () => {
 });
 
 describe('replay-clock scheduler', () => {
-  beforeEach(() => { vi.useFakeTimers(); });
-  afterEach(() => { vi.runOnlyPendingTimers(); vi.useRealTimers(); });
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
+  });
 
   test('fires ops at their offsets', () => {
     const fired = [];
     scheduleReplay([
-      { at: 0,   fn: () => fired.push('a') },
+      { at: 0, fn: () => fired.push('a') },
       { at: 100, fn: () => fired.push('b') },
       { at: 300, fn: () => fired.push('c') },
     ]);
-    vi.advanceTimersByTime(0);   expect(fired).toEqual(['a']);
-    vi.advanceTimersByTime(100); expect(fired).toEqual(['a', 'b']);
-    vi.advanceTimersByTime(200); expect(fired).toEqual(['a', 'b', 'c']);
+    vi.advanceTimersByTime(0);
+    expect(fired).toEqual(['a']);
+    vi.advanceTimersByTime(100);
+    expect(fired).toEqual(['a', 'b']);
+    vi.advanceTimersByTime(200);
+    expect(fired).toEqual(['a', 'b', 'c']);
   });
 
   test('releases keep-alive and deregisters when a non-looping take finishes', () => {
     const before = _activeReplayCount();
-    scheduleReplay([{ at: 0, fn: () => {} }, { at: 50, fn: () => {} }]);
+    scheduleReplay([
+      { at: 0, fn: () => {} },
+      { at: 50, fn: () => {} },
+    ]);
     expect(_activeReplayCount()).toBe(before + 1);
     vi.advanceTimersByTime(60);
     expect(_activeReplayCount()).toBe(before);
@@ -135,15 +167,26 @@ describe('replay-clock scheduler', () => {
 
   test('loop re-schedules the cycle', () => {
     let n = 0;
-    const clock = scheduleReplay([{ at: 0, fn: () => n++ }, { at: 100, fn: () => {} }], { loop: true });
-    vi.advanceTimersByTime(0);   expect(n).toBe(1);
-    vi.advanceTimersByTime(250); expect(n).toBeGreaterThanOrEqual(2); // wrapped at least once
+    const clock = scheduleReplay(
+      [
+        { at: 0, fn: () => n++ },
+        { at: 100, fn: () => {} },
+      ],
+      { loop: true },
+    );
+    vi.advanceTimersByTime(0);
+    expect(n).toBe(1);
+    vi.advanceTimersByTime(250);
+    expect(n).toBeGreaterThanOrEqual(2); // wrapped at least once
     clock.stop();
   });
 
   test('stop() cancels pending ops', () => {
     const fired = [];
-    const clock = scheduleReplay([{ at: 0, fn: () => fired.push('a') }, { at: 100, fn: () => fired.push('b') }]);
+    const clock = scheduleReplay([
+      { at: 0, fn: () => fired.push('a') },
+      { at: 100, fn: () => fired.push('b') },
+    ]);
     vi.advanceTimersByTime(0);
     clock.stop();
     vi.advanceTimersByTime(200);
@@ -152,34 +195,59 @@ describe('replay-clock scheduler', () => {
 
   test('replayActions maps {t,...} actions through applyFn with offset', () => {
     const seen = [];
-    replayActions(a => seen.push(a.v), [{ t: 0, v: 'x' }, { t: 100, v: 'y' }], { offset: 50 });
-    vi.advanceTimersByTime(40); expect(seen).toEqual([]);
-    vi.advanceTimersByTime(20); expect(seen).toEqual(['x']);   // 50ms
-    vi.advanceTimersByTime(100); expect(seen).toEqual(['x', 'y']); // 150ms
+    replayActions(
+      (a) => seen.push(a.v),
+      [
+        { t: 0, v: 'x' },
+        { t: 100, v: 'y' },
+      ],
+      { offset: 50 },
+    );
+    vi.advanceTimersByTime(40);
+    expect(seen).toEqual([]);
+    vi.advanceTimersByTime(20);
+    expect(seen).toEqual(['x']); // 50ms
+    vi.advanceTimersByTime(100);
+    expect(seen).toEqual(['x', 'y']); // 150ms
   });
 
   test('reset stops active clocks', () => {
     scheduleReplay([{ at: 1000, fn: () => {} }], { loop: true });
     expect(_activeReplayCount()).toBeGreaterThan(0);
-    runResetHandlers();   // global reset (no editor id)
+    runResetHandlers(); // global reset (no editor id)
     expect(_activeReplayCount()).toBe(0);
   });
 });
 
 describe('timeline()', () => {
-  beforeEach(() => { vi.useFakeTimers(); });
-  afterEach(() => { vi.runOnlyPendingTimers(); vi.useRealTimers(); });
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
+  });
 
   test('dispatches each track action to its widget _applyAction at offset', () => {
-    const p  = fakeWidget('p');
+    const p = fakeWidget('p');
     const dp = fakeWidget('dp');
     timeline()
-      .track(p,  [{ t: 0, note: 'C4' }, { t: 100, note: 'E4' }], { at: 0 })
+      .track(
+        p,
+        [
+          { t: 0, note: 'C4' },
+          { t: 100, note: 'E4' },
+        ],
+        { at: 0 },
+      )
       .track(dp, [{ t: 0, vi: 0 }], { at: 200 })
       .play();
-    vi.advanceTimersByTime(0);   expect(p.applied).toHaveLength(1);
-    vi.advanceTimersByTime(100); expect(p.applied).toHaveLength(2);
-    vi.advanceTimersByTime(100); expect(dp.applied).toHaveLength(1); // at:200
+    vi.advanceTimersByTime(0);
+    expect(p.applied).toHaveLength(1);
+    vi.advanceTimersByTime(100);
+    expect(p.applied).toHaveLength(2);
+    vi.advanceTimersByTime(100);
+    expect(dp.applied).toHaveLength(1); // at:200
   });
 
   test('skips tracks whose target lacks _applyAction', () => {

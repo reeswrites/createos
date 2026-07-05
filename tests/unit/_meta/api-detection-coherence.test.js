@@ -13,22 +13,22 @@ import { API_PATTERNS, detectAPIUsage } from '../../../src/editor/api-detector.j
 // One representative snippet per detection key. Editing API_PATTERNS without
 // adding/keeping a sample here fails this gate.
 const SAMPLES = {
-  usesAudio:    'audio.synth();',
-  usesShader:   "const s = new Shader('return vec4f(1.0);');",
+  usesAudio: 'audio.synth();',
+  usesShader: "const s = new Shader('return vec4f(1.0);');",
   usesGLShader: "const g = new GLShader('preset');",
   usesShaderFX: 'ShaderFX.invert();',
-  usesPixi:     'pixi.add(sprite);',
-  usesSensors:  'sensors.accel();',
-  usesCamera:   'const c = new Camera();',
-  usesVideo:    'video.signal();',
-  usesVision:   'vision.detect();',
-  usesDesktop:  'desktop.files();',
-  usesMedia:    'Media.image(url);',
-  usesDraw:     'draw.circle(1, 2, 3);',
+  usesPixi: 'pixi.add(sprite);',
+  usesSensors: 'sensors.accel();',
+  usesCamera: 'const c = new Camera();',
+  usesVideo: 'video.signal();',
+  usesVision: 'vision.detect();',
+  usesDesktop: 'desktop.files();',
+  usesMedia: 'Media.image(url);',
+  usesDraw: 'draw.circle(1, 2, 3);',
   usesGetCanvas: 'getCanvas(0);',
-  usesLayer:    'getLayer(0);',
-  usesThree:    'const t = new ThreeScene();',
-  usesRoute:    'route(Source.mic).amplitude.to(osc.frequency);',
+  usesLayer: 'getLayer(0);',
+  usesThree: 'const t = new ThreeScene();',
+  usesRoute: 'route(Source.mic).amplitude.to(osc.frequency);',
 };
 
 // Non-pattern keys the detector adds to its result (AST call-flow + parse meta).
@@ -38,17 +38,26 @@ const META_RESULT_KEYS = ['shaderStartCalled', 'shaderConstructedOnly', 'parseEr
 // Every detection flag is classified as exactly one of these. CONSUMED flags must
 // be read by execute() in editor-instance.js; the rest are detected-but-not-yet-
 // wired (informational / reserved) and explicitly listed here on purpose.
-const CONSUMED = [
-  'usesAudio',
-];
+const CONSUMED = ['usesAudio'];
 // ADR 040: the auto-opened output window is gone — visual APIs spawn their own
 // windows (new Canvas() / .show()), so execute() no longer reads these flags.
 // They remain detected for toolkit/other uses but are no longer consumed here.
 const DETECTED_UNCONSUMED = [
-  'usesSensors', 'usesCamera', 'usesVideo', 'usesVision', 'usesDesktop', 'usesMedia',
-  'usesRoute',   // route() spawns its own wm windows; no separate canvas window needed
-  'usesDraw', 'usesGetCanvas', 'usesGLShader', 'usesLayer',
-  'usesPixi', 'usesShader', 'usesShaderFX', 'usesThree',
+  'usesSensors',
+  'usesCamera',
+  'usesVideo',
+  'usesVision',
+  'usesDesktop',
+  'usesMedia',
+  'usesRoute', // route() spawns its own wm windows; no separate canvas window needed
+  'usesDraw',
+  'usesGetCanvas',
+  'usesGLShader',
+  'usesLayer',
+  'usesPixi',
+  'usesShader',
+  'usesShaderFX',
+  'usesThree',
 ];
 
 const patternKeys = Object.keys(API_PATTERNS).sort();

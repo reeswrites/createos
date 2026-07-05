@@ -19,28 +19,48 @@ function makeIDBMock() {
       return {
         objectStore() {
           return {
-            put(val, key) { stores[storeName][key] = val; return {}; },
+            put(val, key) {
+              stores[storeName][key] = val;
+              return {};
+            },
             get(key) {
               const req = { result: stores[storeName][key] };
               Promise.resolve().then(() => req.onsuccess?.());
               return req;
             },
-            delete(key) { delete stores[storeName][key]; return {}; },
+            delete(key) {
+              delete stores[storeName][key];
+              return {};
+            },
           };
         },
-        get _complete() { return this; },
-        set oncomplete(fn) { if (fn) Promise.resolve().then(fn); },
+        get _complete() {
+          return this;
+        },
+        set oncomplete(fn) {
+          if (fn) Promise.resolve().then(fn);
+        },
       };
     },
     close() {},
-    get _stores() { return stores; },
+    get _stores() {
+      return stores;
+    },
   });
   const mock = {
     open(name) {
       const req = {};
       const db = openReq(name);
       Promise.resolve().then(() => {
-        req.onupgradeneeded?.({ target: { result: { createObjectStore(s) { if (!stores[s]) stores[s] = {}; } } } });
+        req.onupgradeneeded?.({
+          target: {
+            result: {
+              createObjectStore(s) {
+                if (!stores[s]) stores[s] = {};
+              },
+            },
+          },
+        });
         req.onsuccess?.({ target: { result: db } });
       });
       return req;
@@ -88,19 +108,19 @@ describe('desktop.addBlob', () => {
     const blob = new Blob(['v'], { type: 'video/webm' });
     DesktopAPI.addBlob(blob, { name: 'clip.webm', type: 'video' });
     const state = serializeDesktop();
-    const entry = state.find(e => e.name === 'clip.webm');
+    const entry = state.find((e) => e.name === 'clip.webm');
     expect(entry).toBeDefined();
     expect(entry.blobKey).toBeTruthy();
     expect(entry.blobKey).toMatch(/^dt-/);
   });
 
   it('triggers download when download:true', () => {
-    const appendSpy  = vi.spyOn(document.body, 'appendChild');
+    const appendSpy = vi.spyOn(document.body, 'appendChild');
     const blob = new Blob(['p'], { type: 'image/png' });
     DesktopAPI.addBlob(blob, { name: 'photo.png', type: 'image', download: true });
     // appendChild is called with the <a> download element
-    const calls = appendSpy.mock.calls.map(c => c[0]);
-    const anchor = calls.find(el => el?.tagName === 'A');
+    const calls = appendSpy.mock.calls.map((c) => c[0]);
+    const anchor = calls.find((el) => el?.tagName === 'A');
     expect(anchor).toBeDefined();
     expect(anchor.download).toBe('photo.png');
   });
@@ -113,7 +133,7 @@ describe('serializeDesktop', () => {
     const blob = new Blob(['x'], { type: 'image/jpeg' });
     DesktopAPI.addBlob(blob, { name: 'shot.jpg', type: 'image' });
     const state = serializeDesktop();
-    const entry = state.find(e => e.name === 'shot.jpg');
+    const entry = state.find((e) => e.name === 'shot.jpg');
     expect(entry).toBeDefined();
     expect(entry.blobKey).toBeTruthy();
     expect(entry.content).toBeUndefined(); // no inline data
@@ -124,7 +144,7 @@ describe('serializeDesktop', () => {
     const blob = new Blob(['x'], { type: 'video/webm' });
     DesktopAPI.addBlob(blob, { name: 'vid.webm', type: 'video' });
     const state = serializeDesktop({ forProject: true });
-    const entry = state.find(e => e.name === 'vid.webm');
+    const entry = state.find((e) => e.name === 'vid.webm');
     expect(entry).toBeUndefined(); // excluded from project file
   });
 
@@ -132,7 +152,7 @@ describe('serializeDesktop', () => {
     // Simulate an HTTP URL icon (no blobKey, not a blob: URL)
     DesktopAPI.add('https://example.com/img.png', { name: 'web.png', type: 'image' });
     const state = serializeDesktop({ forProject: true });
-    const entry = state.find(e => e.name === 'web.png');
+    const entry = state.find((e) => e.name === 'web.png');
     expect(entry).toBeDefined();
     expect(entry.url).toBe('https://example.com/img.png');
   });
@@ -154,12 +174,12 @@ describe('restoreDesktop', () => {
     const blob = new Blob(['img'], { type: 'image/jpeg' });
     DesktopAPI.addBlob(blob, { name: 'a.jpg', type: 'image' });
     const state = serializeDesktop();
-    const entry = state.find(e => e.name === 'a.jpg');
+    const entry = state.find((e) => e.name === 'a.jpg');
     // Remove icons and restore from state (simulates reload)
     DesktopAPI.clear();
     restoreDesktop([entry]);
     // Wait for async IDB + promise resolution
-    await new Promise(r => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 50));
     // URL.createObjectURL should have been called again for the restored blob
     expect(URL.createObjectURL).toHaveBeenCalled();
   });
@@ -183,9 +203,19 @@ describe('CameraStream capture methods', () => {
   beforeEach(async () => {
     // Minimal MediaRecorder mock
     class MockMR {
-      constructor(stream, opts) { this.state = 'inactive'; this.mimeType = opts?.mimeType ?? 'video/webm'; this.ondataavailable = null; this.onstop = null; }
-      start() { this.state = 'recording'; }
-      stop() { this.state = 'inactive'; this.onstop?.(); }
+      constructor(stream, opts) {
+        this.state = 'inactive';
+        this.mimeType = opts?.mimeType ?? 'video/webm';
+        this.ondataavailable = null;
+        this.onstop = null;
+      }
+      start() {
+        this.state = 'recording';
+      }
+      stop() {
+        this.state = 'inactive';
+        this.onstop?.();
+      }
     }
     MockMR.isTypeSupported = () => true;
     global.MediaRecorder = MockMR;
@@ -203,7 +233,9 @@ describe('CameraStream capture methods', () => {
     // Make all video elements appear as HAVE_METADATA (readyState >= 1) so
     // Camera.open() resolves immediately without waiting for loadedmetadata.
     Object.defineProperty(HTMLVideoElement.prototype, 'readyState', {
-      get() { return 1; },
+      get() {
+        return 1;
+      },
       configurable: true,
     });
     global.navigator.mediaDevices = {
@@ -216,7 +248,9 @@ describe('CameraStream capture methods', () => {
   it('cam.photo() calls desktop.addBlob with image type', async () => {
     mockMediaDevices('cam1');
     HTMLCanvasElement.prototype.toBlob = vi.fn((cb, type) => cb(new Blob(['img'], { type })));
-    window.desktop = { addBlob: vi.fn(() => ({ id: 'icon-1', name: 'photo.jpg', type: 'image', url: 'blob:x' })) };
+    window.desktop = {
+      addBlob: vi.fn(() => ({ id: 'icon-1', name: 'photo.jpg', type: 'image', url: 'blob:x' })),
+    };
     const { Camera } = await import('../../../../src/api/media/camera.js');
     const cam = await Camera.open({ deviceId: 'cam1' });
     await cam.photo({ name: 'test' });
@@ -241,28 +275,42 @@ describe('CameraStream capture methods', () => {
 
   it('two opens of the same device share ONE stream (single getUserMedia)', async () => {
     const stream = makeMediaStream('camS');
-    Object.defineProperty(HTMLVideoElement.prototype, 'readyState', { get() { return 1; }, configurable: true });
+    Object.defineProperty(HTMLVideoElement.prototype, 'readyState', {
+      get() {
+        return 1;
+      },
+      configurable: true,
+    });
     let gumCalls = 0;
     global.navigator.mediaDevices = {
       enumerateDevices: async () => [{ kind: 'videoinput', deviceId: 'camS' }],
-      getUserMedia: async () => { gumCalls++; return stream; },
+      getUserMedia: async () => {
+        gumCalls++;
+        return stream;
+      },
     };
     const { Camera } = await import('../../../../src/api/media/camera.js');
     const a = await Camera.open({ deviceId: 'camS' });
     const b = await Camera.open({ deviceId: 'camS' });
-    expect(gumCalls).toBe(1);              // one underlying stream
-    expect(a.element).toBe(b.element);     // same <video> element
-    expect(a._stream).toBe(b._stream);     // same MediaStream
-    a.stop(); b.stop();
+    expect(gumCalls).toBe(1); // one underlying stream
+    expect(a.element).toBe(b.element); // same <video> element
+    expect(a._stream).toBe(b._stream); // same MediaStream
+    a.stop();
+    b.stop();
   });
 
-  it('scoped reset keeps another editor\'s camera alive; last release stops tracks', async () => {
+  it("scoped reset keeps another editor's camera alive; last release stops tracks", async () => {
     const stopped = [];
     const stream = {
       getVideoTracks: () => [{ getSettings: () => ({ deviceId: 'camT' }) }],
       getTracks: () => [{ stop: () => stopped.push('track') }],
     };
-    Object.defineProperty(HTMLVideoElement.prototype, 'readyState', { get() { return 1; }, configurable: true });
+    Object.defineProperty(HTMLVideoElement.prototype, 'readyState', {
+      get() {
+        return 1;
+      },
+      configurable: true,
+    });
     global.navigator.mediaDevices = {
       enumerateDevices: async () => [{ kind: 'videoinput', deviceId: 'camT' }],
       getUserMedia: async () => stream,
@@ -271,16 +319,16 @@ describe('CameraStream capture methods', () => {
 
     const prev = window.__ar_active_editor_id;
     window.__ar_active_editor_id = 1;
-    const a = await Camera.open({ deviceId: 'camT' });   // editor 1
+    const a = await Camera.open({ deviceId: 'camT' }); // editor 1
     window.__ar_active_editor_id = 2;
-    await Camera.open({ deviceId: 'camT' });   // editor 2, shares stream
+    await Camera.open({ deviceId: 'camT' }); // editor 2, shares stream
     window.__ar_active_editor_id = prev;
 
-    cleanupCameras(2);                       // editor 2 resets
-    expect(stopped).toEqual([]);             // stream still alive (editor 1 holds it)
-    expect(a._stream).toBe(stream);          // editor 1's handle still reads it
+    cleanupCameras(2); // editor 2 resets
+    expect(stopped).toEqual([]); // stream still alive (editor 1 holds it)
+    expect(a._stream).toBe(stream); // editor 1's handle still reads it
 
-    cleanupCameras(1);                       // editor 1 resets → last holder
-    expect(stopped).toEqual(['track']);      // now the track stops
+    cleanupCameras(1); // editor 1 resets → last holder
+    expect(stopped).toEqual(['track']); // now the track stops
   });
 });

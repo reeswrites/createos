@@ -1,5 +1,11 @@
 import { onReset } from '../../runtime/reset-registry.js';
 import { notify } from '../../events/index.js';
+import {
+  getDesktopFileType,
+  isDesktopFileType,
+  desktopFileGlyphs,
+  desktopFileCssClass,
+} from './desktop-file-registry.js';
 // desktop-files.js — file icons on the IDE desktop (project-scoped)
 //
 // Two icon types:
@@ -241,17 +247,12 @@ function _classify(name, mime = '') {
 }
 
 const _GLYPH = { image: '🖼', video: '🎬', audio: '🎵', code: '📄', file: '📁' };
-const _FA_GLYPH = {
+// Base (non-widget) FA glyphs; widget file types supply theirs via the registry.
+const _FA_GLYPH_BASE = {
   editor: 'fa-solid fa-file-code',
   folder: 'fa-solid fa-folder',
-  beat: 'fa-solid fa-drum',
-  launchpad: 'fa-solid fa-table-cells',
-  sprite: 'fa-solid fa-border-all',
-  paint: 'fa-solid fa-paintbrush',
-  note: 'fa-solid fa-file-lines',
-  ascii: 'fa-solid fa-font',
-  piano: 'fa-solid fa-music',
 };
+const _faGlyph = (type) => _FA_GLYPH_BASE[type] ?? desktopFileGlyphs()[type];
 const _WM = { image: 'image', video: 'video' };
 
 // ── Trash zone ────────────────────────────────────────────────────────────────
@@ -312,11 +313,12 @@ function _makeThumb(icon) {
   g.className = 'dt-glyph';
   if (io.glyphBg) g.style.background = io.glyphBg;
   if (io.glyphColor) g.style.color = io.glyphColor;
+  const fa = _faGlyph(icon.type);
   if (io.glyph) {
     g.textContent = io.glyph;
-  } else if (_FA_GLYPH[icon.type]) {
+  } else if (fa) {
     const i = document.createElement('i');
-    i.className = _FA_GLYPH[icon.type];
+    i.className = fa;
     g.appendChild(i);
   } else {
     g.textContent = _GLYPH[icon.type] ?? '📁';
@@ -326,27 +328,13 @@ function _makeThumb(icon) {
 
 function _buildEl(icon) {
   const el = document.createElement('div');
-  el.className =
-    'dt-icon' +
-    (icon.type === 'editor'
-      ? ' dt-editor-icon'
+  const cssClass =
+    icon.type === 'editor'
+      ? 'dt-editor-icon'
       : icon.type === 'folder'
-        ? ' dt-folder-icon'
-        : icon.type === 'beat'
-          ? ' dt-beat-icon'
-          : icon.type === 'launchpad'
-            ? ' dt-beat-icon'
-            : icon.type === 'sprite'
-              ? ' dt-sprite-icon'
-              : icon.type === 'paint'
-                ? ' dt-paint-icon'
-                : icon.type === 'ascii'
-                  ? ' dt-ascii-icon'
-                  : icon.type === 'note'
-                    ? ' dt-note-icon'
-                    : icon.type === 'piano'
-                      ? ' dt-piano-icon'
-                      : '');
+        ? 'dt-folder-icon'
+        : desktopFileCssClass(icon.type);
+  el.className = 'dt-icon' + (cssClass ? ' ' + cssClass : '');
   el.style.left = icon.x + 'px';
   el.style.top = icon.y + 'px';
   el.dataset.dtId = icon.id;
@@ -575,184 +563,19 @@ function _activate(icon) {
       .catch(() => {});
     return;
   }
-  if (icon.type === 'beat') {
+  // JSON-blob widget file types — the Desktop File-Type registry owns the open
+  // logic (constructor + frame reconstruction), co-located with each widget.
+  const fileType = getDesktopFileType(icon.type);
+  if (fileType) {
     fetch(icon.url)
       .then((r) => r.json())
-      .then((data) => {
-        if (window.Drumpad) {
-          new window.Drumpad({
-            ...data,
-            x: (icon.x ?? 100) + 80,
-            y: icon.y ?? 100,
-            _desktopIconId: icon.id,
-          });
-        }
-      })
-      .catch(() => {});
-    return;
-  }
-  if (icon.type === 'launchpad') {
-    fetch(icon.url)
-      .then((r) => r.json())
-      .then((data) => {
-        if (window.Launchpad) {
-          new window.Launchpad({
-            ...data,
-            x: (icon.x ?? 100) + 80,
-            y: icon.y ?? 100,
-            _desktopIconId: icon.id,
-          });
-        }
-      })
-      .catch(() => {});
-    return;
-  }
-  if (icon.type === 'note') {
-    fetch(icon.url)
-      .then((r) => r.json())
-      .then((data) => {
-        if (window.Notepad) {
-          new window.Notepad({
-            ...data,
-            x: (icon.x ?? 100) + 80,
-            y: icon.y ?? 100,
-            _desktopIconId: icon.id,
-          });
-        }
-      })
-      .catch(() => {});
-    return;
-  }
-  if (icon.type === 'sprite') {
-    fetch(icon.url)
-      .then((r) => r.json())
-      .then((data) => {
-        if (!window.SpriteEditor || !window.Sprite) return;
-        const sp = new window.Sprite({
-          width: data.width,
-          height: data.height,
-          scale: data.scale,
-          frames: data.frames?.length ?? 1,
-        });
-        const frameUrls = data.frames ?? [];
-        let loaded = 0;
-        const open = () => {
-          new window.SpriteEditor({
-            sprite: sp,
-            title: data.title,
-            x: (icon.x ?? 100) + 80,
-            y: icon.y ?? 100,
-            _desktopIconId: icon.id,
-          });
-        };
-        if (!frameUrls.length) {
-          open();
-          return;
-        }
-        frameUrls.forEach((url, i) => {
-          const img = new Image();
-          img.onload = () => {
-            sp._frames[i].getContext('2d').drawImage(img, 0, 0);
-            sp._render();
-            if (++loaded === frameUrls.length) open();
-          };
-          img.onerror = () => {
-            if (++loaded === frameUrls.length) open();
-          };
-          img.src = url;
-        });
-      })
-      .catch(() => {});
-    return;
-  }
-  if (icon.type === 'paint') {
-    fetch(icon.url)
-      .then((r) => r.json())
-      .then((data) => {
-        if (!window.Paint) return;
-        const frameUrls = data.frames ?? [];
-        let loaded = 0;
-        const canvases = frameUrls.map(() => {
-          const c = document.createElement('canvas');
-          c.width = data.width ?? 400;
-          c.height = data.height ?? 300;
-          return c;
-        });
-        const open = () => {
-          new window.Paint({
-            width: data.width ?? 400,
-            height: data.height ?? 300,
-            bg: data.bg ?? '#ffffff',
-            fps: data.fps ?? 8,
-            title: data.title ?? 'Paint',
-            x: (icon.x ?? 100) + 80,
-            y: icon.y ?? 100,
-            _desktopIconId: icon.id,
-            _frameCanvases: canvases.length ? canvases : null,
-            backdrop: data.backdrop ?? null,
-            backdropMode: data.backdropMode ?? 'image',
-          });
-        };
-        if (!frameUrls.length) {
-          open();
-          return;
-        }
-        frameUrls.forEach((url, i) => {
-          const img = new Image();
-          img.onload = () => {
-            canvases[i].getContext('2d').drawImage(img, 0, 0);
-            if (++loaded === frameUrls.length) open();
-          };
-          img.onerror = () => {
-            if (++loaded === frameUrls.length) open();
-          };
-          img.src = url;
-        });
-      })
-      .catch(() => {});
-    return;
-  }
-  if (icon.type === 'ascii') {
-    fetch(icon.url)
-      .then((r) => r.json())
-      .then((data) => {
-        if (!window.AsciiEditor) return;
-        new window.AsciiEditor({
-          cols: data.cols ?? 64,
-          rows: data.rows ?? 24,
-          cellW: data.cellW ?? 10,
-          cellH: data.cellH ?? 18,
-          fps: data.fps ?? 8,
-          bg: data.bg ?? '#0d0208',
-          title: data.title ?? 'ASCII Editor',
+      .then((data) =>
+        fileType.open(data, {
           x: (icon.x ?? 100) + 80,
           y: icon.y ?? 100,
           _desktopIconId: icon.id,
-          _frames: data.frames ?? null,
-        });
-      })
-      .catch(() => {});
-    return;
-  }
-  if (icon.type === 'piano') {
-    fetch(icon.url)
-      .then((r) => r.json())
-      .then((data) => {
-        if (!window.Piano) return;
-        const p = new window.Piano({
-          title: data.title ?? 'Piano',
-          bpm: data.bpm ?? 120,
-          preset: data.preset ?? 'electric',
-          duration: data.duration ?? '8n',
-          x: (icon.x ?? 100) + 80,
-          y: icon.y ?? 100,
-          _desktopIconId: icon.id,
-        });
-        if (data.steps)
-          data.steps.forEach((notes, si) => {
-            if (p.note) notes.forEach((n) => p.note(si, n, true));
-          });
-      })
+        }),
+      )
       .catch(() => {});
     return;
   }
@@ -1094,6 +917,17 @@ function _ctxDesktop(cx, cy) {
 
 // ── Internal add ──────────────────────────────────────────────────────────────
 
+// Pin a freshly-restored icon to its saved coordinates (the icon is spawned at
+// saved.{x,y}+38 to trip the cascade check, then snapped back to saved.{x,y}).
+function _placeIcon(icon, saved) {
+  icon.x = saved.x;
+  icon.y = saved.y;
+  if (icon.el) {
+    icon.el.style.left = icon.x + 'px';
+    icon.el.style.top = icon.y + 'px';
+  }
+}
+
 function _addFileIcon(
   name,
   mime,
@@ -1406,12 +1240,7 @@ export function restoreDesktop(icons = []) {
         saved.type ?? null,
       );
       icon.blobKey = saved.blobKey;
-      icon.x = saved.x;
-      icon.y = saved.y;
-      if (icon.el) {
-        icon.el.style.left = icon.x + 'px';
-        icon.el.style.top = icon.y + 'px';
-      }
+      _placeIcon(icon, saved);
       _getCaptureBlob(saved.blobKey).then((blob) => {
         if (!blob || !_icons.has(icon.id)) return;
         if (icon.url?.startsWith('blob:')) URL.revokeObjectURL(icon.url);
@@ -1440,13 +1269,9 @@ export function restoreDesktop(icons = []) {
           saved.content,
           saved.iconOpts ?? null,
         );
-        icon.x = saved.x;
-        icon.y = saved.y;
-        if (icon.el) {
-          icon.el.style.left = icon.x + 'px';
-          icon.el.style.top = icon.y + 'px';
-        }
-      } else if (saved.type === 'beat') {
+        _placeIcon(icon, saved);
+      } else if (isDesktopFileType(saved.type)) {
+        // Any JSON-blob widget file type — one branch for the whole registry.
         const blob = new Blob([saved.content], { type: 'application/json' });
         const burl = URL.createObjectURL(blob);
         const icon = _addFileIcon(
@@ -1457,128 +1282,9 @@ export function restoreDesktop(icons = []) {
           saved.y + 38,
           saved.content,
           saved.iconOpts ?? null,
-          'beat',
+          saved.type,
         );
-        icon.x = saved.x;
-        icon.y = saved.y;
-        if (icon.el) {
-          icon.el.style.left = icon.x + 'px';
-          icon.el.style.top = icon.y + 'px';
-        }
-      } else if (saved.type === 'launchpad') {
-        const blob = new Blob([saved.content], { type: 'application/json' });
-        const burl = URL.createObjectURL(blob);
-        const icon = _addFileIcon(
-          saved.name,
-          '',
-          burl,
-          saved.x + 38,
-          saved.y + 38,
-          saved.content,
-          saved.iconOpts ?? null,
-          'launchpad',
-        );
-        icon.x = saved.x;
-        icon.y = saved.y;
-        if (icon.el) {
-          icon.el.style.left = icon.x + 'px';
-          icon.el.style.top = icon.y + 'px';
-        }
-      } else if (saved.type === 'sprite') {
-        const blob = new Blob([saved.content], { type: 'application/json' });
-        const burl = URL.createObjectURL(blob);
-        const icon = _addFileIcon(
-          saved.name,
-          '',
-          burl,
-          saved.x + 38,
-          saved.y + 38,
-          saved.content,
-          saved.iconOpts ?? null,
-          'sprite',
-        );
-        icon.x = saved.x;
-        icon.y = saved.y;
-        if (icon.el) {
-          icon.el.style.left = icon.x + 'px';
-          icon.el.style.top = icon.y + 'px';
-        }
-      } else if (saved.type === 'paint') {
-        const blob = new Blob([saved.content], { type: 'application/json' });
-        const burl = URL.createObjectURL(blob);
-        const icon = _addFileIcon(
-          saved.name,
-          '',
-          burl,
-          saved.x + 38,
-          saved.y + 38,
-          saved.content,
-          saved.iconOpts ?? null,
-          'paint',
-        );
-        icon.x = saved.x;
-        icon.y = saved.y;
-        if (icon.el) {
-          icon.el.style.left = icon.x + 'px';
-          icon.el.style.top = icon.y + 'px';
-        }
-      } else if (saved.type === 'ascii') {
-        const blob = new Blob([saved.content], { type: 'application/json' });
-        const burl = URL.createObjectURL(blob);
-        const icon = _addFileIcon(
-          saved.name,
-          '',
-          burl,
-          saved.x + 38,
-          saved.y + 38,
-          saved.content,
-          saved.iconOpts ?? null,
-          'ascii',
-        );
-        icon.x = saved.x;
-        icon.y = saved.y;
-        if (icon.el) {
-          icon.el.style.left = icon.x + 'px';
-          icon.el.style.top = icon.y + 'px';
-        }
-      } else if (saved.type === 'note') {
-        const blob = new Blob([saved.content], { type: 'application/json' });
-        const burl = URL.createObjectURL(blob);
-        const icon = _addFileIcon(
-          saved.name,
-          '',
-          burl,
-          saved.x + 38,
-          saved.y + 38,
-          saved.content,
-          saved.iconOpts ?? null,
-          'note',
-        );
-        icon.x = saved.x;
-        icon.y = saved.y;
-        if (icon.el) {
-          icon.el.style.left = icon.x + 'px';
-          icon.el.style.top = icon.y + 'px';
-        }
-      } else if (saved.type === 'piano') {
-        const blob = new Blob([saved.content], { type: 'application/json' });
-        const burl = URL.createObjectURL(blob);
-        const icon = _addFileIcon(
-          saved.name,
-          '',
-          burl,
-          saved.x + 38,
-          saved.y + 38,
-          saved.content,
-          saved.iconOpts ?? null,
-          'piano',
-        );
-        icon.x = saved.x;
-        icon.y = saved.y;
-        if (icon.el) {
-          icon.el.style.left = icon.x + 'px';
-          icon.el.style.top = icon.y + 'px';
-        }
+        _placeIcon(icon, saved);
       }
     } else if (saved.url) {
       const icon = _addFileIcon(
@@ -1590,12 +1296,7 @@ export function restoreDesktop(icons = []) {
         null,
         saved.iconOpts ?? null,
       );
-      icon.x = saved.x;
-      icon.y = saved.y;
-      if (icon.el) {
-        icon.el.style.left = icon.x + 'px';
-        icon.el.style.top = icon.y + 'px';
-      }
+      _placeIcon(icon, saved);
     }
   }
 }

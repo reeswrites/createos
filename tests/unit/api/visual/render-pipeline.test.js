@@ -1,31 +1,42 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { pipe, Pipeline, cleanupPipelines, PixelStageBase } from '../../../../src/api/visual/render-pipeline.js';
+import {
+  pipe,
+  Pipeline,
+  cleanupPipelines,
+  PixelStageBase,
+} from '../../../../src/api/visual/render-pipeline.js';
 
 // ── Canvas / DOM mocks ────────────────────────────────────────────────────────
 
 function makeCtx(w = 800, h = 600) {
   const pixels = new Uint8ClampedArray(w * h * 4);
   const ctx = {
-    canvas:              null,
-    fillStyle:           '',
-    font:                '',
-    textAlign:           'left',
-    textBaseline:        'alphabetic',
+    canvas: null,
+    fillStyle: '',
+    font: '',
+    textAlign: 'left',
+    textBaseline: 'alphabetic',
     imageSmoothingEnabled: true,
-    filter:              'none',
-    _fillTexts:          [],
-    _drawImages:         [],
-    _fillRects:          [],
-    fillRect:   vi.fn().mockImplementation(function() { this._fillRects.push(this.fillStyle); }),
-    fillText:   vi.fn().mockImplementation(function(t, x, y) { this._fillTexts.push({ t, x, y }); }),
-    drawImage:  vi.fn().mockImplementation(function(src, ...rest) { this._drawImages.push({ src, args: rest }); }),
+    filter: 'none',
+    _fillTexts: [],
+    _drawImages: [],
+    _fillRects: [],
+    fillRect: vi.fn().mockImplementation(function () {
+      this._fillRects.push(this.fillStyle);
+    }),
+    fillText: vi.fn().mockImplementation(function (t, x, y) {
+      this._fillTexts.push({ t, x, y });
+    }),
+    drawImage: vi.fn().mockImplementation(function (src, ...rest) {
+      this._drawImages.push({ src, args: rest });
+    }),
     getImageData: vi.fn().mockImplementation((x, y, w2, h2) => ({
       data: pixels.slice(0, w2 * h2 * 4),
     })),
     putImageData: vi.fn(),
-    clearRect:   vi.fn(),
-    save:        vi.fn(),
-    restore:     vi.fn(),
+    clearRect: vi.fn(),
+    save: vi.fn(),
+    restore: vi.fn(),
     setTransform: vi.fn(),
   };
   return ctx;
@@ -34,9 +45,9 @@ function makeCtx(w = 800, h = 600) {
 function makeCanvas(w = 800, h = 600) {
   const ctx = makeCtx(w, h);
   const canvas = {
-    width:  w,
+    width: w,
     height: h,
-    style:  { cssText: '' },
+    style: { cssText: '' },
     remove: vi.fn(),
     getContext: vi.fn(() => ctx),
   };
@@ -81,15 +92,15 @@ beforeEach(() => {
   // (synchronous invocation would cause infinite recursion in the pipeline loop).
   let _rafId = 0;
   global.requestAnimationFrame = vi.fn(() => ++_rafId);
-  global.cancelAnimationFrame  = vi.fn();
+  global.cancelAnimationFrame = vi.fn();
 
   // Mock window globals
-  global.window.__ar_paused   = false;
+  global.window.__ar_paused = false;
   global.window.__ar_keepAlive = new Set();
-  global.window.GLShader = vi.fn().mockImplementation(function() {
-    this._canvas  = makeCanvas().canvas;  // .canvas not ._canvas
-    this.video    = vi.fn().mockReturnThis();
-    this.start    = vi.fn().mockReturnThis();
+  global.window.GLShader = vi.fn().mockImplementation(function () {
+    this._canvas = makeCanvas().canvas; // .canvas not ._canvas
+    this.video = vi.fn().mockReturnThis();
+    this.start = vi.fn().mockReturnThis();
     this._destroy = vi.fn();
   });
 });
@@ -190,8 +201,8 @@ describe('AsciiStage', () => {
     expect(stage._canvas).toBeTruthy();
     stage._start();
     // Canvas sized: cols * cellW × rows * cellH
-    expect(stage._canvas.width).toBe(10 * (stage._cellW));
-    expect(stage._canvas.height).toBe(4 * (stage._cellH));
+    expect(stage._canvas.width).toBe(10 * stage._cellW);
+    expect(stage._canvas.height).toBe(4 * stage._cellH);
   });
 
   it('exposes .canvas getter matching ._canvas', () => {
@@ -212,8 +223,14 @@ describe('AsciiStage', () => {
     // Dark black pixel at col 1: should map to ' '
     offCtx.getImageData = vi.fn().mockReturnValue({
       data: new Uint8ClampedArray([
-        255, 255, 255, 255,   // col 0: white → lum=1 → '#'
-        0,   0,   0,   255,   // col 1: black → lum=0 → ' '
+        255,
+        255,
+        255,
+        255, // col 0: white → lum=1 → '#'
+        0,
+        0,
+        0,
+        255, // col 1: black → lum=0 → ' '
       ]),
     });
 
@@ -332,7 +349,10 @@ describe('cleanupPipelines()', () => {
   it('is idempotent (calling twice does not throw)', () => {
     const { canvas } = makeCanvas();
     pipe(canvas).start();
-    expect(() => { cleanupPipelines(); cleanupPipelines(); }).not.toThrow();
+    expect(() => {
+      cleanupPipelines();
+      cleanupPipelines();
+    }).not.toThrow();
   });
 
   it('calls _destroy on stage canvases', () => {
@@ -345,18 +365,18 @@ describe('cleanupPipelines()', () => {
     expect(removeSpy).toHaveBeenCalled();
   });
 
-  it('scoped reset only destroys the resetting editor\'s pipelines', () => {
+  it("scoped reset only destroys the resetting editor's pipelines", () => {
     const prev = window.__ar_active_editor_id;
     const { canvas: c1 } = makeCanvas();
     const { canvas: c2 } = makeCanvas();
     window.__ar_active_editor_id = 1;
-    const p1 = pipe(c1).start();   // editor 1
+    const p1 = pipe(c1).start(); // editor 1
     window.__ar_active_editor_id = 2;
-    const p2 = pipe(c2).start();   // editor 2
+    const p2 = pipe(c2).start(); // editor 2
     window.__ar_active_editor_id = prev;
 
-    cleanupPipelines(2);            // editor 2 resets
-    expect(window.__ar_keepAlive.size).toBe(1);  // editor 1's pipeline survives
+    cleanupPipelines(2); // editor 2 resets
+    expect(window.__ar_keepAlive.size).toBe(1); // editor 1's pipeline survives
     expect(p1._rafId).not.toBeNull();
     expect(p2._rafId).toBeNull();
   });
@@ -380,7 +400,8 @@ describe('cleanupPipelines()', () => {
 describe('PixelateStage', () => {
   it('creates output canvas matching upstream dimensions', () => {
     const { canvas } = makeCanvas(640, 480);
-    canvas.width = 640; canvas.height = 480;
+    canvas.width = 640;
+    canvas.height = 480;
     const p = pipe(canvas).pixelate({ blockSize: 16 });
     const stage = p._stages[0];
     stage._start();
@@ -390,7 +411,8 @@ describe('PixelateStage', () => {
 
   it('read() calls drawImage twice (downscale + upscale)', () => {
     const { canvas } = makeCanvas(640, 480);
-    canvas.width = 640; canvas.height = 480;
+    canvas.width = 640;
+    canvas.height = 480;
     const p = pipe(canvas).pixelate({ blockSize: 10 });
     const stage = p._stages[0];
     stage._start();
@@ -412,7 +434,7 @@ describe('FxStage', () => {
     stage._start();
 
     let capturedFilter = null;
-    stage._ctx.drawImage = vi.fn().mockImplementation(function() {
+    stage._ctx.drawImage = vi.fn().mockImplementation(function () {
       capturedFilter = this.filter;
     });
     stage.read();
@@ -460,12 +482,17 @@ describe('GLShaderStage', () => {
 
   it('accepts a pre-created GLShader instance instead of body string', () => {
     const { canvas: src } = makeCanvas();
-    const existingShader = { _canvas: makeCanvas().canvas, video: vi.fn().mockReturnThis(), start: vi.fn().mockReturnThis(), _destroy: vi.fn() };
+    const existingShader = {
+      _canvas: makeCanvas().canvas,
+      video: vi.fn().mockReturnThis(),
+      start: vi.fn().mockReturnThis(),
+      _destroy: vi.fn(),
+    };
     const p = pipe(src).glshader(existingShader);
     const stage = p._stages[0];
     stage._start();
 
-    expect(window.GLShader).not.toHaveBeenCalled();  // no new construction
+    expect(window.GLShader).not.toHaveBeenCalled(); // no new construction
     expect(stage._shaderInst).toBe(existingShader);
     expect(existingShader.video).toHaveBeenCalledWith(src);
     expect(existingShader.start).toHaveBeenCalled();
@@ -473,7 +500,12 @@ describe('GLShaderStage', () => {
 
   it('does NOT destroy pre-created instance on _destroy()', () => {
     const { canvas: src } = makeCanvas();
-    const existingShader = { _canvas: makeCanvas().canvas, video: vi.fn().mockReturnThis(), start: vi.fn().mockReturnThis(), _destroy: vi.fn() };
+    const existingShader = {
+      _canvas: makeCanvas().canvas,
+      video: vi.fn().mockReturnThis(),
+      start: vi.fn().mockReturnThis(),
+      _destroy: vi.fn(),
+    };
     const p = pipe(src).glshader(existingShader);
     const stage = p._stages[0];
     stage._start();
@@ -484,7 +516,12 @@ describe('GLShaderStage', () => {
   it('pre-created instance _getSource() returns its canvas', () => {
     const { canvas: src } = makeCanvas();
     const shaderCanvas = makeCanvas().canvas;
-    const existingShader = { _canvas: shaderCanvas, video: vi.fn().mockReturnThis(), start: vi.fn().mockReturnThis(), _destroy: vi.fn() };
+    const existingShader = {
+      _canvas: shaderCanvas,
+      video: vi.fn().mockReturnThis(),
+      start: vi.fn().mockReturnThis(),
+      _destroy: vi.fn(),
+    };
     const stage = pipe(src).glshader(existingShader)._stages[0];
     stage._start();
     expect(stage._getSource()).toBe(shaderCanvas);
@@ -544,7 +581,9 @@ describe('pipe().use(factory)', () => {
     const { canvas: src } = makeCanvas();
     const { canvas: out } = makeCanvas();
     const userRead = vi.fn();
-    const p = pipe(src).ascii({ cols: 10 }).use(() => ({ canvas: out, read: userRead }));
+    const p = pipe(src)
+      .ascii({ cols: 10 })
+      .use(() => ({ canvas: out, read: userRead }));
     expect(p._stages.length).toBe(2);
     expect(p._stages[1]._upstream).toBe(p._stages[0]);
   });
@@ -607,17 +646,22 @@ describe('pipe.register()', () => {
       label: 'Test Stage',
       hint: 'A test stage',
     });
-    expect(addEntry).toHaveBeenCalledWith('Pipeline', expect.objectContaining({
-      label: 'Test Stage',
-      hint: 'A test stage',
-      blockType: 'pipe_custom_testStage',
-    }));
+    expect(addEntry).toHaveBeenCalledWith(
+      'Pipeline',
+      expect.objectContaining({
+        label: 'Test Stage',
+        hint: 'A test stage',
+        blockType: 'pipe_custom_testStage',
+      }),
+    );
     delete global.window.__ar_addToolkitEntry;
   });
 
   it('toolkit entry code contains the stage name', () => {
     let capturedCmd = null;
-    global.window.__ar_addToolkitEntry = (_cat, cmd) => { capturedCmd = cmd; };
+    global.window.__ar_addToolkitEntry = (_cat, cmd) => {
+      capturedCmd = cmd;
+    };
     pipe.register('noFieldStage', (_src) => ({ canvas: makeCanvas().canvas, read: vi.fn() }), {
       label: 'No Fields',
     });
@@ -627,7 +671,9 @@ describe('pipe.register()', () => {
 
   it('toolkit entry code includes default field values', () => {
     let capturedCmd = null;
-    global.window.__ar_addToolkitEntry = (_cat, cmd) => { capturedCmd = cmd; };
+    global.window.__ar_addToolkitEntry = (_cat, cmd) => {
+      capturedCmd = cmd;
+    };
     pipe.register('colorStage', (_src) => ({ canvas: makeCanvas().canvas, read: vi.fn() }), {
       label: 'Color Stage',
       fields: [
@@ -727,8 +773,18 @@ describe('PixelStageBase subclass', () => {
 
 describe('Pipeline.STAGE_CTORS', () => {
   const expectedTypes = [
-    'tint','negative','solarize','posterize','duotone',
-    'grain','strobe','blur','hue','ascii','pixelate','fx',
+    'tint',
+    'negative',
+    'solarize',
+    'posterize',
+    'duotone',
+    'grain',
+    'strobe',
+    'blur',
+    'hue',
+    'ascii',
+    'pixelate',
+    'fx',
   ];
 
   it('contains all expected stage types', () => {
@@ -744,12 +800,12 @@ describe('Pipeline.STAGE_CTORS', () => {
     for (const [type, ctor] of Object.entries(ctors)) {
       let stage;
       // provide sensible defaults for each type
-      if (type === 'tint')      stage = ctor(fakeUpstream, '#ff0000');
+      if (type === 'tint') stage = ctor(fakeUpstream, '#ff0000');
       else if (type === 'blur') stage = ctor(fakeUpstream, 4);
-      else if (type === 'hue')  stage = ctor(fakeUpstream, 90);
-      else if (type === 'fx')   stage = ctor(fakeUpstream, 'invert(1)');
-      else                      stage = ctor(fakeUpstream);
-      expect(typeof stage.read,       `${type}.read`).toBe('function');
+      else if (type === 'hue') stage = ctor(fakeUpstream, 90);
+      else if (type === 'fx') stage = ctor(fakeUpstream, 'invert(1)');
+      else stage = ctor(fakeUpstream);
+      expect(typeof stage.read, `${type}.read`).toBe('function');
       expect(typeof stage._getSource, `${type}._getSource`).toBe('function');
     }
   });

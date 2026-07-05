@@ -3,56 +3,116 @@ import { describe, it, expect, vi } from 'vitest';
 // ── Minimal event bus stub ────────────────────────────────────────────────────
 
 const _subscribers = new Map();
-const _commands    = new Map();
+const _commands = new Map();
 
 vi.stubGlobal('__ar_notify', (event, data) => {
-  (_subscribers.get(event) ?? []).forEach(fn => fn(data));
+  (_subscribers.get(event) ?? []).forEach((fn) => fn(data));
 });
 
 vi.mock('../../../src/events/index.js', () => ({
-  notify:          (event, data) => { (_subscribers.get(event) ?? []).forEach(fn => fn(data)); },
-  registerCommand: (event, fn)   => { _commands.set(event, fn); },
-  registerSource:  vi.fn(),
-  emit:            (event, data) => {
-    if (_commands.has(event)) { _commands.get(event)(data ?? {}); return; }
-    (_subscribers.get(event) ?? []).forEach(fn => fn(data));
+  notify: (event, data) => {
+    (_subscribers.get(event) ?? []).forEach((fn) => fn(data));
   },
-  on:              (event)       => ({ do: (fn) => { if (!_subscribers.has(event)) _subscribers.set(event, []); _subscribers.get(event).push(fn); return { do: vi.fn() }; } }),
-  any:             vi.fn(),
-  hold:            vi.fn(),
-  clearRunScoped:  vi.fn(),
-  addBusTap:       () => () => {},
+  registerCommand: (event, fn) => {
+    _commands.set(event, fn);
+  },
+  registerSource: vi.fn(),
+  emit: (event, data) => {
+    if (_commands.has(event)) {
+      _commands.get(event)(data ?? {});
+      return;
+    }
+    (_subscribers.get(event) ?? []).forEach((fn) => fn(data));
+  },
+  on: (event) => ({
+    do: (fn) => {
+      if (!_subscribers.has(event)) _subscribers.set(event, []);
+      _subscribers.get(event).push(fn);
+      return { do: vi.fn() };
+    },
+  }),
+  any: vi.fn(),
+  hold: vi.fn(),
+  clearRunScoped: vi.fn(),
+  addBusTap: () => () => {},
 }));
 
 // ── Tone.js stub ─────────────────────────────────────────────────────────────
 
 vi.mock('tone', () => {
   class FakeLoop {
-    constructor(fn) { this._fn = fn; }
-    start() { return this; }
-    stop()  { return this; }
+    constructor(fn) {
+      this._fn = fn;
+    }
+    start() {
+      return this;
+    }
+    stop() {
+      return this;
+    }
     dispose() {}
   }
   return {
-    Loop:          FakeLoop,
-    Time:          (_t) => ({ toSeconds: () => 1 }),
-    getTransport:  () => ({ bpm: { value: 120 }, stop: vi.fn(), cancel: vi.fn(), scheduleRepeat: vi.fn() }),
+    Loop: FakeLoop,
+    Time: (_t) => ({ toSeconds: () => 1 }),
+    getTransport: () => ({
+      bpm: { value: 120 },
+      stop: vi.fn(),
+      cancel: vi.fn(),
+      scheduleRepeat: vi.fn(),
+    }),
     getDestination: () => ({ volume: { rampTo: vi.fn() } }),
-    now:           () => 0,
-    start:         vi.fn(),
-    Frequency:     vi.fn(),
-    NoiseSynth:    class {},
-    MetalSynth:    class {},
-    Analyser:      class { getValue() { return []; } frequencyBinCount = 0; },
-    Player:        class { constructor() { this.loaded = Promise.resolve(); } toDestination() {} disconnect() {} chain() {} start() {} stop() {} volume = { value: 0 }; },
+    now: () => 0,
+    start: vi.fn(),
+    Frequency: vi.fn(),
+    NoiseSynth: class {},
+    MetalSynth: class {},
+    Analyser: class {
+      getValue() {
+        return [];
+      }
+      frequencyBinCount = 0;
+    },
+    Player: class {
+      constructor() {
+        this.loaded = Promise.resolve();
+      }
+      toDestination() {}
+      disconnect() {}
+      chain() {}
+      start() {}
+      stop() {}
+      volume = { value: 0 };
+    },
   };
 });
 
 vi.mock('../../../src/runtime/reset-registry.js', () => ({ onReset: vi.fn() }));
-vi.mock('../../../src/events/system-events.js',   () => ({}));
-vi.mock('./viz.js',     () => ({ AudioViz: class {}, SpectrogramCanvas: class {}, PianoRollViz: class {}, _noteHooks: [] }), { virtual: true });
-vi.mock('../../../src/api/visual/viz.js', () => ({ AudioViz: class {}, SpectrogramCanvas: class {}, PianoRollViz: class {}, _noteHooks: [] }));
-vi.mock('../../../src/api/audio/mixer.js', () => ({ acquireStrip: () => ({ input: {}, name: 'x', _autoNamed: true }), renameStrip: () => {}, mixer: {}, cleanupMixer: () => {}, serializeMixer: () => ({}), restoreMixer: () => {} }));
+vi.mock('../../../src/events/system-events.js', () => ({}));
+vi.mock(
+  './viz.js',
+  () => ({
+    AudioViz: class {},
+    SpectrogramCanvas: class {},
+    PianoRollViz: class {},
+    _noteHooks: [],
+  }),
+  { virtual: true },
+);
+vi.mock('../../../src/api/visual/viz.js', () => ({
+  AudioViz: class {},
+  SpectrogramCanvas: class {},
+  PianoRollViz: class {},
+  _noteHooks: [],
+}));
+vi.mock('../../../src/api/audio/mixer.js', () => ({
+  acquireStrip: () => ({ input: {}, name: 'x', _autoNamed: true }),
+  renameStrip: () => {},
+  mixer: {},
+  cleanupMixer: () => {},
+  serializeMixer: () => ({}),
+  restoreMixer: () => {},
+}));
 vi.mock('../../../src/api/audio/drumpad.js', () => ({ Drumpad: class {} }));
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

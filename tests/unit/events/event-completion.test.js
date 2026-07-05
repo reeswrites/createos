@@ -58,7 +58,7 @@ describe('eventCompletionSource', () => {
     const ctx = makeContext(code, insideQuote);
     const result = eventCompletionSource(ctx);
     expect(result).not.toBeNull();
-    const labels = result.options.map(o => o.label);
+    const labels = result.options.map((o) => o.label);
     // Check a sample of known system events
     expect(labels).toContain('beat:tick');
     expect(labels).toContain('wm:spawn');
@@ -70,7 +70,7 @@ describe('eventCompletionSource', () => {
     const code = `on('')`;
     const insideQuote = code.indexOf("'") + 1;
     const result = eventCompletionSource(makeContext(code, insideQuote));
-    const beatTick = result.options.find(o => o.label === 'beat:tick');
+    const beatTick = result.options.find((o) => o.label === 'beat:tick');
     expect(beatTick).toBeDefined();
     expect(beatTick.type).toBe('keyword');
   });
@@ -82,7 +82,7 @@ describe('eventCompletionSource', () => {
     const ctx = makeContext(code, insideQuote);
     const result = eventCompletionSource(ctx);
     expect(result).not.toBeNull();
-    const labels = result.options.map(o => o.label);
+    const labels = result.options.map((o) => o.label);
     expect(labels).toContain('my-custom-event');
   });
 
@@ -91,7 +91,7 @@ describe('eventCompletionSource', () => {
     const onLine = code.lastIndexOf("on('')");
     const insideQuote = onLine + 4;
     const result = eventCompletionSource(makeContext(code, insideQuote));
-    const userEvt = result.options.find(o => o.label === 'user:thing');
+    const userEvt = result.options.find((o) => o.label === 'user:thing');
     expect(userEvt).toBeDefined();
     expect(userEvt.type).toBe('variable');
   });
@@ -101,7 +101,7 @@ describe('eventCompletionSource', () => {
     const code = `emit('beat:tick', {});\non('')`;
     const insideQuote = code.lastIndexOf("on('") + 4;
     const result = eventCompletionSource(makeContext(code, insideQuote));
-    const beatTickEntries = result.options.filter(o => o.label === 'beat:tick');
+    const beatTickEntries = result.options.filter((o) => o.label === 'beat:tick');
     expect(beatTickEntries).toHaveLength(1);
     expect(beatTickEntries[0].type).toBe('keyword');
   });
@@ -111,7 +111,7 @@ describe('eventCompletionSource', () => {
     const insideFirstArg = code.indexOf("'") + 1; // inside 'beat:tick'
     const result = eventCompletionSource(makeContext(code, insideFirstArg + 2));
     expect(result).not.toBeNull();
-    const labels = result.options.map(o => o.label);
+    const labels = result.options.map((o) => o.label);
     expect(labels).toContain('beat:tick');
   });
 
@@ -128,7 +128,7 @@ describe('eventCompletionSource', () => {
     const code = `on('')`;
     const insideQuote = code.indexOf("'") + 1;
     const result = eventCompletionSource(makeContext(code, insideQuote));
-    const labels = new Set(result.options.map(o => o.label));
+    const labels = new Set(result.options.map((o) => o.label));
     for (const evt of SYSTEM_EVENTS) {
       expect(labels.has(evt.name)).toBe(true);
     }

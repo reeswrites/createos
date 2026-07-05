@@ -4,7 +4,7 @@ import { describe, test, expect, afterEach, vi } from 'vitest';
 
 vi.mock('tone', () => {
   let _nowVal = 0;
-  const Analyser = vi.fn(function(type, bins) {
+  const Analyser = vi.fn(function (type, bins) {
     return {
       _bins: bins,
       _type: type,
@@ -14,24 +14,26 @@ vi.mock('tone', () => {
       dispose: vi.fn(),
     };
   });
-  const EQ3 = vi.fn(function() {
+  const EQ3 = vi.fn(function () {
     return {
-      low:  { value: 0 },
-      mid:  { value: 0 },
+      low: { value: 0 },
+      mid: { value: 0 },
       high: { value: 0 },
-      connect:       vi.fn(),
-      disconnect:    vi.fn(),
+      connect: vi.fn(),
+      disconnect: vi.fn(),
       toDestination: vi.fn(),
-      chain:         vi.fn(),
-      dispose:       vi.fn(),
+      chain: vi.fn(),
+      dispose: vi.fn(),
     };
   });
-  const Player = vi.fn(function() {
+  const Player = vi.fn(function () {
     return {
       volume: { value: 0 },
       loop: false,
       buffer: { duration: 60, getChannelData: () => new Float32Array(100).fill(0.5) },
-      toDestination: vi.fn(function() { return this; }),
+      toDestination: vi.fn(function () {
+        return this;
+      }),
       disconnect: vi.fn(),
       chain: vi.fn(),
       start: vi.fn(),
@@ -40,22 +42,26 @@ vi.mock('tone', () => {
       loaded: Promise.resolve(),
     };
   });
-  const Synth = vi.fn(function() {
+  const Synth = vi.fn(function () {
     return {
       volume: { value: 0 },
       triggerAttackRelease: vi.fn(),
-      toDestination: vi.fn(function() { return this; }),
+      toDestination: vi.fn(function () {
+        return this;
+      }),
       connect: vi.fn(),
       disconnect: vi.fn(),
       chain: vi.fn(),
       dispose: vi.fn(),
     };
   });
-  const PolySynth = vi.fn(function() {
+  const PolySynth = vi.fn(function () {
     return {
       volume: { value: 0 },
       triggerAttackRelease: vi.fn(),
-      toDestination: vi.fn(function() { return this; }),
+      toDestination: vi.fn(function () {
+        return this;
+      }),
       connect: vi.fn(),
       disconnect: vi.fn(),
       chain: vi.fn(),
@@ -63,7 +69,9 @@ vi.mock('tone', () => {
     };
   });
   const mockNode = () => ({
-    toDestination: vi.fn(function() { return this; }),
+    toDestination: vi.fn(function () {
+      return this;
+    }),
     disconnect: vi.fn(),
     chain: vi.fn(),
     start: vi.fn(),
@@ -71,41 +79,99 @@ vi.mock('tone', () => {
   });
   return {
     default: {},
-    Analyser, EQ3, Player,
-    Synth, PolySynth,
-    FMSynth: Synth, AMSynth: Synth, PluckSynth: Synth,
-    MetalSynth: Synth, NoiseSynth: Synth, MembraneSynth: Synth,
-    Filter: vi.fn(function() { return mockNode(); }),
-    Reverb: vi.fn(function() { return mockNode(); }),
-    FeedbackDelay: vi.fn(function() { return mockNode(); }),
-    PitchShift: vi.fn(function() { return mockNode(); }),
-    Distortion: vi.fn(function() { return mockNode(); }),
-    Meter: vi.fn(function() { return { ...mockNode(), connect: vi.fn(), getValue: () => -80 }; }),
-    Gain: vi.fn(function() { return { ...mockNode(), connect: vi.fn() }; }),
-    Volume: vi.fn(function() { return { ...mockNode(), volume: { value: 0 }, connect: vi.fn() }; }),
-    Channel: vi.fn(function() { return { ...mockNode(), volume: { value: 0 }, pan: { value: 0 }, mute: false, connect: vi.fn() }; }),
+    Analyser,
+    EQ3,
+    Player,
+    Synth,
+    PolySynth,
+    FMSynth: Synth,
+    AMSynth: Synth,
+    PluckSynth: Synth,
+    MetalSynth: Synth,
+    NoiseSynth: Synth,
+    MembraneSynth: Synth,
+    Filter: vi.fn(function () {
+      return mockNode();
+    }),
+    Reverb: vi.fn(function () {
+      return mockNode();
+    }),
+    FeedbackDelay: vi.fn(function () {
+      return mockNode();
+    }),
+    PitchShift: vi.fn(function () {
+      return mockNode();
+    }),
+    Distortion: vi.fn(function () {
+      return mockNode();
+    }),
+    Meter: vi.fn(function () {
+      return { ...mockNode(), connect: vi.fn(), getValue: () => -80 };
+    }),
+    Gain: vi.fn(function () {
+      return { ...mockNode(), connect: vi.fn() };
+    }),
+    Volume: vi.fn(function () {
+      return { ...mockNode(), volume: { value: 0 }, connect: vi.fn() };
+    }),
+    Channel: vi.fn(function () {
+      return {
+        ...mockNode(),
+        volume: { value: 0 },
+        pan: { value: 0 },
+        mute: false,
+        connect: vi.fn(),
+      };
+    }),
     connect: vi.fn(),
-    UserMedia: vi.fn(function() { return { open: vi.fn().mockResolvedValue(undefined), ...mockNode() }; }),
-    Chorus: vi.fn(function() { return { ...mockNode(), start: vi.fn() }; }),
-    AutoFilter: vi.fn(function() { return { ...mockNode(), start: vi.fn() }; }),
-    Tremolo: vi.fn(function() { return { ...mockNode(), start: vi.fn() }; }),
-    Vibrato: vi.fn(function() { return mockNode(); }),
-    Compressor: vi.fn(function() { return mockNode(); }),
-    Loop: vi.fn(function() { return { start: vi.fn(), stop: vi.fn(), dispose: vi.fn() }; }),
-    Sequence: vi.fn(function() { return { dispose: vi.fn() }; }),
-    LFO: vi.fn(function() { return { ...mockNode(), start: vi.fn() }; }),
-    AutoWah: vi.fn(function() { return mockNode(); }),
-    Phaser: vi.fn(function() { return mockNode(); }),
+    UserMedia: vi.fn(function () {
+      return { open: vi.fn().mockResolvedValue(undefined), ...mockNode() };
+    }),
+    Chorus: vi.fn(function () {
+      return { ...mockNode(), start: vi.fn() };
+    }),
+    AutoFilter: vi.fn(function () {
+      return { ...mockNode(), start: vi.fn() };
+    }),
+    Tremolo: vi.fn(function () {
+      return { ...mockNode(), start: vi.fn() };
+    }),
+    Vibrato: vi.fn(function () {
+      return mockNode();
+    }),
+    Compressor: vi.fn(function () {
+      return mockNode();
+    }),
+    Loop: vi.fn(function () {
+      return { start: vi.fn(), stop: vi.fn(), dispose: vi.fn() };
+    }),
+    Sequence: vi.fn(function () {
+      return { dispose: vi.fn() };
+    }),
+    LFO: vi.fn(function () {
+      return { ...mockNode(), start: vi.fn() };
+    }),
+    AutoWah: vi.fn(function () {
+      return mockNode();
+    }),
+    Phaser: vi.fn(function () {
+      return mockNode();
+    }),
     now: () => _nowVal,
-    _setNow: (v) => { _nowVal = v; },
+    _setNow: (v) => {
+      _nowVal = v;
+    },
     start: vi.fn().mockResolvedValue(undefined),
     getDestination: () => ({ volume: { value: 0 }, connect: vi.fn(), disconnect: vi.fn() }),
     getTransport: () => ({
       bpm: { value: 120 },
-      start: vi.fn(), stop: vi.fn(), cancel: vi.fn(), schedule: vi.fn(),
+      start: vi.fn(),
+      stop: vi.fn(),
+      cancel: vi.fn(),
+      schedule: vi.fn(),
     }),
     Transport: { bpm: { value: 120 } },
-    Time: (t) => ({ toSeconds: () => typeof t === 'number' ? t : 1 }),
+    Time: (t) => ({ toSeconds: () => (typeof t === 'number' ? t : 1) }),
     Frequency: (_n) => ({ toFrequency: () => 440, toMidi: () => 60 }),
     Draw: { schedule: vi.fn() },
   };
@@ -113,7 +179,8 @@ vi.mock('tone', () => {
 
 // Import after mock
 const { audio, cleanupAudio } = await import('../../../../src/api/audio/audio.js');
-const { _noteHooks, SpectrogramCanvas, PianoRollViz } = await import('../../../../src/api/visual/viz.js');
+const { _noteHooks, SpectrogramCanvas, PianoRollViz } =
+  await import('../../../../src/api/visual/viz.js');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

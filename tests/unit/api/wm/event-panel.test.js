@@ -2,7 +2,12 @@
 // DOM-light: tests only the exported pure functions.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { matchesFilter, repr, makeRateState, applyRateLimit } from '../../../../src/api/wm/event-panel.js';
+import {
+  matchesFilter,
+  repr,
+  makeRateState,
+  applyRateLimit,
+} from '../../../../src/api/wm/event-panel.js';
 
 // ── matchesFilter ─────────────────────────────────────────────────────────────
 
@@ -40,11 +45,21 @@ describe('matchesFilter', () => {
 // ── repr ──────────────────────────────────────────────────────────────────────
 
 describe('repr', () => {
-  it('renders numbers', () => { expect(repr(42)).toBe('42'); });
-  it('renders null', () => { expect(repr(null)).toBe('null'); });
-  it('renders undefined', () => { expect(repr(undefined)).toBe('undefined'); });
-  it('renders booleans', () => { expect(repr(true)).toBe('true'); });
-  it('renders strings quoted', () => { expect(repr('hi')).toBe('"hi"'); });
+  it('renders numbers', () => {
+    expect(repr(42)).toBe('42');
+  });
+  it('renders null', () => {
+    expect(repr(null)).toBe('null');
+  });
+  it('renders undefined', () => {
+    expect(repr(undefined)).toBe('undefined');
+  });
+  it('renders booleans', () => {
+    expect(repr(true)).toBe('true');
+  });
+  it('renders strings quoted', () => {
+    expect(repr('hi')).toBe('"hi"');
+  });
 
   it('renders shallow array', () => {
     expect(repr([1, 2, 3])).toBe('[1, 2, 3]');
@@ -79,7 +94,13 @@ describe('applyRateLimit', () => {
   let rateMap, container, rows;
 
   function makeContainer() {
-    container = { children: [], firstChild: null, lastChild: null, insertBefore: vi.fn(), removeChild: vi.fn() };
+    container = {
+      children: [],
+      firstChild: null,
+      lastChild: null,
+      insertBefore: vi.fn(),
+      removeChild: vi.fn(),
+    };
     rows = [];
     container.insertBefore.mockImplementation((el) => {
       rows.unshift(el);
@@ -88,7 +109,7 @@ describe('applyRateLimit', () => {
       container.lastChild = rows[rows.length - 1] ?? null;
     });
     container.removeChild.mockImplementation((el) => {
-      rows = rows.filter(r => r !== el);
+      rows = rows.filter((r) => r !== el);
       container.children = rows;
       container.firstChild = rows[0] ?? null;
       container.lastChild = rows[rows.length - 1] ?? null;

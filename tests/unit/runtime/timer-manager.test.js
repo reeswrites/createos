@@ -30,9 +30,7 @@ describe('freezeTimers', () => {
 
   test('clears timeout IDs via nativeClearTimeout', () => {
     const clearTimeout = vi.fn();
-    const timeouts = new Map([
-      [10, { cb: () => {}, delay: 500, createdAt: Date.now(), args: [] }],
-    ]);
+    const timeouts = new Map([[10, { cb: () => {}, delay: 500, createdAt: Date.now(), args: [] }]]);
     freezeTimers(new Map(), timeouts, vi.fn(), clearTimeout);
     expect(clearTimeout).toHaveBeenCalledWith(10);
   });

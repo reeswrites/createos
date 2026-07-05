@@ -3,7 +3,8 @@ import { EditableImage, editImage } from '../../../../src/api/media/image-edit.j
 
 function makeCanvas(w = 100, h = 100) {
   const c = document.createElement('canvas');
-  c.width = w; c.height = h;
+  c.width = w;
+  c.height = h;
   return c;
 }
 
@@ -143,10 +144,7 @@ describe('EditableImage.reset()', () => {
 describe('EditableImage op pipeline', () => {
   test('chained ops apply in order', () => {
     // crop then flipH — both should apply without throwing
-    const c = editImage(makeCanvas(200, 200))
-      .crop(0, 0, 100, 80)
-      .flipH()
-      .toCanvas();
+    const c = editImage(makeCanvas(200, 200)).crop(0, 0, 100, 80).flipH().toCanvas();
     expect(c.width).toBe(100);
     expect(c.height).toBe(80);
   });

@@ -8,7 +8,10 @@ import { jsToBlocks } from '../../../src/blocks/js-to-blocks.js';
 function chain(root) {
   const out = [];
   let b = root;
-  while (b) { out.push(b); b = b.next?.block; }
+  while (b) {
+    out.push(b);
+    b = b.next?.block;
+  }
   return out;
 }
 
@@ -29,9 +32,9 @@ describe('js_raw passthrough (ADR 037)', () => {
   });
 
   it('keeps recognized blocks AND wraps unrecognized ones in the same program', () => {
-    const ws = jsToBlocks("canvas.bg('#000');\nnote(\"c e g\").play();");
+    const ws = jsToBlocks('canvas.bg(\'#000\');\nnote("c e g").play();');
     const blocks = chain(ws.blocks.blocks[0]);
-    expect(blocks.some((b) => b.type !== 'js_raw')).toBe(true);   // canvas.bg recognized
+    expect(blocks.some((b) => b.type !== 'js_raw')).toBe(true); // canvas.bg recognized
     const raw = blocks.find((b) => b.type === 'js_raw');
     expect(raw?.fields.CODE).toContain('note("c e g").play()');
   });

@@ -12,6 +12,7 @@ import {
   wireCaptureButton,
 } from './widget-shell.js';
 import { onReset } from '../../runtime/reset-registry.js';
+import { registerDesktopFileType } from '../platform/desktop-file-registry.js';
 import { TextLayer } from './text-layer.js';
 import { Take } from '../signal/performance-recorder.js';
 import { replayActions } from '../signal/replay-clock.js';
@@ -1448,3 +1449,45 @@ export class Paint {
 
 // Register teardown with the reset registry (ADR 008).
 onReset(cleanupPaints);
+
+// Desktop File-Type Adapter (ADR 055) — owns 'paint' icon glyph + restore.
+// Frame images are pre-loaded into canvases here (_frameCanvases is Paint's own
+// ctor option), so desktop-files never reconstructs Paint state from outside.
+registerDesktopFileType('paint', {
+  glyph: 'fa-solid fa-paintbrush',
+  cssClass: 'dt-paint-icon',
+  open: (data, pos) => {
+    const frameUrls = data.frames ?? [];
+    const canvases = frameUrls.map(() => {
+      const c = document.createElement('canvas');
+      c.width = data.width ?? 400;
+      c.height = data.height ?? 300;
+      return c;
+    });
+    const open = () =>
+      new Paint({
+        width: data.width ?? 400,
+        height: data.height ?? 300,
+        bg: data.bg ?? '#ffffff',
+        fps: data.fps ?? 8,
+        title: data.title ?? 'Paint',
+        _frameCanvases: canvases.length ? canvases : null,
+        backdrop: data.backdrop ?? null,
+        backdropMode: data.backdropMode ?? 'image',
+        ...pos,
+      });
+    if (!frameUrls.length) return open();
+    let loaded = 0;
+    frameUrls.forEach((url, i) => {
+      const img = new Image();
+      img.onload = () => {
+        canvases[i].getContext('2d').drawImage(img, 0, 0);
+        if (++loaded === frameUrls.length) open();
+      };
+      img.onerror = () => {
+        if (++loaded === frameUrls.length) open();
+      };
+      img.src = url;
+    });
+  },
+});

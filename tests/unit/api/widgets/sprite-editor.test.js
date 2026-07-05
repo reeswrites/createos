@@ -34,7 +34,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanupSpriteEditors();
   cleanupSprites();
-  document.querySelectorAll('[id^="win-sprite-test-"]').forEach(el => el.remove());
+  document.querySelectorAll('[id^="win-sprite-test-"]').forEach((el) => el.remove());
   delete window.wm;
   delete window.__ar_active_editor_id;
   delete window.__ar_instances;
@@ -117,7 +117,7 @@ describe('tool selection', () => {
 
 describe('palette', () => {
   it('clicking a swatch sets _color', () => {
-    const ed  = new SpriteEditor({ width: 4, height: 4, scale: 4 });
+    const ed = new SpriteEditor({ width: 4, height: 4, scale: 4 });
     const win = document.getElementById(ed._winId);
     const swatches = win.querySelectorAll('.wm-body > div:nth-child(2) button');
     swatches[0].click(); // first swatch = #000000
@@ -125,7 +125,7 @@ describe('palette', () => {
   });
 
   it('clicking transparent swatch sets _color to transparent', () => {
-    const ed  = new SpriteEditor({ width: 4, height: 4, scale: 4 });
+    const ed = new SpriteEditor({ width: 4, height: 4, scale: 4 });
     const win = document.getElementById(ed._winId);
     const transSw = win.querySelector('button[title="Transparent / erase"]');
     transSw.click();
@@ -137,12 +137,13 @@ describe('palette', () => {
 
 describe('flood fill', () => {
   it('calls putImageData after a fill', () => {
-    const ed  = new SpriteEditor({ width: 4, height: 4, scale: 4 });
+    const ed = new SpriteEditor({ width: 4, height: 4, scale: 4 });
     const ctx = ed.sprite.ctx();
 
     // Target pixel (0,0) = red [255,0,0,255]; fill = transparent [0,0,0,0] → they differ
     const imgData = ctx.createImageData(4, 4);
-    imgData.data[0] = 255; imgData.data[3] = 255; // red at (0,0)
+    imgData.data[0] = 255;
+    imgData.data[3] = 255; // red at (0,0)
     vi.spyOn(ctx, 'getImageData').mockReturnValue(imgData);
     const putSpy = vi.spyOn(ctx, 'putImageData');
 
@@ -153,7 +154,7 @@ describe('flood fill', () => {
   });
 
   it('fills contiguous region and leaves border intact', () => {
-    const ed  = new SpriteEditor({ width: 4, height: 4, scale: 4 });
+    const ed = new SpriteEditor({ width: 4, height: 4, scale: 4 });
     const ctx = ed.sprite.ctx();
 
     // Border = red [255,0,0,255], interior = blue [0,0,255,255]
@@ -163,9 +164,11 @@ describe('flood fill', () => {
       for (let x = 0; x < 4; x++) {
         const i = (y * 4 + x) * 4;
         if (x === 0 || x === 3 || y === 0 || y === 3) {
-          d[i] = 255; d[i+3] = 255; // red border
+          d[i] = 255;
+          d[i + 3] = 255; // red border
         } else {
-          d[i+2] = 255; d[i+3] = 255; // blue interior
+          d[i + 2] = 255;
+          d[i + 3] = 255; // blue interior
         }
       }
     }
@@ -190,7 +193,7 @@ describe('flood fill', () => {
   });
 
   it('does nothing when target color matches fill color', () => {
-    const ed  = new SpriteEditor({ width: 4, height: 4, scale: 4 });
+    const ed = new SpriteEditor({ width: 4, height: 4, scale: 4 });
     const ctx = ed.sprite.ctx();
 
     // All-transparent pixels (createImageData default = [0,0,0,0] everywhere)
@@ -211,7 +214,7 @@ describe('flood fill', () => {
 describe('line commit', () => {
   it('draws pixels along a horizontal line', () => {
     const ed = new SpriteEditor({ width: 8, height: 8, scale: 4 });
-    ed._tool  = 'line';
+    ed._tool = 'line';
     ed._color = '#00ff00';
     const pixelSpy = vi.spyOn(ed.sprite, 'pixel');
     ed._commitShape({ x: 0, y: 2 }, { x: 4, y: 2 });
@@ -223,7 +226,7 @@ describe('line commit', () => {
 
   it('draws pixels along a diagonal (Bresenham)', () => {
     const ed = new SpriteEditor({ width: 8, height: 8, scale: 4 });
-    ed._tool  = 'line';
+    ed._tool = 'line';
     ed._color = '#ff0000';
     const pixelSpy = vi.spyOn(ed.sprite, 'pixel');
     ed._commitShape({ x: 0, y: 0 }, { x: 2, y: 2 });
@@ -238,21 +241,21 @@ describe('line commit', () => {
 describe('rect commit', () => {
   it('outline rect draws corners but not interior', () => {
     const ed = new SpriteEditor({ width: 8, height: 8, scale: 4 });
-    ed._tool  = 'rect';
+    ed._tool = 'rect';
     ed._color = '#ffffff';
     const pixelSpy = vi.spyOn(ed.sprite, 'pixel');
     ed._commitShape({ x: 1, y: 1 }, { x: 4, y: 4 });
 
     const called = new Set(pixelSpy.mock.calls.map(([x, y]) => `${x},${y}`));
-    expect(called.has('1,1')).toBe(true);  // corner
-    expect(called.has('4,4')).toBe(true);  // corner
+    expect(called.has('1,1')).toBe(true); // corner
+    expect(called.has('4,4')).toBe(true); // corner
     expect(called.has('2,2')).toBe(false); // interior should NOT be drawn
     expect(called.has('3,3')).toBe(false);
   });
 
   it('filled rect draws all pixels including interior', () => {
     const ed = new SpriteEditor({ width: 8, height: 8, scale: 4 });
-    ed._tool  = 'rectfill';
+    ed._tool = 'rectfill';
     ed._color = '#ffffff';
     const pixelSpy = vi.spyOn(ed.sprite, 'pixel');
     ed._commitShape({ x: 1, y: 1 }, { x: 3, y: 3 });
@@ -268,8 +271,8 @@ describe('rect commit', () => {
 
 describe('eyedropper', () => {
   it('sets _color from frame pixel data', () => {
-    const ed  = new SpriteEditor({ width: 4, height: 4, scale: 4 });
-    const sp  = ed.sprite;
+    const ed = new SpriteEditor({ width: 4, height: 4, scale: 4 });
+    const sp = ed.sprite;
     const ctx = sp.ctx();
 
     const imgData = ctx.createImageData(4, 4);
@@ -282,7 +285,7 @@ describe('eyedropper', () => {
   });
 
   it('sets _color to transparent when pixel has alpha=0', () => {
-    const ed  = new SpriteEditor({ width: 4, height: 4, scale: 4 });
+    const ed = new SpriteEditor({ width: 4, height: 4, scale: 4 });
     const ctx = ed.sprite.ctx();
     const imgData = ctx.createImageData(4, 4); // all zeros
     vi.spyOn(ctx, 'getImageData').mockReturnValue(imgData);
@@ -297,7 +300,7 @@ describe('eyedropper', () => {
 
 describe('frame operations', () => {
   it('add frame button increases frameCount', () => {
-    const ed     = new SpriteEditor({ width: 4, height: 4, scale: 4 });
+    const ed = new SpriteEditor({ width: 4, height: 4, scale: 4 });
     const before = ed.sprite.frameCount;
     document.getElementById(ed._winId).querySelector('button[title="Add frame"]').click();
     expect(ed.sprite.frameCount).toBe(before + 1);
@@ -310,36 +313,49 @@ describe('frame operations', () => {
   });
 
   it('duplicate frame increases frameCount', () => {
-    const ed     = new SpriteEditor({ width: 4, height: 4, scale: 4 });
+    const ed = new SpriteEditor({ width: 4, height: 4, scale: 4 });
     const before = ed.sprite.frameCount;
-    document.getElementById(ed._winId).querySelector('button[title="Duplicate current frame"]').click();
+    document
+      .getElementById(ed._winId)
+      .querySelector('button[title="Duplicate current frame"]')
+      .click();
     expect(ed.sprite.frameCount).toBe(before + 1);
   });
 
   it('duplicate frame selects the new frame', () => {
     const ed = new SpriteEditor({ width: 4, height: 4, scale: 4 });
-    document.getElementById(ed._winId).querySelector('button[title="Duplicate current frame"]').click();
+    document
+      .getElementById(ed._winId)
+      .querySelector('button[title="Duplicate current frame"]')
+      .click();
     expect(ed.sprite._fi).toBe(1);
   });
 
   it('delete frame decreases frameCount', () => {
-    const ed     = new SpriteEditor({ width: 4, height: 4, scale: 4, frames: 2 });
+    const ed = new SpriteEditor({ width: 4, height: 4, scale: 4, frames: 2 });
     const before = ed.sprite.frameCount;
-    document.getElementById(ed._winId).querySelector('button[title="Delete current frame"]').click();
+    document
+      .getElementById(ed._winId)
+      .querySelector('button[title="Delete current frame"]')
+      .click();
     expect(ed.sprite.frameCount).toBe(before - 1);
   });
 
   it('delete guard: cannot delete last frame', () => {
     const ed = new SpriteEditor({ width: 4, height: 4, scale: 4 });
     expect(ed.sprite.frameCount).toBe(1);
-    document.getElementById(ed._winId).querySelector('button[title="Delete current frame"]').click();
+    document
+      .getElementById(ed._winId)
+      .querySelector('button[title="Delete current frame"]')
+      .click();
     expect(ed.sprite.frameCount).toBe(1);
   });
 
   it('move left swaps frames and updates _fi', () => {
     const ed = new SpriteEditor({ width: 4, height: 4, scale: 4, frames: 3 });
     const sp = ed.sprite;
-    const f0 = sp._frames[0], f1 = sp._frames[1];
+    const f0 = sp._frames[0],
+      f1 = sp._frames[1];
     sp.frame(1);
     document.getElementById(ed._winId).querySelector('button[title="Move frame left"]').click();
     expect(sp._fi).toBe(0);
@@ -348,7 +364,7 @@ describe('frame operations', () => {
   });
 
   it('onion skin toggle sets sprite._onionAlpha', () => {
-    const ed  = new SpriteEditor({ width: 4, height: 4, scale: 4, frames: 2 });
+    const ed = new SpriteEditor({ width: 4, height: 4, scale: 4, frames: 2 });
     const win = document.getElementById(ed._winId);
     const btn = win.querySelector('button[title="Toggle onion skin"]');
     btn.click();
@@ -386,7 +402,8 @@ describe('code export', () => {
     const ctx = ed.sprite.ctx();
     // Mock getImageData to return a pixel with actual data
     const imgData = ctx.createImageData(4, 4);
-    imgData.data[0] = 255; imgData.data[3] = 255; // red pixel at (0,0)
+    imgData.data[0] = 255;
+    imgData.data[3] = 255; // red pixel at (0,0)
     vi.spyOn(ctx, 'getImageData').mockReturnValue(imgData);
 
     ed._exportCode();
@@ -441,7 +458,7 @@ describe('SpriteEditor event hooks', () => {
   it('onPixel fires via _paintAt', () => {
     const ed = new SpriteEditor({ width: 8, height: 8, scale: 4 });
     const evs = [];
-    ed.onPixel(e => evs.push(e));
+    ed.onPixel((e) => evs.push(e));
     ed._paintAt(2, 3, '#ff0000');
     expect(evs).toHaveLength(1);
     expect(evs[0]).toMatchObject({ x: 2, y: 3, color: '#ff0000' });
@@ -450,7 +467,7 @@ describe('SpriteEditor event hooks', () => {
   it('onColor fires via _setColor', () => {
     const ed = new SpriteEditor({ width: 8, height: 8, scale: 4 });
     const evs = [];
-    ed.onColor(e => evs.push(e));
+    ed.onColor((e) => evs.push(e));
     ed._setColor('#00ff00');
     expect(evs).toHaveLength(1);
     expect(evs[0]).toMatchObject({ color: '#00ff00' });
@@ -460,7 +477,7 @@ describe('SpriteEditor event hooks', () => {
   it('onStroke fires via _emitStroke', () => {
     const ed = new SpriteEditor({ width: 8, height: 8, scale: 4 });
     const evs = [];
-    ed.onStroke(e => evs.push(e));
+    ed.onStroke((e) => evs.push(e));
     ed._expandBbox(1, 2);
     ed._expandBbox(5, 6);
     ed._emitStroke();
@@ -472,7 +489,7 @@ describe('SpriteEditor event hooks', () => {
   it('_emitStroke silent when no bbox', () => {
     const ed = new SpriteEditor({ width: 8, height: 8, scale: 4 });
     const evs = [];
-    ed.onStroke(e => evs.push(e));
+    ed.onStroke((e) => evs.push(e));
     ed._emitStroke();
     expect(evs).toHaveLength(0);
   });
@@ -480,7 +497,7 @@ describe('SpriteEditor event hooks', () => {
   it('onTool fires with tool/prev', () => {
     const ed = new SpriteEditor({ width: 8, height: 8, scale: 4 });
     const evs = [];
-    ed.onTool(e => evs.push(e));
+    ed.onTool((e) => evs.push(e));
     ed._events.emit('tool', { tool: 'fill', prev: 'pencil' });
     expect(evs[0]).toMatchObject({ tool: 'fill', prev: 'pencil' });
   });
@@ -488,7 +505,7 @@ describe('SpriteEditor event hooks', () => {
   it('onFrame fires with action', () => {
     const ed = new SpriteEditor({ width: 8, height: 8, scale: 4 });
     const evs = [];
-    ed.onFrame(e => evs.push(e));
+    ed.onFrame((e) => evs.push(e));
     ed._events.emit('frame', { action: 'add', index: 1, count: 2 });
     expect(evs[0]).toMatchObject({ action: 'add', index: 1 });
   });

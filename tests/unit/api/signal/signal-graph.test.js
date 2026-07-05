@@ -51,9 +51,7 @@ describe('signalGraph', () => {
 
   it('show() SVG includes source/sink nodes when routes exist', () => {
     signalGraph._winId = null;
-    window.__ar_signalRoutes = [
-      { source: 'audio.fft', sink: 'ThreeScene', label: 'bass' },
-    ];
+    window.__ar_signalRoutes = [{ source: 'audio.fft', sink: 'ThreeScene', label: 'bass' }];
     signalGraph.show();
     const html = window.wm.spawn.mock.calls[0][1].html;
     expect(html).toContain('audio.fft');

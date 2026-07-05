@@ -10,7 +10,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Flush pending microtasks (async command handler body) + one macrotask.
-const flushAsync = () => new Promise(r => setTimeout(r, 0));
+const flushAsync = () => new Promise((r) => setTimeout(r, 0));
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -27,7 +27,9 @@ function fakeReadable(chunks) {
 function fakeWritable() {
   const written = [];
   const stream = new WritableStream({
-    write(chunk) { written.push(chunk); },
+    write(chunk) {
+      written.push(chunk);
+    },
   });
   stream._written = written;
   return stream;
@@ -36,10 +38,12 @@ function fakeWritable() {
 function fakePort(readableChunks = []) {
   const writable = fakeWritable();
   return {
-    get readable() { return fakeReadable(readableChunks); },
+    get readable() {
+      return fakeReadable(readableChunks);
+    },
     writable,
-    open:    vi.fn(() => Promise.resolve()),
-    close:   vi.fn(() => Promise.resolve()),
+    open: vi.fn(() => Promise.resolve()),
+    close: vi.fn(() => Promise.resolve()),
     getInfo: vi.fn(() => ({ vendorId: 0x2341, productId: 0x0043 })),
   };
 }
@@ -58,7 +62,8 @@ describe('serial:connect / serial:status', () => {
     port = fakePort([]);
     Object.defineProperty(navigator, 'serial', {
       value: { requestPort: vi.fn(() => Promise.resolve(port)) },
-      configurable: true, writable: true,
+      configurable: true,
+      writable: true,
     });
     ({ emit, subscribe, clearRunScoped } = await import('../../../../src/events/bus.js'));
     await import('../../../../src/api/io/serial.js');
@@ -78,7 +83,10 @@ describe('serial:connect / serial:status', () => {
 
     expect(port.open).toHaveBeenCalledWith({ baudRate: 9600 });
     expect(statusFn).toHaveBeenCalledWith(
-      expect.objectContaining({ connected: true, port: expect.objectContaining({ vendorId: 0x2341 }) }),
+      expect.objectContaining({
+        connected: true,
+        port: expect.objectContaining({ vendorId: 0x2341 }),
+      }),
     );
     unsub();
   });
@@ -114,7 +122,8 @@ describe('sensor:serial:data and gpio:pin — text mode', () => {
     port = fakePort([encoder.encode('13:512\n')]);
     Object.defineProperty(navigator, 'serial', {
       value: { requestPort: vi.fn(() => Promise.resolve(port)) },
-      configurable: true, writable: true,
+      configurable: true,
+      writable: true,
     });
     ({ emit, subscribe, clearRunScoped } = await import('../../../../src/events/bus.js'));
     await import('../../../../src/api/io/serial.js');
@@ -129,7 +138,7 @@ describe('sensor:serial:data and gpio:pin — text mode', () => {
     const dataFn = vi.fn();
     const unsub = subscribe('sensor:serial:data', dataFn);
     emit('serial:connect', { baudRate: 115200 });
-    await new Promise(r => setTimeout(r, 20)); // connect + pipe drain
+    await new Promise((r) => setTimeout(r, 20)); // connect + pipe drain
     expect(dataFn).toHaveBeenCalledWith(expect.objectContaining({ line: '13:512' }));
     unsub();
   });
@@ -138,7 +147,7 @@ describe('sensor:serial:data and gpio:pin — text mode', () => {
     const gpioFn = vi.fn();
     const unsub = subscribe('gpio:pin', gpioFn);
     emit('serial:connect', { baudRate: 115200 });
-    await new Promise(r => setTimeout(r, 20));
+    await new Promise((r) => setTimeout(r, 20));
     expect(gpioFn).toHaveBeenCalledWith({ pin: 13, value: 512 });
     unsub();
   });
@@ -149,7 +158,8 @@ describe('sensor:serial:data and gpio:pin — text mode', () => {
     const badPort = fakePort([encoder.encode('HELLO WORLD\n')]);
     Object.defineProperty(navigator, 'serial', {
       value: { requestPort: vi.fn(() => Promise.resolve(badPort)) },
-      configurable: true, writable: true,
+      configurable: true,
+      writable: true,
     });
     ({ emit, subscribe } = await import('../../../../src/events/bus.js'));
     await import('../../../../src/api/io/serial.js');
@@ -160,11 +170,12 @@ describe('sensor:serial:data and gpio:pin — text mode', () => {
     const u2 = subscribe('gpio:pin', gpioFn);
 
     emit('serial:connect');
-    await new Promise(r => setTimeout(r, 20));
+    await new Promise((r) => setTimeout(r, 20));
 
     expect(dataFn).toHaveBeenCalledWith(expect.objectContaining({ line: 'HELLO WORLD' }));
     expect(gpioFn).not.toHaveBeenCalled();
-    u1(); u2();
+    u1();
+    u2();
   });
 });
 
@@ -179,7 +190,8 @@ describe('custom parse', () => {
     port = fakePort([encoder.encode('{"p":3,"v":255}\n')]);
     Object.defineProperty(navigator, 'serial', {
       value: { requestPort: vi.fn(() => Promise.resolve(port)) },
-      configurable: true, writable: true,
+      configurable: true,
+      writable: true,
     });
     ({ emit, subscribe } = await import('../../../../src/events/bus.js'));
     await import('../../../../src/api/io/serial.js');
@@ -196,12 +208,16 @@ describe('custom parse', () => {
 
     emit('serial:connect', {
       baudRate: 115200,
-      parse: line => {
-        try { const { p, v } = JSON.parse(line); return { pin: p, value: v }; }
-        catch { return null; }
+      parse: (line) => {
+        try {
+          const { p, v } = JSON.parse(line);
+          return { pin: p, value: v };
+        } catch {
+          return null;
+        }
       },
     });
-    await new Promise(r => setTimeout(r, 20));
+    await new Promise((r) => setTimeout(r, 20));
 
     expect(gpioFn).toHaveBeenCalledWith({ pin: 3, value: 255 });
     unsub();
@@ -220,13 +236,16 @@ describe('gpio:write and serial:write', () => {
     // Patch writable to record bytes
     port.writable = {
       getWriter: () => ({
-        write: async (bytes) => { written.push(new TextDecoder().decode(bytes)); },
+        write: async (bytes) => {
+          written.push(new TextDecoder().decode(bytes));
+        },
         releaseLock: vi.fn(),
       }),
     };
     Object.defineProperty(navigator, 'serial', {
       value: { requestPort: vi.fn(() => Promise.resolve(port)) },
-      configurable: true, writable: true,
+      configurable: true,
+      writable: true,
     });
     ({ emit, subscribe } = await import('../../../../src/events/bus.js'));
     await import('../../../../src/api/io/serial.js');
@@ -271,7 +290,8 @@ describe('port survives reset', () => {
     port = fakePort([]);
     Object.defineProperty(navigator, 'serial', {
       value: { requestPort: vi.fn(() => Promise.resolve(port)) },
-      configurable: true, writable: true,
+      configurable: true,
+      writable: true,
     });
     ({ emit, subscribe, clearRunScoped } = await import('../../../../src/events/bus.js'));
     await import('../../../../src/api/io/serial.js');

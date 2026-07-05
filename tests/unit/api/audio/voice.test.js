@@ -9,14 +9,23 @@ vi.mock('tone', () => {
       triggerAttackRelease: vi.fn(),
       triggerAttack: vi.fn(),
       triggerRelease: vi.fn(),
-      connect: vi.fn(function () { return this; }),
-      chain: vi.fn(function () { return this; }),
-      toDestination: vi.fn(function () { return this; }),
+      connect: vi.fn(function () {
+        return this;
+      }),
+      chain: vi.fn(function () {
+        return this;
+      }),
+      toDestination: vi.fn(function () {
+        return this;
+      }),
       start: vi.fn(),
       dispose: vi.fn(),
     };
   }
-  const mk = (tag) => vi.fn(function () { return makeNode(tag); });
+  const mk = (tag) =>
+    vi.fn(function () {
+      return makeNode(tag);
+    });
   return {
     default: {},
     Synth: mk('Synth'),
@@ -28,10 +37,31 @@ vi.mock('tone', () => {
     MembraneSynth: mk('MembraneSynth'),
     MetalSynth: mk('MetalSynth'),
     NoiseSynth: mk('NoiseSynth'),
-    PolySynth: vi.fn(function (Ctor) { return makeNode('Poly:' + (Ctor?.name ?? '')); }),
-    Sampler: vi.fn(function (opts) { const n = makeNode('Sampler'); opts?.onload?.(); n.buffer = { duration: 4 }; return n; }),
-    Player: vi.fn(function (opts) { const n = makeNode('Player'); n.start = vi.fn(); n.volume = { value: 0 }; opts?.onload?.(); n.buffer = { duration: 8 }; return n; }),
-    GrainPlayer: vi.fn(function (opts) { const n = makeNode('GrainPlayer'); n.start = vi.fn(); n.volume = { value: 0 }; opts?.onload?.(); n.buffer = { duration: 8 }; return n; }),
+    PolySynth: vi.fn(function (Ctor) {
+      return makeNode('Poly:' + (Ctor?.name ?? ''));
+    }),
+    Sampler: vi.fn(function (opts) {
+      const n = makeNode('Sampler');
+      opts?.onload?.();
+      n.buffer = { duration: 4 };
+      return n;
+    }),
+    Player: vi.fn(function (opts) {
+      const n = makeNode('Player');
+      n.start = vi.fn();
+      n.volume = { value: 0 };
+      opts?.onload?.();
+      n.buffer = { duration: 8 };
+      return n;
+    }),
+    GrainPlayer: vi.fn(function (opts) {
+      const n = makeNode('GrainPlayer');
+      n.start = vi.fn();
+      n.volume = { value: 0 };
+      opts?.onload?.();
+      n.buffer = { duration: 8 };
+      return n;
+    }),
     Gain: mk('Gain'),
     Reverb: mk('Reverb'),
     Chorus: mk('Chorus'),
@@ -74,7 +104,10 @@ describe('normalizeVoice', () => {
   });
 
   it('accepts the legacy piano {synth,effects} shape', () => {
-    const v = normalizeVoice({ synth: { type: 'AM', opts: { a: 1 } }, effects: [{ type: 'reverb' }] });
+    const v = normalizeVoice({
+      synth: { type: 'AM', opts: { a: 1 } },
+      effects: [{ type: 'reverb' }],
+    });
     expect(v.engine).toBe('am');
     expect(v.opts).toEqual({ a: 1 });
     expect(v.effects).toHaveLength(1);
@@ -184,7 +217,11 @@ describe('Voice registry', () => {
   it('list and remove work', () => {
     Voice.define('A', { engine: 'fm' });
     Voice.define('B', { engine: 'am' });
-    expect(Voice.list().map((v) => v.name).sort()).toEqual(['A', 'B']);
+    expect(
+      Voice.list()
+        .map((v) => v.name)
+        .sort(),
+    ).toEqual(['A', 'B']);
     Voice.remove('A');
     expect(Voice.get('A')).toBeNull();
   });

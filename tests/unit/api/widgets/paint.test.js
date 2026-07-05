@@ -27,16 +27,16 @@ beforeEach(() => {
     addHistoryControls: vi.fn(),
   };
   window.desktop = {
-    add:       vi.fn(() => ({ id: 'dt-paint-test-1' })),
+    add: vi.fn(() => ({ id: 'dt-paint-test-1' })),
     updateUrl: vi.fn(),
   };
   window.__ar_active_editor_id = null;
-  window.__ar_instances        = null;
+  window.__ar_instances = null;
 });
 
 afterEach(() => {
   cleanupPaints();
-  document.querySelectorAll('[id^="win-paint-test-"]').forEach(el => el.remove());
+  document.querySelectorAll('[id^="win-paint-test-"]').forEach((el) => el.remove());
   delete window.wm;
   delete window.desktop;
   delete window.__ar_active_editor_id;
@@ -61,11 +61,14 @@ describe('Paint constructor', () => {
   it('fills frames with bg color (verifies fillRect called)', () => {
     const origGetCtx = HTMLCanvasElement.prototype.getContext;
     const fillRects = [];
-    HTMLCanvasElement.prototype.getContext = function(type) {
+    HTMLCanvasElement.prototype.getContext = function (type) {
       const ctx = origGetCtx.call(this, type);
       if (ctx && !ctx._fillRectPatched) {
         const orig = ctx.fillRect.bind(ctx);
-        ctx.fillRect = (...args) => { fillRects.push(args); orig(...args); };
+        ctx.fillRect = (...args) => {
+          fillRects.push(args);
+          orig(...args);
+        };
         ctx._fillRectPatched = true;
       }
       return ctx;
@@ -86,7 +89,7 @@ describe('Paint constructor', () => {
   });
 
   it('sets _widgetType = "paint" on the window element', () => {
-    const p   = new Paint({ width: 100, height: 80 });
+    const p = new Paint({ width: 100, height: 80 });
     const win = document.getElementById(p._winId);
     expect(win._widgetType).toBe('paint');
   });
@@ -126,15 +129,19 @@ describe('Paint constructor', () => {
 
   it('restores from _frameCanvases (copies canvas content via drawImage)', () => {
     const fc = document.createElement('canvas');
-    fc.width  = 50; fc.height = 50;
+    fc.width = 50;
+    fc.height = 50;
 
     const drawImageCalls = [];
     const origGetCtx = HTMLCanvasElement.prototype.getContext;
-    HTMLCanvasElement.prototype.getContext = function(type) {
+    HTMLCanvasElement.prototype.getContext = function (type) {
       const ctx = origGetCtx.call(this, type);
       if (ctx && !ctx._drawImagePatched) {
         const orig = ctx.drawImage.bind(ctx);
-        ctx.drawImage = (...args) => { drawImageCalls.push(args); orig(...args); };
+        ctx.drawImage = (...args) => {
+          drawImageCalls.push(args);
+          orig(...args);
+        };
         ctx._drawImagePatched = true;
       }
       return ctx;
@@ -145,7 +152,7 @@ describe('Paint constructor', () => {
 
     expect(p.frameCount).toBe(1);
     // At least one drawImage call with our source canvas
-    const copied = drawImageCalls.some(args => args[0] === fc);
+    const copied = drawImageCalls.some((args) => args[0] === fc);
     expect(copied).toBe(true);
   });
 });
@@ -197,19 +204,20 @@ describe('Paint frame API', () => {
 
 describe('Paint undo snapshots', () => {
   it('_snapFrames captures frame count', () => {
-    const p    = new Paint({ width: 10, height: 10, frames: 2 });
+    const p = new Paint({ width: 10, height: 10, frames: 2 });
     const snap = p._snapFrames();
     expect(snap.frames.length).toBe(2);
     expect(snap.fi).toBe(0);
   });
 
   it('_applyFrames calls putImageData on each frame', () => {
-    const p   = new Paint({ width: 10, height: 10 });
+    const p = new Paint({ width: 10, height: 10 });
     const ctx = p._frames[0].getContext('2d');
 
     // Populate snapshot with createImageData (jsdom safe)
     const imgData = ctx.createImageData(10, 10);
-    imgData.data[0] = 255; imgData.data[3] = 255; // red pixel
+    imgData.data[0] = 255;
+    imgData.data[3] = 255; // red pixel
 
     const snap = { fi: 0, frames: [imgData.data] };
 
@@ -223,7 +231,7 @@ describe('Paint undo snapshots', () => {
     const p = new Paint({ width: 10, height: 10 });
     expect(p.frameCount).toBe(1);
 
-    const ctx  = p._frames[0].getContext('2d');
+    const ctx = p._frames[0].getContext('2d');
     const data = ctx.createImageData(10, 10).data;
     const snap = { fi: 0, frames: [data, data] }; // 2 frames in snapshot
     p._applyFrames(snap);
@@ -234,7 +242,7 @@ describe('Paint undo snapshots', () => {
     const p = new Paint({ width: 10, height: 10, frames: 3 });
     expect(p.frameCount).toBe(3);
 
-    const ctx  = p._frames[0].getContext('2d');
+    const ctx = p._frames[0].getContext('2d');
     const data = ctx.createImageData(10, 10).data;
     const snap = { fi: 0, frames: [data] }; // 1 frame in snapshot
     p._applyFrames(snap);
@@ -246,9 +254,16 @@ describe('Paint undo snapshots', () => {
 
 describe('Paint _getState', () => {
   it('includes all required fields', () => {
-    const p = new Paint({ width: 200, height: 150, bg: '#cccccc', fps: 12, title: 'MyPaint', frames: 2 });
+    const p = new Paint({
+      width: 200,
+      height: 150,
+      bg: '#cccccc',
+      fps: 12,
+      title: 'MyPaint',
+      frames: 2,
+    });
     // mock toDataURL so frames[0] is a string
-    p._frames.forEach(fc => {
+    p._frames.forEach((fc) => {
       vi.spyOn(fc, 'toDataURL').mockReturnValue('data:image/png;base64,stub');
     });
     const s = p._getState();
@@ -307,7 +322,10 @@ describe('frame strip', () => {
   it('duplicate frame increases frameCount', () => {
     const p = new Paint({ width: 50, height: 50 });
     const before = p.frameCount;
-    document.getElementById(p._winId).querySelector('button[title="Duplicate current frame"]').click();
+    document
+      .getElementById(p._winId)
+      .querySelector('button[title="Duplicate current frame"]')
+      .click();
     expect(p.frameCount).toBe(before + 1);
   });
 
@@ -327,7 +345,8 @@ describe('frame strip', () => {
 
   it('move left swaps frames', () => {
     const p = new Paint({ width: 50, height: 50, frames: 3 });
-    const f0 = p._frames[0], f1 = p._frames[1];
+    const f0 = p._frames[0],
+      f1 = p._frames[1];
     p.frame(1);
     document.getElementById(p._winId).querySelector('button[title="Move frame left"]').click();
     expect(p._fi).toBe(0);
@@ -340,11 +359,12 @@ describe('frame strip', () => {
 
 describe('Paint _floodFill', () => {
   it('calls putImageData after filling', () => {
-    const p   = new Paint({ width: 4, height: 4, bg: 'transparent' });
+    const p = new Paint({ width: 4, height: 4, bg: 'transparent' });
     const ctx = p._frames[0].getContext('2d');
 
     const imgData = ctx.createImageData(4, 4);
-    imgData.data[0] = 255; imgData.data[3] = 255; // red at (0,0)
+    imgData.data[0] = 255;
+    imgData.data[3] = 255; // red at (0,0)
     vi.spyOn(ctx, 'getImageData').mockReturnValue(imgData);
     const putSpy = vi.spyOn(ctx, 'putImageData');
 
@@ -355,7 +375,7 @@ describe('Paint _floodFill', () => {
   });
 
   it('fills contiguous region and stops at border', () => {
-    const p   = new Paint({ width: 4, height: 4, bg: 'transparent' });
+    const p = new Paint({ width: 4, height: 4, bg: 'transparent' });
     const ctx = p._frames[0].getContext('2d');
 
     // Border = red [255,0,0,255], interior = blue [0,0,255,255]
@@ -365,9 +385,11 @@ describe('Paint _floodFill', () => {
       for (let x = 0; x < 4; x++) {
         const i = (y * 4 + x) * 4;
         if (x === 0 || x === 3 || y === 0 || y === 3) {
-          d[i] = 255; d[i+3] = 255; // red border
+          d[i] = 255;
+          d[i + 3] = 255; // red border
         } else {
-          d[i+2] = 255; d[i+3] = 255; // blue interior
+          d[i + 2] = 255;
+          d[i + 3] = 255; // blue interior
         }
       }
     }
@@ -392,7 +414,7 @@ describe('Paint _floodFill', () => {
   });
 
   it('no-op when target matches fill color', () => {
-    const p   = new Paint({ width: 4, height: 4, bg: 'transparent' });
+    const p = new Paint({ width: 4, height: 4, bg: 'transparent' });
     const ctx = p._frames[0].getContext('2d');
 
     const imgData = ctx.createImageData(4, 4); // all zeros (transparent)
@@ -409,7 +431,7 @@ describe('Paint _floodFill', () => {
 
 describe('eyedropper', () => {
   it('sets _color from frame pixel', () => {
-    const p   = new Paint({ width: 4, height: 4 });
+    const p = new Paint({ width: 4, height: 4 });
     const ctx = p._frames[0].getContext('2d');
 
     const imgData = ctx.createImageData(4, 4);
@@ -422,7 +444,7 @@ describe('eyedropper', () => {
   });
 
   it('sets _color to #000000 when alpha=0', () => {
-    const p   = new Paint({ width: 4, height: 4 });
+    const p = new Paint({ width: 4, height: 4 });
     const ctx = p._frames[0].getContext('2d');
     vi.spyOn(ctx, 'getImageData').mockReturnValue(ctx.createImageData(4, 4));
 
@@ -447,8 +469,8 @@ describe('code export', () => {
 
     expect(dispatch).toHaveBeenCalledOnce();
     const inserted = dispatch.mock.calls[0][0].changes.insert;
-    expect(inserted).toContain("new Canvas()");
-    expect(inserted).toContain("canvas.image(");
+    expect(inserted).toContain('new Canvas()');
+    expect(inserted).toContain('canvas.image(');
   });
 });
 
@@ -490,11 +512,11 @@ describe('Paint backdrop', () => {
     expect(p._backdropEl).toBeNull();
 
     const img = new Image();
-    img.width  = 40;
+    img.width = 40;
     img.height = 40;
     // mark as complete so drawSrc fires synchronously
-    Object.defineProperty(img, 'complete',     { get: () => true });
-    Object.defineProperty(img, 'naturalWidth', { get: () => 40  });
+    Object.defineProperty(img, 'complete', { get: () => true });
+    Object.defineProperty(img, 'naturalWidth', { get: () => 40 });
 
     p.setBackdrop(img, { mode: 'image' });
 
@@ -509,8 +531,8 @@ describe('Paint backdrop', () => {
     expect(checker).not.toBeNull();
 
     const img = new Image();
-    Object.defineProperty(img, 'complete',     { get: () => true });
-    Object.defineProperty(img, 'naturalWidth', { get: () => 40  });
+    Object.defineProperty(img, 'complete', { get: () => true });
+    Object.defineProperty(img, 'naturalWidth', { get: () => 40 });
     p.setBackdrop(img, { mode: 'image' });
 
     expect(checker.style.display).toBe('none');
@@ -519,8 +541,8 @@ describe('Paint backdrop', () => {
   it('clearBackdrop removes _backdropEl and restores checker', () => {
     const p = new Paint({ width: 40, height: 40 });
     const img = new Image();
-    Object.defineProperty(img, 'complete',     { get: () => true });
-    Object.defineProperty(img, 'naturalWidth', { get: () => 40  });
+    Object.defineProperty(img, 'complete', { get: () => true });
+    Object.defineProperty(img, 'naturalWidth', { get: () => 40 });
     p.setBackdrop(img, { mode: 'image' });
     expect(p._backdropInfo).not.toBeNull();
 
@@ -532,11 +554,13 @@ describe('Paint backdrop', () => {
 
   it('_getState includes backdrop when active', () => {
     const p = new Paint({ width: 20, height: 20 });
-    p._frames.forEach(fc => vi.spyOn(fc, 'toDataURL').mockReturnValue('data:image/png;base64,stub'));
+    p._frames.forEach((fc) =>
+      vi.spyOn(fc, 'toDataURL').mockReturnValue('data:image/png;base64,stub'),
+    );
 
     const img = new Image();
-    Object.defineProperty(img, 'complete',     { get: () => true });
-    Object.defineProperty(img, 'naturalWidth', { get: () => 20  });
+    Object.defineProperty(img, 'complete', { get: () => true });
+    Object.defineProperty(img, 'naturalWidth', { get: () => 20 });
     p.setBackdrop(img, { mode: 'image' });
 
     // _backdropSnapshot creates a fresh canvas whose toDataURL is not implemented
@@ -550,11 +574,13 @@ describe('Paint backdrop', () => {
 
   it('_getState has no backdrop when cleared', () => {
     const p = new Paint({ width: 20, height: 20 });
-    p._frames.forEach(fc => vi.spyOn(fc, 'toDataURL').mockReturnValue('data:image/png;base64,stub'));
+    p._frames.forEach((fc) =>
+      vi.spyOn(fc, 'toDataURL').mockReturnValue('data:image/png;base64,stub'),
+    );
 
     const img = new Image();
-    Object.defineProperty(img, 'complete',     { get: () => true });
-    Object.defineProperty(img, 'naturalWidth', { get: () => 20  });
+    Object.defineProperty(img, 'complete', { get: () => true });
+    Object.defineProperty(img, 'naturalWidth', { get: () => 20 });
     p.setBackdrop(img, { mode: 'image' });
     p.clearBackdrop();
 
@@ -565,8 +591,8 @@ describe('Paint backdrop', () => {
   it('_render suppresses bg fill when backdrop active', () => {
     const p = new Paint({ width: 20, height: 20, bg: '#ff0000' });
     const img = new Image();
-    Object.defineProperty(img, 'complete',     { get: () => true });
-    Object.defineProperty(img, 'naturalWidth', { get: () => 20  });
+    Object.defineProperty(img, 'complete', { get: () => true });
+    Object.defineProperty(img, 'naturalWidth', { get: () => 20 });
     p.setBackdrop(img, { mode: 'image' });
 
     const ctx = p._canvas.getContext('2d');
@@ -580,8 +606,8 @@ describe('Paint backdrop', () => {
   it('constructor backdrop param calls setBackdrop', () => {
     const spy = vi.spyOn(Paint.prototype, 'setBackdrop');
     const img = new Image();
-    Object.defineProperty(img, 'complete',     { get: () => true });
-    Object.defineProperty(img, 'naturalWidth', { get: () => 20  });
+    Object.defineProperty(img, 'complete', { get: () => true });
+    Object.defineProperty(img, 'naturalWidth', { get: () => 20 });
     new Paint({ width: 20, height: 20, backdrop: img });
     expect(spy).toHaveBeenCalledOnce();
     spy.mockRestore();
@@ -601,7 +627,7 @@ describe('Paint event hooks', () => {
   it('onTool fires when tool changes', () => {
     const p = new Paint({ width: 40, height: 40 });
     const evs = [];
-    p.onTool(e => evs.push(e));
+    p.onTool((e) => evs.push(e));
     // simulate tool-row button click via _events directly (DOM btn not in jsdom)
     p._events.emit('tool', { tool: 'eraser', prev: 'pen' });
     expect(evs).toHaveLength(1);
@@ -611,7 +637,7 @@ describe('Paint event hooks', () => {
   it('onColor fires when color changes via _setColor', () => {
     const p = new Paint({ width: 40, height: 40 });
     const evs = [];
-    p.onColor(e => evs.push(e));
+    p.onColor((e) => evs.push(e));
     p._setColor('#ff0000');
     expect(evs).toHaveLength(1);
     expect(evs[0]).toMatchObject({ color: '#ff0000' });
@@ -626,7 +652,7 @@ describe('Paint event hooks', () => {
   it('onStroke fires after _emitStroke with correct bbox', () => {
     const p = new Paint({ width: 40, height: 40 });
     const evs = [];
-    p.onStroke(e => evs.push(e));
+    p.onStroke((e) => evs.push(e));
     // _emitStroke takes the pre-computed bbox arg; the guard lives in _bindPointer
     const b = { x: 5, y: 10, w: 15, h: 20 };
     p._emitStroke(b);
@@ -655,7 +681,7 @@ describe('Paint event hooks', () => {
   it('onFrame fires when frame emitted', () => {
     const p = new Paint({ width: 40, height: 40 });
     const evs = [];
-    p.onFrame(e => evs.push(e));
+    p.onFrame((e) => evs.push(e));
     p._events.emit('frame', { action: 'add', index: 1, count: 2 });
     expect(evs[0]).toMatchObject({ action: 'add', index: 1 });
   });

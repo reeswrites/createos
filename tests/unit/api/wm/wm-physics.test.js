@@ -6,9 +6,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 function makeApi() {
   // Minimal subset of the wm api object with just physics methods
   const api = {
-    _physState:  new Map(),
+    _physState: new Map(),
     _physActive: false,
-    _physRafId:  null,
+    _physRafId: null,
     _physGravity: 0,
 
     physics(on = true, opts = {}) {
@@ -19,7 +19,10 @@ function makeApi() {
         // Don't start actual RAF in tests
       } else if (!on) {
         api._physActive = false;
-        if (api._physRafId) { cancelAnimationFrame(api._physRafId); api._physRafId = null; }
+        if (api._physRafId) {
+          cancelAnimationFrame(api._physRafId);
+          api._physRafId = null;
+        }
       }
       return api;
     },
@@ -29,7 +32,8 @@ function makeApi() {
         api._physState.set(id, { vx: 0, vy: 0, mass: 1, elasticity: 0.6 });
       }
       const s = api._physState.get(id);
-      s.vx += vx; s.vy += vy;
+      s.vx += vx;
+      s.vy += vy;
       return api;
     },
 
@@ -41,11 +45,11 @@ function makeApi() {
     _physTick() {
       const desktop = document.getElementById('desktop');
       if (!desktop) return;
-      const dW = desktop.offsetWidth  || 800;
+      const dW = desktop.offsetWidth || 800;
       const dH = desktop.offsetHeight || 600;
 
       const windows = document.querySelectorAll('#desktop .wm-win');
-      windows.forEach(win => {
+      windows.forEach((win) => {
         const id = win.id;
         if (!id) return;
         if (!api._physState.has(id)) {
@@ -53,24 +57,38 @@ function makeApi() {
         }
         const s = api._physState.get(id);
         s.vy += api._physGravity;
-        s.vx *= 0.98; s.vy *= 0.98;
+        s.vx *= 0.98;
+        s.vy *= 0.98;
 
         let x = parseInt(win.style.left, 10) || 0;
-        let y = parseInt(win.style.top,  10) || 0;
-        const w = win.offsetWidth  || 200;
+        let y = parseInt(win.style.top, 10) || 0;
+        const w = win.offsetWidth || 200;
         const h = win.offsetHeight || 200;
-        x += s.vx; y += s.vy;
+        x += s.vx;
+        y += s.vy;
 
-        if (x < 0)      { x = 0;      s.vx =  Math.abs(s.vx) * s.elasticity; }
-        if (x + w > dW) { x = dW - w; s.vx = -Math.abs(s.vx) * s.elasticity; }
-        if (y < 0)      { y = 0;      s.vy =  Math.abs(s.vy) * s.elasticity; }
-        if (y + h > dH) { y = dH - h; s.vy = -Math.abs(s.vy) * s.elasticity; }
+        if (x < 0) {
+          x = 0;
+          s.vx = Math.abs(s.vx) * s.elasticity;
+        }
+        if (x + w > dW) {
+          x = dW - w;
+          s.vx = -Math.abs(s.vx) * s.elasticity;
+        }
+        if (y < 0) {
+          y = 0;
+          s.vy = Math.abs(s.vy) * s.elasticity;
+        }
+        if (y + h > dH) {
+          y = dH - h;
+          s.vy = -Math.abs(s.vy) * s.elasticity;
+        }
 
         if (Math.abs(s.vx) < 0.05) s.vx = 0;
         if (Math.abs(s.vy) < 0.05) s.vy = 0;
 
         win.style.left = `${x}px`;
-        win.style.top  = `${y}px`;
+        win.style.top = `${y}px`;
       });
     },
   };
@@ -81,7 +99,7 @@ function makeApi() {
 function makeDesktop(w = 800, h = 600) {
   const d = document.createElement('div');
   d.id = 'desktop';
-  Object.defineProperty(d, 'offsetWidth',  { get: () => w, configurable: true });
+  Object.defineProperty(d, 'offsetWidth', { get: () => w, configurable: true });
   Object.defineProperty(d, 'offsetHeight', { get: () => h, configurable: true });
   document.body.appendChild(d);
   return d;
@@ -92,8 +110,8 @@ function makeWin(id, x, y, w = 200, h = 100) {
   win.id = id;
   win.className = 'wm-win';
   win.style.left = `${x}px`;
-  win.style.top  = `${y}px`;
-  Object.defineProperty(win, 'offsetWidth',  { get: () => w, configurable: true });
+  win.style.top = `${y}px`;
+  Object.defineProperty(win, 'offsetWidth', { get: () => w, configurable: true });
   Object.defineProperty(win, 'offsetHeight', { get: () => h, configurable: true });
   document.getElementById('desktop').appendChild(win);
   return win;
@@ -167,12 +185,12 @@ describe('wm._physTick()', () => {
     api._physTick();
     const win = document.getElementById('w1');
     expect(parseInt(win.style.left, 10)).toBeGreaterThan(100);
-    expect(parseInt(win.style.top,  10)).toBeGreaterThan(100);
+    expect(parseInt(win.style.top, 10)).toBeGreaterThan(100);
   });
 
   it('bounces off right edge', () => {
     const api = makeApi();
-    makeWin('w2', 650, 100);  // 650 + 200 = 850 > 800
+    makeWin('w2', 650, 100); // 650 + 200 = 850 > 800
     api.push('w2', 50, 0);
     api._physTick();
     const win = document.getElementById('w2');
@@ -185,7 +203,7 @@ describe('wm._physTick()', () => {
 
   it('bounces off bottom edge', () => {
     const api = makeApi();
-    makeWin('w3', 100, 550);  // 550 + 100 = 650 > 600
+    makeWin('w3', 100, 550); // 550 + 100 = 650 > 600
     api.push('w3', 0, 80);
     api._physTick();
     const win = document.getElementById('w3');

@@ -14,7 +14,9 @@ describe('WidgetHistory', () => {
     onChange = vi.fn();
     hist = new WidgetHistory({
       capture: () => ({ val: state.val }),
-      restore: (snap) => { state.val = snap.val; },
+      restore: (snap) => {
+        state.val = snap.val;
+      },
       debounce: 100,
       max: 5,
       onChange,
@@ -76,14 +78,17 @@ describe('WidgetHistory', () => {
 
   it('rapid commits collapse into one undo step (debounce)', () => {
     // Three rapid mutations — should produce only ONE undo step
-    state.val = 1; hist.commit();
-    state.val = 2; hist.commit();
-    state.val = 3; hist.commit();
+    state.val = 1;
+    hist.commit();
+    state.val = 2;
+    hist.commit();
+    state.val = 3;
+    hist.commit();
     vi.advanceTimersByTime(200);
 
     expect(hist.canUndo()).toBe(true);
     hist.undo();
-    expect(state.val).toBe(0);  // back to pre-burst
+    expect(state.val).toBe(0); // back to pre-burst
     expect(hist.canUndo()).toBe(false);
   });
 
@@ -95,7 +100,10 @@ describe('WidgetHistory', () => {
     }
     // max=5, so only 5 undo steps should remain
     let count = 0;
-    while (hist.canUndo()) { hist.undo(); count++; }
+    while (hist.canUndo()) {
+      hist.undo();
+      count++;
+    }
     expect(count).toBe(5);
   });
 
@@ -180,12 +188,12 @@ describe('WidgetHistory', () => {
     state.val = 2;
     hist.commit(); // second commit pending (not yet fired), snap={val:1}
 
-    hist.undo();   // cancels second commit; pops first snap ({val:0}); restores state.val=0
+    hist.undo(); // cancels second commit; pops first snap ({val:0}); restores state.val=0
     vi.advanceTimersByTime(200); // second commit timer was cancelled — no extra step
 
-    expect(state.val).toBe(0);   // restored to pre-first-commit state
+    expect(state.val).toBe(0); // restored to pre-first-commit state
     expect(hist.canUndo()).toBe(false); // undo stack exhausted
-    expect(hist.canRedo()).toBe(true);  // {val:2} was pushed to redo on undo
+    expect(hist.canRedo()).toBe(true); // {val:2} was pushed to redo on undo
   });
 
   it('multi-step undo/redo round-trip', () => {

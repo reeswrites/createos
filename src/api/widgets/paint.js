@@ -3,6 +3,8 @@
 // Sibling to SpriteEditor; reuses WidgetHistory, wm.addHistoryControls, desktop autosave.
 
 import { WidgetEvents } from './widget-events.js';
+import { snapshotFrameCanvases, paintFrameCanvas, downloadCanvasPng } from './frame-snapshot.js';
+import { registerWidgetRestorer } from '../wm/widget-restorer-registry.js';
 import { insertSnippet } from '../../editor/active-editor.js';
 import { FrameDoc } from './frame-doc.js';
 import {
@@ -576,27 +578,16 @@ export class Paint {
     if (this._frames[this._fi]) ctx.drawImage(this._frames[this._fi], 0, 0);
   }
 
-  // ── Undo snapshot (raw RGBA per frame, mirrors SpriteEditor._snapPixels) ──────
+  // ── Undo snapshot (raw RGBA per frame — shared with SpriteEditor) ─────────────
 
   _snapFrames() {
-    return {
-      fi: this._fi,
-      frames: this._frames.map((fc) => {
-        const id = fc.getContext('2d').getImageData(0, 0, this._w, this._h);
-        return new Uint8ClampedArray(id.data);
-      }),
-    };
+    return { fi: this._fi, frames: snapshotFrameCanvases(this._frames, this._w, this._h) };
   }
 
   _applyFrames(snap) {
     while (this._frames.length < snap.frames.length) this.addFrame();
     this._frames.length = snap.frames.length;
-    snap.frames.forEach((data, i) => {
-      const ctx = this._frames[i].getContext('2d');
-      const id = ctx.createImageData(this._w, this._h);
-      id.data.set(new Uint8ClampedArray(data));
-      ctx.putImageData(id, 0, 0);
-    });
+    snap.frames.forEach((data, i) => paintFrameCanvas(this._frames[i], this._w, this._h, data));
     this._fi = snap.fi;
     this._render();
     this._refreshThumbs();
@@ -1371,13 +1362,7 @@ export class Paint {
         })()
       : this._compositeFrame(this._frames[this._fi]);
 
-    src.toBlob((blob) => {
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = sheet ? 'paint-sheet.png' : 'paint-frame.png';
-      a.click();
-      URL.revokeObjectURL(a.href);
-    }, 'image/png');
+    downloadCanvasPng(src, sheet ? 'paint-sheet.png' : 'paint-frame.png');
   }
 
   // ── Event / signal public API ─────────────────────────────────────────────────
@@ -1490,4 +1475,44 @@ registerDesktopFileType('paint', {
       img.src = url;
     });
   },
+});
+
+// Code-generated window restore. See widget-restorer-registry.js.
+registerWidgetRestorer('paint', (s) => {
+  const ws = s.widgetState ?? {};
+  const frameUrls = ws.frames ?? [];
+  let loaded = 0;
+  const canvases = frameUrls.map(() => {
+    const c = document.createElement('canvas');
+    c.width = ws.width ?? 400;
+    c.height = ws.height ?? 300;
+    return c;
+  });
+  const open = () =>
+    new Paint({
+      width: ws.width ?? 400,
+      height: ws.height ?? 300,
+      bg: ws.bg ?? '#ffffff',
+      fps: ws.fps ?? 8,
+      title: s.title ?? 'Paint',
+      x: s.x,
+      y: s.y,
+      _desktopIconId: ws._desktopIconId,
+      _frameCanvases: canvases.length ? canvases : null,
+    });
+  if (!frameUrls.length) {
+    open();
+    return;
+  }
+  frameUrls.forEach((url, i) => {
+    const img = new Image();
+    img.onload = () => {
+      canvases[i].getContext('2d').drawImage(img, 0, 0);
+      if (++loaded === frameUrls.length) open();
+    };
+    img.onerror = () => {
+      if (++loaded === frameUrls.length) open();
+    };
+    img.src = url;
+  });
 });

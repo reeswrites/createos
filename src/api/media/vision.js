@@ -8,6 +8,8 @@ import {
 import { onReset } from '../../runtime/reset-registry.js';
 import { notify, subscribe } from '../../events/index.js';
 import { acquireCameraRunScoped } from './media-lease.js';
+import { isPaused } from '../../runtime/run-context.js';
+import { GAZE_CALIB } from '../../runtime/storage-keys.js';
 
 const WASM_CDN = 'https://unpkg.com/@mediapipe/tasks-vision@0.10.35/wasm';
 const MODEL_BASE = 'https://storage.googleapis.com/mediapipe-models';
@@ -112,7 +114,7 @@ const RIGHT_IRIS = [473, 474, 475, 476, 477];
 const LEFT_EYE = { outer: 33, inner: 133, top: 159, bottom: 145 };
 const RIGHT_EYE = { outer: 263, inner: 362, top: 386, bottom: 374 };
 
-const GAZE_CALIB_KEY = 'vl_gaze_calib';
+const GAZE_CALIB_KEY = GAZE_CALIB;
 
 let _calib = null; // { wX:[…], wY:[…] } active regression weights
 let _calibDeviceId = null; // resolved camera deviceId for the current key
@@ -914,7 +916,7 @@ export const vision = {
     const smoothed = new Map(); // 'hand:landmark' → { x, y } (normalized)
     let rafId = null;
     const draw = () => {
-      if (!window.__ar_paused && ctx) {
+      if (!isPaused() && ctx) {
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.fillStyle = 'black';
         ctx.fillRect(0, 0, w, h);

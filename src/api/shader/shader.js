@@ -1,4 +1,6 @@
 import { jsToWGSL } from './js-to-wgsl.js';
+import { micViz } from '../media/mic-state.js';
+import { isPaused } from '../../runtime/run-context.js';
 import { resolveWGSL, library } from '../platform/library.js';
 import { onReset } from '../../runtime/reset-registry.js';
 import { mountLayerCanvas } from '../visual/layer.js';
@@ -551,7 +553,7 @@ export class Shader extends ShaderLayerBase {
       if (!this._device) await this._init();
       if (this._rafId) return;
       const loop = (ts) => {
-        if (!window.__ar_paused) this._frame(ts);
+        if (!isPaused()) this._frame(ts);
         this._rafId = requestAnimationFrame(loop);
       };
       this._rafId = requestAnimationFrame(loop);
@@ -639,7 +641,7 @@ export class ShaderFX {
 
   static micVizShader(effect = 'greyscale') {
     acquireMicRunScoped();
-    const src = window.__ar_mic_viz ?? null;
+    const src = micViz() ?? null;
     return new Shader(CAMERA_PRESETS[effect] ?? CAMERA_PRESETS.greyscale, { video: src });
   }
 

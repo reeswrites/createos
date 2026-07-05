@@ -1,4 +1,6 @@
 import * as Tone from 'tone';
+import { micAnalyser } from '../media/mic-state.js';
+import { activeEditorId } from '../../runtime/run-context.js';
 import { Shader } from '../shader/shader.js';
 import { liveOutput } from '../../runtime/keep-alive.js';
 import { runScoped } from '../../runtime/run-scoped.js';
@@ -23,7 +25,7 @@ export function cleanupViz() {
 // is toggled separately by each viz's start()/stop() (liveness toggles), so this
 // uses runScoped (no keep-alive), not runScopedOutput.
 function _registerViz(v) {
-  v._ownerEditorId = window.__ar_active_editor_id;
+  v._ownerEditorId = activeEditorId();
   v._scoped = runScoped({ owner: v._ownerEditorId, onStop: () => v._destroy() });
   _vizs.add(v);
 }
@@ -314,7 +316,7 @@ export class SpectrogramCanvas {
   _getFft() {
     if (this._signal) return this._signal.fft;
     if (this._micMode) {
-      const node = window.__ar_mic_analyser;
+      const node = micAnalyser();
       if (!node) return new Float32Array(this._bins);
       const raw = new Float32Array(node.frequencyBinCount || this._bins);
       if (typeof node.getFloatFrequencyData === 'function') node.getFloatFrequencyData(raw);

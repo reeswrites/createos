@@ -12,6 +12,7 @@
 // hold('event')                                 → global memoized live-state (persistent/non-run-scoped)
 
 import { subscribe, getLastPayload } from './bus.js';
+import { activeEditorId } from '../runtime/run-context.js';
 import { onReset } from '../runtime/reset-registry.js';
 import { SYSTEM_EVENTS } from './system-events.js';
 
@@ -22,7 +23,7 @@ import { SYSTEM_EVENTS } from './system-events.js';
 // at call time, so a tick/tween belongs to the editor that created it. Falls back
 // to native globals when there's no active editor (e.g. tests).
 function _trackedTimers() {
-  const id = window.__ar_active_editor_id;
+  const id = activeEditorId();
   const si = id != null ? window[`__ar_e${id}_setInterval`] : null;
   const ci = id != null ? window[`__ar_e${id}_clearInterval`] : null;
   return { setInterval: si || window.setInterval, clearInterval: ci || window.clearInterval };

@@ -13,6 +13,7 @@
 // the code is torn down a cycle later. Hard reset / window close destroys.
 
 import { DrawTarget } from './draw.js';
+import { activeEditorId } from '../../runtime/run-context.js';
 import { Layer } from './layer.js';
 import { liveOutput } from '../../runtime/keep-alive.js';
 import { onReset } from '../../runtime/reset-registry.js';
@@ -66,7 +67,7 @@ class Canvas extends DrawTarget {
     this._unsubs = [];
     this._disposed = false;
     this._reclaimed = true; // used by the run that creates it
-    this._ownerEditorId = window.__ar_active_editor_id ?? null;
+    this._ownerEditorId = activeEditorId() ?? null;
 
     // ── Spawn the window ──────────────────────────────────────────────────────
     const winId = window.wm?.spawn(title, {

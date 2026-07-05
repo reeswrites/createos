@@ -1,4 +1,3 @@
-import { saveWorkspaceJSON } from '../../blocks/blocks.js';
 import { serializeDesktop, restoreDesktop } from './desktop-files.js';
 import { serializeMixer, restoreMixer } from '../audio/mixer.js';
 import { getWindowAdapter, geoOf, titleOf, readAudio, applyGeo } from '../wm/window-registry.js';
@@ -23,13 +22,7 @@ export function serializeProject(wm, instances) {
         title: titleOf(win, 'Editor'),
         ...geoOf(win),
         audio: readAudio(win),
-        code: inst.cm.state.doc.toString(),
-        mode: inst.blocksMode ? 'blocks' : 'text',
-        blocksJson:
-          inst.blocksMode && inst.blocklyWorkspace
-            ? saveWorkspaceJSON(inst.blocklyWorkspace)
-            : null,
-        executionState: inst.btnState,
+        ...inst.serialize(),
       });
       return;
     }
@@ -63,8 +56,7 @@ export async function applyProject(data, wm, instances, appAPI) {
     const inst = appAPI.createEditor(w.editorId);
     editorIds.push(w.editorId);
 
-    inst.cm.dispatch({ changes: { from: 0, to: inst.cm.state.doc.length, insert: w.code ?? '' } });
-    if (w.mode === 'blocks' && w.blocksJson) inst.loadBlocksJSON(w.blocksJson);
+    inst.applyRecord(w);
 
     applyGeo(document.getElementById(inst.editorWinId), w);
   }

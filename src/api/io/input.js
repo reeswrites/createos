@@ -17,6 +17,7 @@
 // Move source: lazy — starts RAF loop on first subscriber, stops on last.
 
 import { notify, registerSource } from '../../events/index.js';
+import { isPaused } from '../../runtime/run-context.js';
 import { getFocusedWinId } from '../wm/wm.js';
 
 // Capture native addEventListener before the harness patches EventTarget.prototype.
@@ -28,7 +29,7 @@ const _winRem = window.removeEventListener.bind(window);
 // ── Key events ────────────────────────────────────────────────────────────────
 
 _docAdd('keydown', (e) => {
-  if (window.__ar_paused) return;
+  if (isPaused()) return;
   const winId = getFocusedWinId();
   notify('window:key:down', { key: e.key, code: e.code, repeat: e.repeat, winId: winId ?? null });
   if (winId) notify(`wm:${winId}:key:down`, { key: e.key, code: e.code, repeat: e.repeat });
@@ -53,7 +54,7 @@ function _wmBodyCoords(e, winId) {
 }
 
 _docAdd('mousedown', (e) => {
-  if (window.__ar_paused) return;
+  if (isPaused()) return;
   const winId = e.target.closest?.('.wm-win')?.id ?? null;
   notify('window:mouse:down', { button: e.button, x: e.clientX, y: e.clientY, winId });
   if (winId) {
@@ -63,7 +64,7 @@ _docAdd('mousedown', (e) => {
 });
 
 _docAdd('mouseup', (e) => {
-  if (window.__ar_paused) return;
+  if (isPaused()) return;
   const winId = e.target.closest?.('.wm-win')?.id ?? null;
   notify('window:mouse:up', { button: e.button, x: e.clientX, y: e.clientY, winId });
   if (winId) {
@@ -73,7 +74,7 @@ _docAdd('mouseup', (e) => {
 });
 
 _docAdd('click', (e) => {
-  if (window.__ar_paused) return;
+  if (isPaused()) return;
   const winId = e.target.closest?.('.wm-win')?.id ?? null;
   notify('window:mouse:click', { button: e.button, x: e.clientX, y: e.clientY, winId });
   if (winId) {

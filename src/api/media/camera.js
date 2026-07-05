@@ -1,4 +1,5 @@
 import { runScoped } from '../../runtime/run-scoped.js';
+import { activeEditorId } from '../../runtime/run-context.js';
 import { notify, registerCommand } from '../../events/index.js';
 import { recordStream } from './recorder.js';
 import { initCameraLease } from './media-lease.js';
@@ -164,7 +165,7 @@ export const Camera = {
   async open({ index = 0, deviceId = null } = {}) {
     // Capture owner now: open() awaits, and __ar_active_editor_id may change before
     // the handle is constructed. The handle must be tagged with the editor that asked.
-    const ownerEditorId = window.__ar_active_editor_id;
+    const ownerEditorId = activeEditorId();
     let id = deviceId;
     if (!id) {
       const all = await navigator.mediaDevices.enumerateDevices();

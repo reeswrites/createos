@@ -11,6 +11,7 @@
 // Event plumbing delegates to WidgetEvents (src/api/widgets/widget-events.js).
 
 import * as Tone from 'tone';
+import { registerWidgetRestorer } from '../wm/widget-restorer-registry.js';
 import { connectSurfaceStrip } from './mixer.js';
 import { notify } from '../../events/index.js';
 import { insertSnippet } from '../../editor/active-editor.js';
@@ -913,3 +914,19 @@ registerDesktopFileType('beat', {
   cssClass: 'dt-beat-icon',
   open: (data, pos) => new Drumpad({ ...data, ...pos }),
 });
+
+// Code-generated window restore (ADR 055 discipline). See widget-restorer-registry.js.
+registerWidgetRestorer(
+  'drumpad',
+  (s) =>
+    new Drumpad({
+      title: s.title,
+      x: s.x,
+      y: s.y,
+      w: s.w,
+      h: s.h,
+      bpm: s.widgetState?.bpm,
+      patterns: s.widgetState?.patterns,
+      _desktopIconId: s.widgetState?._desktopIconId,
+    }),
+);

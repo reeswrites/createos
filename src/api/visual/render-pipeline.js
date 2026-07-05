@@ -11,6 +11,7 @@
 // driver only calls read() on canvas stages.
 
 import { resolveDrawable, _isCanvas, _isVideo } from './drawable-source.js';
+import { activeEditorId, isPaused } from '../../runtime/run-context.js';
 import { openScreenSource } from '../media/screen.js';
 import { liveOutput } from '../../runtime/keep-alive.js';
 import { onReset } from '../../runtime/reset-registry.js';
@@ -926,7 +927,7 @@ export class Pipeline {
     // Owner editor — set when constructed during a run. Lets cleanup tear down
     // only this editor's pipelines so running one editor doesn't kill another's
     // live output (routes delegate to pipe internally — same scoping applies).
-    this._ownerEditorId = window.__ar_active_editor_id;
+    this._ownerEditorId = activeEditorId();
     // Owner-scoped teardown via the shared run-scoped handler (ADR 041). Keep-alive
     // is toggled separately by start()/stop() (liveness toggles), so this uses
     // runScoped (no keep-alive), not runScopedOutput.
@@ -1212,7 +1213,7 @@ export class Pipeline {
 
     // Drive canvas stages via raf; shader stages self-raf independently
     const loop = () => {
-      if (!window.__ar_paused) {
+      if (!isPaused()) {
         for (const stage of this._stages) {
           if (!stage._isShader) stage.read();
         }

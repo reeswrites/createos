@@ -11,6 +11,7 @@
 // Event plumbing delegates to WidgetEvents (src/api/widgets/widget-events.js).
 
 import * as Tone from 'tone';
+import { registerWidgetRestorer } from '../wm/widget-restorer-registry.js';
 import { connectSurfaceStrip } from './mixer.js';
 import { Voice } from './voice.js';
 import { notify } from '../../events/index.js';
@@ -1215,3 +1216,23 @@ registerDesktopFileType('piano', {
     return p;
   },
 });
+
+// Code-generated window restore. See widget-restorer-registry.js.
+registerWidgetRestorer(
+  'piano',
+  (s) =>
+    new Piano({
+      title: s.title,
+      x: s.x,
+      y: s.y,
+      w: s.w,
+      h: s.h,
+      preset: s.widgetState?.preset,
+      bpm: s.widgetState?.bpm,
+      duration: s.widgetState?.duration,
+      baseOctave: s.widgetState?.baseOctave,
+      octaves: s.widgetState?.octaves,
+      steps: s.widgetState?.steps,
+      _desktopIconId: s.widgetState?._desktopIconId,
+    }),
+);

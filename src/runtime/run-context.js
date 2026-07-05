@@ -7,10 +7,12 @@
 // (__ar_instances, __ar_projectManager, widget restorers) and device singletons
 // (__ar_mic_*, __ar_video) keep their own owners; they have a different lifetime.
 //
-// During migration each field stays BACKED on window.__ar_*, so unmigrated readers
-// keep working while callers convert to these accessors file-by-file. The writes all
-// flow through here (editor-instance is the sole writer), so there is one source of
-// truth even while some reads are still raw. See CONTEXT.md "Run Context".
+// Each field stays BACKED on window.__ar_* as the implementation detail, but every
+// reader now crosses this seam: the active-editor and paused idioms that were smeared
+// raw across ~25 sites (owner-capture in route/viz/canvas/camera/three-scene/pipeline
+// constructors; the paused-raf-gate in input/sensors/shader/pixi/vision loops) all go
+// through activeEditorId()/isPaused(). The globals are private state, not the interface.
+// See CONTEXT.md "Run Context". (ADR 044 migration completed.)
 
 export function activeEditorId() {
   return window.__ar_active_editor_id ?? null;

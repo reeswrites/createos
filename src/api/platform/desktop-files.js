@@ -1,4 +1,5 @@
 import { onReset } from '../../runtime/reset-registry.js';
+import { DESKTOP_STATE, editorTitleKey } from '../../runtime/storage-keys.js';
 import { notify } from '../../events/index.js';
 import {
   getDesktopFileType,
@@ -26,7 +27,7 @@ const _iconClickHandlers = new Map(); // id → fn[] — run-scoped, cleared on 
 // Positions saved from last restoreDesktop() call — picked up by addEditorIcon on spawn.
 const _restoredPositions = new Map(); // editorId → {x, y}
 
-const _DESKTOP_KEY = 'vl-desktop-state';
+const _DESKTOP_KEY = DESKTOP_STATE;
 
 // ── Folder handle IDB persistence ─────────────────────────────────────────────
 const _FOLDER_IDB = 'vl-folder-icons';
@@ -1578,7 +1579,7 @@ export function duplicateEditor(editorId) {
   const newInst = window.__ar_newEditorWithCode?.(code);
   if (!newInst) return;
   try {
-    localStorage.setItem('vl-ide-title-' + newInst.id, newTitle);
+    localStorage.setItem(editorTitleKey(newInst.id), newTitle);
   } catch (_) {}
   newInst.title = newTitle;
   const win = document.getElementById(newInst.editorWinId);

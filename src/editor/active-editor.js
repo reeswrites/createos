@@ -6,9 +6,11 @@
 
 // The active instance is whichever editor most recently ran (set in
 // editor-instance.js on execute). `__ar_instances` is a Map keyed by editor id.
+import { activeEditorId } from '../runtime/run-context.js';
+
 export function getActiveInstance() {
   const map = window.__ar_instances;
-  const id = window.__ar_active_editor_id;
+  const id = activeEditorId();
   const active = id != null ? map?.get(id) : null;
   if (active) return active;
   // No editor has run yet (active id unset) — fall back to the primary editor

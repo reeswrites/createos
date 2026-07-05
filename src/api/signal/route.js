@@ -17,6 +17,7 @@
 // accessible both via route() and directly via pipe().
 
 import { runScopedOutput } from '../../runtime/run-scoped.js';
+import { activeEditorId, isPaused } from '../../runtime/run-context.js';
 import { subscribe, notify } from '../../events/bus.js';
 import { pipe, sourceKind, sourceField } from '../visual/render-pipeline.js';
 import { audio } from '../audio/audio.js';
@@ -269,7 +270,7 @@ class Route {
     // Owner editor — set when constructed during a run (app.js tags it before
     // user code executes). Lets the reset handler tear down only this editor's
     // routes, so running one editor doesn't kill another's live output.
-    this._ownerEditorId = window.__ar_active_editor_id;
+    this._ownerEditorId = activeEditorId();
 
     _routes.add(this);
   }
@@ -663,7 +664,7 @@ class Route {
       }
 
       const loop = () => {
-        if (!window.__ar_paused) {
+        if (!isPaused()) {
           // Read primary source value
           let raw = discrete ? this._held : this._src.read?.();
 

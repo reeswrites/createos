@@ -10,6 +10,7 @@
 // window-strip map.
 
 import * as Tone from 'tone';
+import { micAnalyser } from '../media/mic-state.js';
 import { acquireMic } from '../media/media-lease.js';
 
 // canvas: target <canvas>. getStyle: () => 'bars'|'wave'|'ring'.
@@ -33,7 +34,7 @@ export function createSpectrumCore(canvas, getStyle, opts = {}) {
       } catch (_) {}
       toneAn = null;
     }
-    if (rawAn && rawAn !== window.__ar_mic_analyser) {
+    if (rawAn && rawAn !== micAnalyser()) {
       try {
         rawAn.disconnect();
       } catch (_) {}
@@ -55,7 +56,7 @@ export function createSpectrumCore(canvas, getStyle, opts = {}) {
       Tone.getDestination().connect(toneAn);
     } else if (id === 'mic') {
       _micLease = acquireMic(); // window-scoped (ADR 023)
-      rawAn = window.__ar_mic_analyser; // may be null until mic:ready fires (self-heals in frame())
+      rawAn = micAnalyser(); // may be null until mic:ready fires (self-heals in frame())
     } else if (id.startsWith('vid:')) {
       const vid = document.getElementById(id.slice(4))?.querySelector('video');
       if (vid) {
@@ -89,7 +90,7 @@ export function createSpectrumCore(canvas, getStyle, opts = {}) {
     const W = canvas.width,
       H = canvas.height;
     if (!W || !H) return;
-    if (_currentSrc === 'mic' && !rawAn) rawAn = window.__ar_mic_analyser;
+    if (_currentSrc === 'mic' && !rawAn) rawAn = micAnalyser();
 
     c2d.fillStyle = getColors().bg ?? '#0d0d1a';
     c2d.fillRect(0, 0, W, H);

@@ -15,6 +15,7 @@
 //   audio:transcript    { text, isFinal }
 
 import { notify, subscribe } from '../events/index.js';
+import { micStream } from '../api/media/mic-state.js';
 import { runScopedOutput } from '../runtime/run-scoped.js';
 import { acquireMic } from '../api/media/media-lease.js';
 import { AudioTap } from './audio-tap.js';
@@ -36,7 +37,7 @@ function _resolveSpec(spec) {
       key: 'mic',
       async getStream() {
         lease = acquireMic();
-        if (window.__ar_mic_stream) return window.__ar_mic_stream;
+        if (micStream()) return micStream();
         await new Promise((res) => {
           const done = () => {
             unsubR?.();
@@ -48,7 +49,7 @@ function _resolveSpec(spec) {
           const unsubE = subscribe('mic:error', done);
           const t = setTimeout(done, 4000); // fail-safe
         });
-        return window.__ar_mic_stream;
+        return micStream();
       },
       onRelease() {
         lease?.release();

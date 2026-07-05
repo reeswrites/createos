@@ -1,4 +1,5 @@
 import { onReset } from '../../runtime/reset-registry.js';
+import { isPaused } from '../../runtime/run-context.js';
 import { notify } from '../../events/index.js';
 // sensors.js — unified sensory signal bus
 // Every sensor returns a signal object with live getters + .stream(fn) RAF push.
@@ -53,7 +54,7 @@ _nativeWinAdd('mouseup', (e) => {
 const _held = new Set();
 let _lastKey = '';
 _nativeWinAdd('keydown', (e) => {
-  if (_inTextInput() || window.__ar_paused) return;
+  if (_inTextInput() || isPaused()) return;
   _held.add(e.key);
   _lastKey = e.key;
 });
@@ -277,11 +278,11 @@ export const SensorsAPI = {
       // key: exact key name ('ArrowLeft', 'a', ' ', '*' for any key)
       onKey(key, onDown, onUp) {
         const kd = (e) => {
-          if (_inTextInput() || window.__ar_paused) return;
+          if (_inTextInput() || isPaused()) return;
           if (key === '*' || e.key === key) onDown(sig, e);
         };
         const ku = (e) => {
-          if (_inTextInput() || window.__ar_paused) return;
+          if (_inTextInput() || isPaused()) return;
           if (key === '*' || e.key === key) onUp?.(sig, e);
         };
         _nativeDocAdd('keydown', kd);

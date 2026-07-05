@@ -2,16 +2,16 @@
 //
 // Handles both Tone.Analyser (dB values via getValue()) and Web Audio AnalyserNode
 // (byte values via getByteFrequencyData()). The 'mic' sentinel string resolves
-// through window.__ar_mic_analyser at call time.
+// through the Mic accessor (mic-state.js) at call time.
 //
-// This is a leaf module: no imports — mirrors drawable-source.js.
-// Every module that needed an FFT reader previously duplicated this body;
-// now they all import from here.
+// Near-leaf: its only import is the zero-dep Mic accessor. Every module that
+// needed an FFT reader previously duplicated this body; now they all import here.
+import { micAnalyser } from '../media/mic-state.js';
 
 // Normalize any audio analyser to a Float32Array[0..1] of length `bins`.
 // src: 'mic' | Web Audio AnalyserNode | Tone.Analyser
 export function readAnalyser(src, bins = 32) {
-  const node = src === 'mic' ? window.__ar_mic_analyser : src;
+  const node = src === 'mic' ? micAnalyser() : src;
   if (!node) return new Float32Array(bins);
   const out = new Float32Array(bins);
   if (typeof node.getValue === 'function') {

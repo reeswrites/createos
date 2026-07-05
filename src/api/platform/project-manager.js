@@ -1,15 +1,15 @@
 import { serializeProject, applyProject } from './project.js';
-import { saveWorkspaceJSON } from '../../blocks/blocks.js';
+import { PROJECTS_DB, ACTIVE_PROJECT, ACTIVE_PROJECT_NAME } from '../../runtime/storage-keys.js';
 
 // project-manager.js — named in-browser projects backed by IDB.
 // Each project = { id, name, createdAt, updatedAt, data: serializeProject() output }.
 // Active project pointer: localStorage['vl-active-project'].
 // On first load with no saved projects, current desktop state → "Default".
 
-const _IDB_NAME = 'vl-projects';
+const _IDB_NAME = PROJECTS_DB;
 const _IDB_STORE = 'projects';
-const _ACTIVE_KEY = 'vl-active-project';
-const _NAME_KEY = 'vl-active-project-name';
+const _ACTIVE_KEY = ACTIVE_PROJECT;
+const _NAME_KEY = ACTIVE_PROJECT_NAME;
 
 let _appAPI = null;
 let _getWm = null;
@@ -223,12 +223,9 @@ export async function moveEditorToProject(editorId, targetProjectId, copy = fals
     w: parseInt(win?.style.width) || 320,
     h: parseInt(win?.style.height) || 240,
     visible: win?.style.display !== 'none',
-    code: inst.cm.state.doc.toString(),
-    mode: inst.blocksMode ? 'blocks' : 'text',
-    blocksJson:
-      inst.blocksMode && inst.blocklyWorkspace ? saveWorkspaceJSON(inst.blocklyWorkspace) : null,
-    executionState: 'idle',
     audio: { muted: false, volume: 1 },
+    ...inst.serialize(),
+    executionState: 'idle', // a moved editor lands idle regardless of live state
   };
 
   const proj = await _get(targetProjectId);

@@ -1,6 +1,9 @@
 import { vision, preloadVision } from '../api/media/vision.js';
+import { initToolkitWindow } from '../api/wm/toolkit-window.js';
+import { EDITOR_MANIFEST, editorCodeKey, editorExecKey } from './storage-keys.js';
+import { activeEditorId } from './run-context.js';
 import { lang } from '../api/lang/lang.js';
-import { TOOLKIT_CATEGORIES, addToolkitEntries } from '../editor/completions.js';
+import { addToolkitEntries } from '../editor/completions.js';
 import {
   _registerBuiltin,
   registerAPI,
@@ -61,15 +64,7 @@ import {
 import { initWM } from '../api/wm/wm.js';
 import { initTooltips } from '../api/wm/tooltips.js';
 import { installWidgetHistoryKeys } from '../api/widgets/widget-history.js';
-import {
-  initPaletteWorkspace,
-  onPaletteClick,
-  resizeBlockly,
-  TOOLBOX_CATEGORY_META,
-  finishBlockRenders,
-  applyExternalBlocks,
-  addBlockToCategoryMeta,
-} from '../blocks/blocks.js';
+import { applyExternalBlocks, addBlockToCategoryMeta } from '../blocks/blocks.js';
 import { editImage } from '../api/media/image-edit.js';
 import { ThreeScene, THREE } from '../api/visual/three-scene.js';
 import { signalGraph } from '../api/signal/signal-graph.js';
@@ -303,7 +298,7 @@ _setToolkitApplier(addToolkitEntries);
 
 // ── Global addEventListener patch — routes listeners to active editor ──────────
 EventTarget.prototype.addEventListener = function (type, handler, options) {
-  const edId = window.__ar_active_editor_id;
+  const edId = activeEditorId();
   if (edId != null) {
     const inst = window.__ar_instances?.get(edId);
     if (inst) inst._listeners.push({ target: this, type, handler, options });
@@ -344,21 +339,21 @@ if (_isEmbed) {
     const ids = editorEntries.map((w) => w.editorId);
     editorEntries.forEach((w) => {
       try {
-        localStorage.setItem(`vl-ide-code-${w.editorId}`, w.code ?? '');
+        localStorage.setItem(editorCodeKey(w.editorId), w.code ?? '');
       } catch (_) {}
     });
     if (ids.length > 0) {
       try {
-        localStorage.setItem('vl-ide-editors', JSON.stringify(ids));
+        localStorage.setItem(EDITOR_MANIFEST, JSON.stringify(ids));
       } catch (_) {}
     }
   } else if (_embedCode) {
     // Single-code embed: slot 1 only
     try {
-      localStorage.setItem('vl-ide-code-1', _embedCode);
+      localStorage.setItem(editorCodeKey(1), _embedCode);
     } catch (_) {}
     try {
-      localStorage.setItem('vl-ide-editors', JSON.stringify([1]));
+      localStorage.setItem(EDITOR_MANIFEST, JSON.stringify([1]));
     } catch (_) {}
   }
 }
@@ -381,7 +376,6 @@ window.onload = () => {
   });
 
   // ── Window manager ─────────────────────────────────────────────────────────
-  window.__ar_widgetRestorers = {};
   const _wm = initWM(() => {
     window.__ar_instances?.forEach((inst) => {
       inst.cm.requestMeasure();
@@ -406,137 +400,9 @@ window.onload = () => {
   window.__ar_removeIconById = removeIconById;
   installWidgetHistoryKeys();
 
-  // Widget restore factories — called by wm.restoreState for code-generated windows
-  window.__ar_widgetRestorers['drumpad'] = (s) =>
-    new Drumpad({
-      title: s.title,
-      x: s.x,
-      y: s.y,
-      w: s.w,
-      h: s.h,
-      bpm: s.widgetState?.bpm,
-      patterns: s.widgetState?.patterns,
-      _desktopIconId: s.widgetState?._desktopIconId,
-    });
-  window.__ar_widgetRestorers['piano'] = (s) =>
-    new Piano({
-      title: s.title,
-      x: s.x,
-      y: s.y,
-      w: s.w,
-      h: s.h,
-      preset: s.widgetState?.preset,
-      bpm: s.widgetState?.bpm,
-      duration: s.widgetState?.duration,
-      baseOctave: s.widgetState?.baseOctave,
-      octaves: s.widgetState?.octaves,
-      steps: s.widgetState?.steps,
-      _desktopIconId: s.widgetState?._desktopIconId,
-    });
-  window.__ar_widgetRestorers['note'] = (s) =>
-    new Notepad({
-      title: s.title,
-      x: s.x,
-      y: s.y,
-      w: s.w,
-      h: s.h,
-      content: s.widgetState?.content,
-      _desktopIconId: s.widgetState?._desktopIconId,
-    });
-  // Legacy projects may carry an 'eq' widget — graceful no-op (ADR 032 removed EQWidget).
-  window.__ar_widgetRestorers['eq'] = () => {};
-  window.__ar_widgetRestorers['mixer'] = () => openMixerPanel();
-  window.__ar_widgetRestorers['paint'] = (s) => {
-    const ws = s.widgetState ?? {};
-    const frameUrls = ws.frames ?? [];
-    let loaded = 0;
-    const canvases = frameUrls.map(() => {
-      const c = document.createElement('canvas');
-      c.width = ws.width ?? 400;
-      c.height = ws.height ?? 300;
-      return c;
-    });
-    const open = () =>
-      new Paint({
-        width: ws.width ?? 400,
-        height: ws.height ?? 300,
-        bg: ws.bg ?? '#ffffff',
-        fps: ws.fps ?? 8,
-        title: s.title ?? 'Paint',
-        x: s.x,
-        y: s.y,
-        _desktopIconId: ws._desktopIconId,
-        _frameCanvases: canvases.length ? canvases : null,
-      });
-    if (!frameUrls.length) {
-      open();
-      return;
-    }
-    frameUrls.forEach((url, i) => {
-      const img = new Image();
-      img.onload = () => {
-        canvases[i].getContext('2d').drawImage(img, 0, 0);
-        if (++loaded === frameUrls.length) open();
-      };
-      img.onerror = () => {
-        if (++loaded === frameUrls.length) open();
-      };
-      img.src = url;
-    });
-  };
-
-  window.__ar_widgetRestorers['spriteEditor'] = (s) => {
-    const ws = s.widgetState ?? {};
-    const sp = new Sprite({
-      width: ws.width ?? 16,
-      height: ws.height ?? 16,
-      scale: ws.scale ?? 20,
-      frames: ws.frames?.length ?? 1,
-    });
-    const frameUrls = ws.frames ?? [];
-    let loaded = 0;
-    const open = () =>
-      new SpriteEditor({
-        sprite: sp,
-        title: s.title,
-        x: s.x,
-        y: s.y,
-        _desktopIconId: ws._desktopIconId,
-      });
-    if (!frameUrls.length) {
-      open();
-      return;
-    }
-    frameUrls.forEach((url, i) => {
-      const img = new Image();
-      img.onload = () => {
-        sp._frames[i].getContext('2d').drawImage(img, 0, 0);
-        sp._render();
-        if (++loaded === frameUrls.length) open();
-      };
-      img.onerror = () => {
-        if (++loaded === frameUrls.length) open();
-      };
-      img.src = url;
-    });
-  };
-
-  window.__ar_widgetRestorers['ascii'] = (s) => {
-    const ws = s.widgetState ?? {};
-    new AsciiEditor({
-      cols: ws.cols ?? 64,
-      rows: ws.rows ?? 24,
-      cellW: ws.cellW ?? 10,
-      cellH: ws.cellH ?? 18,
-      fps: ws.fps ?? 8,
-      bg: ws.bg ?? '#0d0208',
-      title: s.title ?? 'ASCII Editor',
-      x: s.x,
-      y: s.y,
-      _desktopIconId: ws._desktopIconId,
-      _frames: ws.frames ?? null,
-    });
-  };
+  // Widget restore factories now live BESIDE each widget class via
+  // registerWidgetRestorer(type, fn) — see widget-restorer-registry.js (ADR 055
+  // discipline). wm.restoreState resolves them through restoreWidget().
 
   // PIXI.js — init once at startup (synchronous in v7). Sets window.pixi + window.Stage.
   initPixi();
@@ -546,78 +412,10 @@ window.onload = () => {
 
   const _stage = document.getElementById('wm-stage');
 
-  // ── Shared tooltip for toolkit snippets ───────────────────────────────────
-  const toolTipEl = document.createElement('div');
-  toolTipEl.id = 'toolkit-tooltip';
-  document.body.appendChild(toolTipEl);
-  const showTooltip = (text, anchorEl) => {
-    toolTipEl.textContent = text;
-    toolTipEl.style.display = 'block';
-    const rect = anchorEl.getBoundingClientRect();
-    toolTipEl.style.left = `${rect.right + 8}px`;
-    toolTipEl.style.top = `${rect.top + rect.height / 2}px`;
-    toolTipEl.style.transform = 'translateY(-50%)';
-  };
-  const hideTooltip = () => {
-    toolTipEl.style.display = 'none';
-  };
-
-  function _makeToolkitBtn(cmd, catName) {
-    const btn = document.createElement('div');
-    btn.className = 'toolkit-btn';
-    btn.draggable = true;
-    btn.dataset.search =
-      `${cmd.label} ${cmd.hint ?? ''} ${(cmd.tags ?? []).join(' ')}`.toLowerCase();
-    btn.dataset.cat = catName.toLowerCase();
-    btn.innerHTML = `<span>${cmd.label}</span><span class="toolkit-info" title="">ℹ</span>`;
-    btn.addEventListener('dragstart', (e) => {
-      e.dataTransfer.setData('application/x-ar-toolkit', cmd.code);
-      if (cmd.blockType) e.dataTransfer.setData('application/x-ar-block-type', cmd.blockType);
-      e.dataTransfer.effectAllowed = 'copy';
-      btn.classList.add('dragging');
-      hideTooltip();
-    });
-    btn.addEventListener('dragend', () => btn.classList.remove('dragging'));
-    if (cmd.hint) {
-      const infoSpan = btn.querySelector('.toolkit-info');
-      infoSpan.addEventListener('mouseenter', () => showTooltip(cmd.hint, infoSpan));
-      infoSpan.addEventListener('mouseleave', hideTooltip);
-      infoSpan.addEventListener('mousedown', (e) => e.stopPropagation());
-    }
-    return btn;
-  }
-
-  function _populateTextPanel(panel) {
-    for (const cat of TOOLKIT_CATEGORIES) {
-      const catEl = document.createElement('div');
-      catEl.className = 'toolkit-category';
-      catEl.dataset.catName = cat.name.toLowerCase();
-      catEl.textContent = cat.name;
-      panel.appendChild(catEl);
-      for (const cmd of cat.commands) {
-        panel.appendChild(_makeToolkitBtn(cmd, cat.name));
-      }
-    }
-  }
-
-  // Live toolkit entry insertion — called by pipe.register() and any runtime registerAPI() use.
-  // Updates all currently-open toolkit text panels without requiring a re-open.
-  window.__ar_addToolkitEntry = (catName, cmd) => {
-    addToolkitEntries(catName, [cmd]);
-    document.querySelectorAll('.ar-toolkit-text').forEach((panel) => {
-      let header = panel.querySelector(
-        `.toolkit-category[data-cat-name="${catName.toLowerCase()}"]`,
-      );
-      if (!header) {
-        header = document.createElement('div');
-        header.className = 'toolkit-category';
-        header.dataset.catName = catName.toLowerCase();
-        header.textContent = catName;
-        panel.appendChild(header);
-      }
-      panel.appendChild(_makeToolkitBtn(cmd, catName));
-    });
-  };
+  // The API Toolbox window type lives in toolkit-window.js. initToolkitWindow builds
+  // the shared tooltip + drag-out snippet panel + lazy Blockly palette and installs
+  // window.__ar_addToolkitEntry (the live entry hook pipe.register / registerAPI use).
+  const _toolkit = initToolkitWindow();
 
   // Boot user library — loads localStorage entries into memory, injects into toolkit + palette
   initLibrary();
@@ -631,190 +429,6 @@ window.onload = () => {
   };
   populateLibraryToolkit();
   populateLibraryBlocks();
-
-  function _filterTextPanel(panel, q) {
-    const query = q.trim().toLowerCase();
-    const cats = panel.querySelectorAll('.toolkit-category');
-    const btns = panel.querySelectorAll('.toolkit-btn');
-    if (!query) {
-      cats.forEach((c) => {
-        c.style.display = '';
-      });
-      btns.forEach((b) => {
-        b.style.display = '';
-      });
-      return;
-    }
-    cats.forEach((c) => {
-      c.style.display = 'none';
-    });
-    btns.forEach((b) => {
-      const match = b.dataset.search?.includes(query);
-      b.style.display = match ? '' : 'none';
-      if (match) {
-        const catEl = panel.querySelector(`.toolkit-category[data-cat-name="${b.dataset.cat}"]`);
-        if (catEl) catEl.style.display = '';
-      }
-    });
-  }
-
-  function _buildToolkitContent(win) {
-    const body = win.querySelector('.wm-body');
-    body.style.overflow = 'hidden';
-    body.style.flexDirection = 'column';
-    body.style.padding = '0';
-    body.style.background = '#f0f2f5';
-
-    const modeBar = document.createElement('div');
-    modeBar.className = 'ar-toolkit-modebar';
-
-    const textModeBtn = document.createElement('button');
-    textModeBtn.className = 'ar-toolkit-mode ar-toolkit-mode-active';
-    textModeBtn.title = 'Text snippets';
-    textModeBtn.innerHTML = '<i class="fa-solid fa-code"></i>';
-
-    const blocksModeBtn = document.createElement('button');
-    blocksModeBtn.className = 'ar-toolkit-mode';
-    blocksModeBtn.title = 'Block palette';
-    blocksModeBtn.innerHTML = '<i class="fa-solid fa-puzzle-piece"></i>';
-
-    const searchInput = document.createElement('input');
-    searchInput.type = 'search';
-    searchInput.placeholder = 'Filter…';
-    searchInput.className = 'ar-toolkit-search';
-    searchInput.addEventListener('mousedown', (e) => e.stopPropagation());
-
-    modeBar.appendChild(textModeBtn);
-    modeBar.appendChild(blocksModeBtn);
-    body.appendChild(modeBar);
-
-    const searchRow = document.createElement('div');
-    searchRow.className = 'ar-toolkit-searchrow';
-    searchRow.appendChild(searchInput);
-    body.appendChild(searchRow);
-
-    const textPanel = document.createElement('div');
-    textPanel.className = 'ar-toolkit-text';
-    _populateTextPanel(textPanel);
-    body.appendChild(textPanel);
-
-    const blocksPanel = document.createElement('div');
-    blocksPanel.className = 'ar-toolkit-blocks';
-    blocksPanel.style.display = 'none';
-
-    const catPanel = document.createElement('div');
-    catPanel.className = 'ar-toolkit-cats';
-
-    const listPanel = document.createElement('div');
-    listPanel.className = 'ar-toolkit-list';
-
-    const backBtn = document.createElement('button');
-    backBtn.className = 'blockly-back-btn';
-    backBtn.textContent = '← Back';
-
-    const paletteDiv = document.createElement('div');
-    paletteDiv.className = 'ar-toolkit-palette';
-
-    listPanel.appendChild(backBtn);
-    listPanel.appendChild(paletteDiv);
-    blocksPanel.appendChild(catPanel);
-    blocksPanel.appendChild(listPanel);
-    body.appendChild(blocksPanel);
-
-    let paletteWorkspace = null;
-    let inBlocksMode = false;
-
-    function ensurePalette() {
-      if (paletteWorkspace) return;
-      paletteWorkspace = initPaletteWorkspace(paletteDiv);
-      onPaletteClick(paletteWorkspace, (type) => {
-        window.__ar_active_blocks_editor?._addBlockToWorkspace(type);
-      });
-      backBtn.addEventListener('click', () => {
-        listPanel.style.display = 'none';
-        catPanel.style.display = '';
-      });
-      for (const { name, hue, blocks } of TOOLBOX_CATEGORY_META) {
-        const btn = document.createElement('button');
-        btn.className = 'blockly-cat-btn';
-        btn.textContent = name;
-        btn.style.background = `hsl(${hue}, 50%, 42%)`;
-        btn.addEventListener('click', async () => {
-          catPanel.style.display = 'none';
-          listPanel.style.display = 'flex';
-          backBtn.textContent = '← ' + name;
-          paletteWorkspace.clear();
-          const addedBlocks = [];
-          for (const { type } of blocks) {
-            const block = paletteWorkspace.newBlock(type);
-            block.initSvg();
-            block.render();
-            addedBlocks.push(block);
-          }
-          await finishBlockRenders();
-          let y = 10;
-          for (const block of addedBlocks) {
-            block.moveTo({ x: 10, y });
-            y += block.getHeightWidth().height + 14;
-          }
-          resizeBlockly(paletteWorkspace);
-          requestAnimationFrame(() => paletteWorkspace.scroll(0, 0));
-        });
-        catPanel.appendChild(btn);
-      }
-    }
-
-    function openText() {
-      textPanel.style.display = '';
-      blocksPanel.style.display = 'none';
-      textModeBtn.classList.add('ar-toolkit-mode-active');
-      blocksModeBtn.classList.remove('ar-toolkit-mode-active');
-      inBlocksMode = false;
-    }
-
-    function openBlocks() {
-      ensurePalette();
-      textPanel.style.display = 'none';
-      blocksPanel.style.display = 'flex';
-      textModeBtn.classList.remove('ar-toolkit-mode-active');
-      blocksModeBtn.classList.add('ar-toolkit-mode-active');
-      inBlocksMode = true;
-      resizeBlockly(paletteWorkspace);
-    }
-
-    searchInput.addEventListener('input', () => {
-      if (!inBlocksMode) _filterTextPanel(textPanel, searchInput.value);
-    });
-    textModeBtn.addEventListener('click', () => {
-      if (inBlocksMode) {
-        openText();
-        searchRow.style.display = '';
-      }
-    });
-    blocksModeBtn.addEventListener('click', () => {
-      if (!inBlocksMode) {
-        openBlocks();
-        searchRow.style.display = 'none';
-      }
-    });
-
-    new ResizeObserver(() => {
-      if (inBlocksMode && paletteWorkspace) resizeBlockly(paletteWorkspace);
-    }).observe(body);
-  }
-
-  let toolkitIdCounter = 0;
-
-  function createToolkit(id) {
-    toolkitIdCounter = Math.max(toolkitIdCounter, id);
-    const winId = id === 1 ? 'win-toolkit' : `win-toolkit-${id}`;
-    const title = id === 1 ? 'API Toolbox' : `API Toolbox ${id}`;
-    window.wm.spawn(title, { id: winId, type: 'html', html: '', audio: false });
-    const win = document.getElementById(winId);
-    _buildToolkitContent(win);
-    win.querySelector('.wm-dup')?.remove();
-    return win;
-  }
 
   // ── Editor instances ───────────────────────────────────────────────────────
   window.__ar_instances = new Map();
@@ -833,7 +447,7 @@ window.onload = () => {
     return inst;
   }
   window.__ar_createEditor = createEditor;
-  window.__ar_createToolkit = createToolkit;
+  window.__ar_createToolkit = _toolkit.createToolkit;
 
   // Window Type Adapter for toolkit windows — restore needs appAPI (createToolkit).
   registerWindowType('toolkit', {
@@ -842,14 +456,14 @@ window.onload = () => {
     },
     restore(w, ctx) {
       const id = ctx.appAPI.nextToolkitId();
-      const win = ctx.appAPI.createToolkit(id);
+      const win = ctx.appAPI._toolkit.createToolkit(id);
       ctx.applyGeo(win, w);
     },
   });
   window.__ar_newEditorWithCode = (code) => {
     const id = ++editorIdCounter;
     try {
-      localStorage.setItem(`vl-ide-code-${id}`, code);
+      localStorage.setItem(editorCodeKey(id), code);
     } catch (_) {}
     const m = EditorInstance.loadManifest();
     if (!m.includes(id)) EditorInstance.saveManifest([...m, id]);
@@ -878,7 +492,7 @@ window.onload = () => {
   } else {
     // Auto-execute editors that were running/paused before refresh
     for (const id of manifest) {
-      const state = localStorage.getItem(`vl-ide-exec-${id}`);
+      const state = localStorage.getItem(editorExecKey(id));
       if (state === 'running' || state === 'paused') {
         const inst = window.__ar_instances.get(id);
         if (inst) {
@@ -1035,8 +649,8 @@ window.onload = () => {
           icon: 'fa-toolbox',
           label: 'New Toolkit',
           action() {
-            const id = ++toolkitIdCounter;
-            const win = createToolkit(id);
+            const id = _toolkit.nextToolkitId();
+            const win = _toolkit.createToolkit(id);
             const w = 200,
               h = 500;
             win.style.cssText += `;left:${Math.min(cx, window.innerWidth - w - 10)}px;top:${Math.min(cy, window.innerHeight - h - 44)}px;width:${w}px;height:${h}px;display:flex;`;
@@ -1080,8 +694,8 @@ window.onload = () => {
 
   // ── "New Toolkit" button ───────────────────────────────────────────────────
   document.getElementById('newToolkitBtn')?.addEventListener('click', () => {
-    const id = ++toolkitIdCounter;
-    const win = createToolkit(id);
+    const id = _toolkit.nextToolkitId();
+    const win = _toolkit.createToolkit(id);
     const desk = document.getElementById('desktop');
     const dw = desk.offsetWidth,
       dh = desk.offsetHeight;
@@ -1581,8 +1195,8 @@ window.onload = () => {
   // ── Project save / load ───────────────────────────────────────────────────
   const appAPI = {
     createEditor,
-    createToolkit,
-    nextToolkitId: () => ++toolkitIdCounter,
+    createToolkit: _toolkit.createToolkit,
+    nextToolkitId: _toolkit.nextToolkitId,
     updateManifest: (ids) => EditorInstance.saveManifest(ids),
   };
 

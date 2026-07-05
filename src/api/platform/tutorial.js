@@ -11,10 +11,11 @@
 // the demo gallery, but it must be a draggable/minimizable window, not a modal.
 
 import { insertSnippet } from '../../editor/active-editor.js';
+import { TUTORIAL_LESSON } from '../../runtime/storage-keys.js';
 import { getFocusedWinId } from '../wm/wm.js';
 
 const WIN_ID = 'win-tutorial';
-const LS_KEY = 'vl_tutorial_lesson';
+const LS_KEY = TUTORIAL_LESSON;
 const DATA_URL = '/createos/tutorial.json';
 
 let _data = null; // parsed tutorial.json

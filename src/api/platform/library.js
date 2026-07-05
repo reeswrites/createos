@@ -1,3 +1,5 @@
+import { LIBRARY } from '../../runtime/storage-keys.js';
+
 // ── User Library ──────────────────────────────────────────────────────────────
 // Persistent cross-project store for named shader bodies, code snippets,
 // and custom Blockly blocks. Stored in localStorage['vl_library'].
@@ -22,7 +24,7 @@
 //   pipe(cam).glshader('rainbow').show('out');
 //   library.list()  // → [{type, name, preview}]
 
-const STORAGE_KEY = 'vl_library';
+const STORAGE_KEY = LIBRARY;
 const VERSION = 1;
 
 // In-memory maps — populated by initLibrary() at boot

@@ -12,6 +12,7 @@
 //   - No WidgetHistory hooks — contenteditable uses native undo (widget-history.js:33 bails).
 
 import { notify, subscribe } from '../../events/index.js';
+import { registerWidgetRestorer } from '../wm/widget-restorer-registry.js';
 import { mountWidgetShell, wireCaptureButton } from './widget-shell.js';
 import { onReset } from '../../runtime/reset-registry.js';
 import { registerDesktopFileType } from '../platform/desktop-file-registry.js';
@@ -815,3 +816,18 @@ registerDesktopFileType('note', {
   cssClass: 'dt-note-icon',
   open: (data, pos) => new Notepad({ ...data, ...pos }),
 });
+
+// Code-generated window restore. See widget-restorer-registry.js.
+registerWidgetRestorer(
+  'note',
+  (s) =>
+    new Notepad({
+      title: s.title,
+      x: s.x,
+      y: s.y,
+      w: s.w,
+      h: s.h,
+      content: s.widgetState?.content,
+      _desktopIconId: s.widgetState?._desktopIconId,
+    }),
+);

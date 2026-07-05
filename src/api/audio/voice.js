@@ -15,9 +15,10 @@
 // dependency (ADR 046).
 
 import * as Tone from 'tone';
+import { VOICES } from '../../runtime/storage-keys.js';
 import { buildFaustHandle, FAUST_PRESETS } from './faust.js';
 
-const STORAGE_KEY = 'vl_voices';
+const STORAGE_KEY = VOICES;
 const VERSION = 1;
 
 // ── Engine registry ───────────────────────────────────────────────────────────

@@ -11,6 +11,16 @@ import { Decoration } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
 import { javascript, javascriptLanguage } from '@codemirror/lang-javascript';
 import {
+  EDITOR_MANIFEST,
+  LEGACY_EDITOR_CODE,
+  editorCodeKey,
+  editorExecKey,
+  editorTitleKey,
+  editorAutoExecKey,
+  editorTraceKey,
+  editorBlocksOpenKey,
+} from '../runtime/storage-keys.js';
+import {
   bracketMatching,
   foldGutter,
   codeFolding,
@@ -61,6 +71,7 @@ import {
   resizeBlockly,
   workspaceIsEmpty,
   loadWorkspaceJSON,
+  saveWorkspaceJSON,
   registerSidebarDeleteZone,
 } from '../blocks/blocks.js';
 import { jsToBlocks } from '../blocks/js-to-blocks.js';
@@ -264,11 +275,6 @@ export function editorPreamble(id) {
   return [...windowed, ...control].join('\n');
 }
 
-const STORAGE_PREFIX = 'vl-ide-code-';
-const EXEC_STATE_PREFIX = 'vl-ide-exec-';
-const TITLE_PREFIX = 'vl-ide-title-';
-const LEGACY_KEY = 'vl-ide-code';
-
 const ICONS = {
   play: '<i class="fa-solid fa-play"></i>',
   pause: '<i class="fa-solid fa-pause"></i>',
@@ -281,7 +287,7 @@ export let activeBlocksEditor = null;
 export class EditorInstance {
   constructor(id, { nativeTimers, wm, toolkitWinId, defaultCode = '' }) {
     this.id = id;
-    this.title = localStorage.getItem(TITLE_PREFIX + id) ?? (id === 1 ? 'Editor' : `Editor ${id}`);
+    this.title = localStorage.getItem(editorTitleKey(id)) ?? (id === 1 ? 'Editor' : `Editor ${id}`);
     this._native = nativeTimers;
     this._wm = wm;
     this._toolkitWinId = toolkitWinId;
@@ -314,10 +320,10 @@ export class EditorInstance {
     this.blocklyWorkspace = null;
     this.blocksMode = false;
 
-    this._autoExec = localStorage.getItem(`vl-autoexec-${id}`) === '1';
+    this._autoExec = localStorage.getItem(editorAutoExecKey(id)) === '1';
     this._autoExecTimer = null;
 
-    this._traceEnabled = localStorage.getItem(`vl-trace-${id}`) !== '0';
+    this._traceEnabled = localStorage.getItem(editorTraceKey(id)) !== '0';
     this._traceDirty = new Set();
     this._traceActive = new Map(); // line → removal-timer id
     this._traceRAF = null;
@@ -330,7 +336,7 @@ export class EditorInstance {
 
     // Restore blocks mode pref — wait for FA font so icon widths are correct
     const _faReady = document.fonts.load('900 13px "Font Awesome 6 Free"').catch(() => {});
-    if (localStorage.getItem(`vl-blocks-open-${id}`) === '1') {
+    if (localStorage.getItem(editorBlocksOpenKey(id)) === '1') {
       _faReady.then(() => requestAnimationFrame(() => this._openBlocks()));
     } else {
       _faReady.then(() => requestAnimationFrame(() => this._positionThumb(false)));
@@ -384,7 +390,7 @@ export class EditorInstance {
     traceToggleBtn.innerHTML = '<i class="fa-solid fa-route"></i>';
     traceToggleBtn.addEventListener('click', () => {
       this._traceEnabled = !this._traceEnabled;
-      localStorage.setItem(`vl-trace-${this.id}`, this._traceEnabled ? '1' : '0');
+      localStorage.setItem(editorTraceKey(this.id), this._traceEnabled ? '1' : '0');
       traceToggleBtn.classList.toggle('ar-btn-active', this._traceEnabled);
     });
     this._traceToggleBtn = traceToggleBtn;
@@ -429,10 +435,14 @@ export class EditorInstance {
     this.editorColumn.appendChild(this.consolePanel);
 
     // CodeMirror init
-    const storageKey = STORAGE_PREFIX + this.id;
+    const storageKey = editorCodeKey(this.id);
     // Migrate legacy key for editor 1
-    if (this.id === 1 && !localStorage.getItem(storageKey) && localStorage.getItem(LEGACY_KEY)) {
-      localStorage.setItem(storageKey, localStorage.getItem(LEGACY_KEY));
+    if (
+      this.id === 1 &&
+      !localStorage.getItem(storageKey) &&
+      localStorage.getItem(LEGACY_EDITOR_CODE)
+    ) {
+      localStorage.setItem(storageKey, localStorage.getItem(LEGACY_EDITOR_CODE));
     }
     const initialCode = localStorage.getItem(storageKey) ?? this._defaultCode;
     if (initialCode.trim().length > 0) this._everHadContent = true;
@@ -580,13 +590,13 @@ export class EditorInstance {
     this._textBtn.addEventListener('click', () => {
       if (this.blocksMode) {
         this._closeBlocks();
-        localStorage.setItem(`vl-blocks-open-${this.id}`, '0');
+        localStorage.setItem(editorBlocksOpenKey(this.id), '0');
       }
     });
     this._blocksBtn.addEventListener('click', () => {
       if (!this.blocksMode) {
         this._openBlocks();
-        localStorage.setItem(`vl-blocks-open-${this.id}`, '1');
+        localStorage.setItem(editorBlocksOpenKey(this.id), '1');
       }
     });
 
@@ -644,7 +654,7 @@ export class EditorInstance {
     this._autoExecBtn.addEventListener('click', () => {
       this._autoExec = !this._autoExec;
       this._autoExecBtn.classList.toggle('ar-btn-active', this._autoExec);
-      localStorage.setItem(`vl-autoexec-${this.id}`, this._autoExec ? '1' : '0');
+      localStorage.setItem(editorAutoExecKey(this.id), this._autoExec ? '1' : '0');
     });
 
     bar.appendChild(modeToggle);
@@ -735,7 +745,7 @@ export class EditorInstance {
     editorWin._wmOnTitleChange = (newTitle) => {
       this.title = newTitle;
       try {
-        localStorage.setItem(TITLE_PREFIX + this.id, newTitle);
+        localStorage.setItem(editorTitleKey(this.id), newTitle);
       } catch (_) {}
       const ownTitle = editorWin.querySelector('.wm-title');
       if (ownTitle && ownTitle.textContent !== newTitle) ownTitle.textContent = newTitle;
@@ -923,6 +933,30 @@ export class EditorInstance {
     if (this.blocklyWorkspace && json) loadWorkspaceJSON(this.blocklyWorkspace, json);
   }
 
+  // ── Project round-trip (the editor-owned half) ────────────────────────────────
+  // The code + authoring mode this editor owns. The window-owned half of an editor
+  // record (title / geometry / audio / editorId) is composed by the caller from the
+  // DOM window — see project.js / project-manager.js. This is the single source of
+  // the editor field-list that those callers used to hand-list in parallel.
+  serialize() {
+    return {
+      code: this.cm.state.doc.toString(),
+      mode: this.blocksMode ? 'blocks' : 'text',
+      blocksJson:
+        this.blocksMode && this.blocklyWorkspace ? saveWorkspaceJSON(this.blocklyWorkspace) : null,
+      executionState: this.btnState,
+    };
+  }
+
+  // Apply a serialized editor record's code + blocks (the inverse of serialize()).
+  // Execution-state restore stays with the caller — it needs all windows to exist.
+  applyRecord(rec) {
+    this.cm.dispatch({
+      changes: { from: 0, to: this.cm.state.doc.length, insert: rec.code ?? '' },
+    });
+    if (rec.mode === 'blocks' && rec.blocksJson) this.loadBlocksJSON(rec.blocksJson);
+  }
+
   _closeBlocks() {
     if (this.blocklyWorkspace) {
       const code = workspaceIsEmpty(this.blocklyWorkspace)
@@ -952,7 +986,7 @@ export class EditorInstance {
 
   _saveExecState(state) {
     try {
-      localStorage.setItem(EXEC_STATE_PREFIX + this.id, state);
+      localStorage.setItem(editorExecKey(this.id), state);
     } catch (_) {}
   }
 
@@ -1176,19 +1210,19 @@ export class EditorInstance {
 
     EditorInstance.removeFromManifest(this.id);
     try {
-      localStorage.removeItem(STORAGE_PREFIX + this.id);
+      localStorage.removeItem(editorCodeKey(this.id));
     } catch (_) {}
     try {
-      localStorage.removeItem(EXEC_STATE_PREFIX + this.id);
+      localStorage.removeItem(editorExecKey(this.id));
     } catch (_) {}
     try {
-      localStorage.removeItem(TITLE_PREFIX + this.id);
+      localStorage.removeItem(editorTitleKey(this.id));
     } catch (_) {}
     try {
-      localStorage.removeItem(`vl-autoexec-${this.id}`);
+      localStorage.removeItem(editorAutoExecKey(this.id));
     } catch (_) {}
     try {
-      localStorage.removeItem(`vl-blocks-open-${this.id}`);
+      localStorage.removeItem(editorBlocksOpenKey(this.id));
     } catch (_) {}
 
     const editorWin = document.getElementById(this.editorWinId);
@@ -1209,14 +1243,14 @@ export class EditorInstance {
 
   static loadManifest() {
     try {
-      const s = localStorage.getItem('vl-ide-editors');
+      const s = localStorage.getItem(EDITOR_MANIFEST);
       if (s) return JSON.parse(s);
     } catch (_) {}
     return [];
   }
 
   static saveManifest(ids) {
-    localStorage.setItem('vl-ide-editors', JSON.stringify(ids));
+    localStorage.setItem(EDITOR_MANIFEST, JSON.stringify(ids));
   }
 
   static removeFromManifest(id) {

@@ -12,6 +12,7 @@
 // See ADR 013.
 
 import { onReset } from '../runtime/reset-registry.js';
+import { activeEditorId } from '../runtime/run-context.js';
 
 const _commandHandlers = new Map(); // event → handler(data) → payload
 const _subscribers = new Map(); // event → Set<{ fn, runScoped }>
@@ -108,7 +109,7 @@ export function notify(event, data = {}) {
 // Returns an unsubscribe handle that also decrements the lazy-source count.
 export function subscribe(event, fn, { persistent = false } = {}) {
   _srcInc(event);
-  const runScoped = !persistent && window.__ar_active_editor_id != null;
+  const runScoped = !persistent && activeEditorId() != null;
   let set = _subscribers.get(event);
   if (!set) {
     set = new Set();

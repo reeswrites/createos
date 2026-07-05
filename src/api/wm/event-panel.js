@@ -1,4 +1,5 @@
 import { addBusTap } from '../../events/index.js';
+import { activeEditorId } from '../../runtime/run-context.js';
 
 // ── Pure helpers (exported for unit tests) ────────────────────────────────────
 
@@ -167,7 +168,7 @@ export function openEventPanel() {
       .trim()
       .split(/\s+/)
       .some((p) => !p.startsWith('-'));
-    if (!hasPositive && window.__ar_active_editor_id == null) return;
+    if (!hasPositive && activeEditorId() == null) return;
     if (!matchesFilter(event, filterStr)) return;
     applyRateLimit(rateMap, event, data, rowsEl, MAX_ROWS, createRow);
   });

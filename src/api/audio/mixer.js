@@ -17,11 +17,14 @@
 // per ADR 032: solo is a persisted per-strip flag, non-soloed sources duck.
 
 import * as Tone from 'tone';
+import { registerWidgetRestorer } from '../wm/widget-restorer-registry.js';
+import { MIXER } from '../../runtime/storage-keys.js';
+import { activeEditorId } from '../../runtime/run-context.js';
 import { onReset } from '../../runtime/reset-registry.js';
 import { notify, subscribe } from '../../events/index.js';
 import { liveOutput } from '../../runtime/keep-alive.js';
 
-const _STORE_KEY = 'vl_mixer';
+const _STORE_KEY = MIXER;
 
 const _strips = new Map(); // name → Strip (live, has Tone nodes)
 const _settings = new Map(); // name → { volume, pan, mute, solo, eq } (persisted, survives teardown)
@@ -530,7 +533,7 @@ class Mixer {
   add(node, { name, persist } = {}) {
     const strip = acquireStrip(name, {
       type: 'node',
-      owner: window.__ar_active_editor_id ?? null,
+      owner: activeEditorId() ?? null,
       lifecycle: persist ? 'persistent' : 'run',
     });
     try {
@@ -878,3 +881,7 @@ function _renameStrip(oldName, newName) {
 export function openMixerPanel() {
   mixer.show();
 }
+
+// Code-generated window restore. Mixer + legacy no-op EQ (ADR 032 removed EQWidget).
+registerWidgetRestorer('mixer', () => openMixerPanel());
+registerWidgetRestorer('eq', () => {});

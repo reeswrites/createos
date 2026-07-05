@@ -1,5 +1,6 @@
 import { notify } from '../../events/index.js';
 import { initMicLease } from './media-lease.js';
+import { setMicAnalyser, setMicStream, setMicOn, setMicViz } from './mic-state.js';
 
 export function initMic() {
   let currentStream = null;
@@ -11,7 +12,7 @@ export function initMic() {
   const vizCanvas = document.getElementById('mic-viz');
   vizCanvas.width = 512;
   vizCanvas.height = 64;
-  window.__ar_mic_viz = vizCanvas;
+  setMicViz(vizCanvas);
   const ctx = vizCanvas.getContext('2d');
 
   const NUM_BARS = 48;
@@ -49,23 +50,23 @@ export function initMic() {
       audioCtx = new AudioContext();
       analyser = audioCtx.createAnalyser();
       analyser.fftSize = 128;
-      window.__ar_mic_analyser = analyser;
+      setMicAnalyser(analyser);
     }
     navigator.mediaDevices
       .getUserMedia({ audio: true, video: false })
       .then((stream) => {
         currentStream = stream;
-        window.__ar_mic_stream = stream;
+        setMicStream(stream);
         audioCtx.createMediaStreamSource(currentStream).connect(analyser);
         if (audioCtx.state === 'suspended') audioCtx.resume();
         if (!rafId) drawBars();
-        window.__ar_mic_on = true;
+        setMicOn(true);
         notify('mic:open', { toolbar: true });
         notify('mic:ready', { toolbar: true });
       })
       .catch((err) => {
         // Undo analyser/context setup if stream acquisition fails.
-        window.__ar_mic_analyser = null;
+        setMicAnalyser(null);
         analyser = null;
         try {
           audioCtx.close();
@@ -85,9 +86,9 @@ export function initMic() {
     ctx.clearRect(0, 0, vizCanvas.width, vizCanvas.height);
     currentStream?.getAudioTracks().forEach((t) => t.stop());
     currentStream = null;
-    window.__ar_mic_stream = null;
-    window.__ar_mic_analyser = null;
-    window.__ar_mic_on = false;
+    setMicStream(null);
+    setMicAnalyser(null);
+    setMicOn(false);
     analyser = null;
     // Reset AudioContext so next acquire creates a fresh one.
     if (audioCtx) {

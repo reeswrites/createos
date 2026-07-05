@@ -1,4 +1,6 @@
 import * as Tone from 'tone';
+import { micAnalyser, micViz } from '../media/mic-state.js';
+import { activeEditorId } from '../../runtime/run-context.js';
 import { AudioViz, SpectrogramCanvas, PianoRollViz, _noteHooks } from '../visual/viz.js';
 import { acquireStrip } from './mixer.js';
 import { Drumpad } from './drumpad.js';
@@ -289,7 +291,7 @@ class Instrument {
     this._strip = acquireStrip(null, {
       type: 'instrument',
       nameHint: kind, // → 'synth 1', 'fm 2', … (counter resets each run)
-      owner: window.__ar_active_editor_id ?? null,
+      owner: activeEditorId() ?? null,
       lifecycle: 'run',
     });
     try {
@@ -777,7 +779,7 @@ class AudioAPI {
     try {
       const strip = acquireStrip('mic', {
         type: 'mic',
-        owner: window.__ar_active_editor_id ?? null,
+        owner: activeEditorId() ?? null,
         lifecycle: 'run',
       });
       m.connect(strip.input);
@@ -788,7 +790,7 @@ class AudioAPI {
   // Live RMS amplitude 0–1 from the harness mic AnalyserNode. Auto-acquires mic on first call.
   get level() {
     _ensureMicLeased();
-    const analyser = window.__ar_mic_analyser;
+    const analyser = micAnalyser();
     if (!analyser) return 0;
     const data = new Uint8Array(analyser.fftSize);
     analyser.getByteTimeDomainData(data);
@@ -882,7 +884,7 @@ class AudioAPI {
   // ── Analysis ─────────────────────────────────────────────────────────────
   // Usage: const m = audio.meter(); synth.chain(m); — meter sits in the signal chain
   get micCanvas() {
-    return window.__ar_mic_viz ?? null;
+    return micViz() ?? null;
   }
 
   viz(source, opts = {}) {

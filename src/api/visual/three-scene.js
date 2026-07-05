@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { activeEditorId, isPaused } from '../../runtime/run-context.js';
 import { liveOutput } from '../../runtime/keep-alive.js';
 import { runScoped } from '../../runtime/run-scoped.js';
 
@@ -28,7 +29,7 @@ export class ThreeScene {
     // Owner-scoped teardown via the shared run-scoped handler (ADR 041). Keep-alive
     // is toggled separately by start()/stop() (this output's liveness toggles), so
     // this uses runScoped (no keep-alive), not runScopedOutput.
-    this._ownerEditorId = window.__ar_active_editor_id;
+    this._ownerEditorId = activeEditorId();
     this._scoped = runScoped({ owner: this._ownerEditorId, onStop: () => this._destroy() });
 
     this.scene = new THREE.Scene();
@@ -112,7 +113,7 @@ export class ThreeScene {
     const loop = (now) => {
       if (this._destroyed) return;
       this._rafId = requestAnimationFrame(loop);
-      if (window.__ar_paused) return;
+      if (isPaused()) return;
       const dt = (now - this._lastTime) / 1000;
       const elapsed = (now - this._startTime) / 1000;
       this._lastTime = now;

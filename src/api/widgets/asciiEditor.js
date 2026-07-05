@@ -3,6 +3,8 @@
 // Sibling to SpriteEditor/Paint; reuses WidgetHistory, wm.addHistoryControls, desktop autosave.
 
 import { WidgetEvents } from './widget-events.js';
+import { downloadBlob } from './frame-snapshot.js';
+import { registerWidgetRestorer } from '../wm/widget-restorer-registry.js';
 import { insertSnippet } from '../../editor/active-editor.js';
 import { FrameDoc } from './frame-doc.js';
 import {
@@ -1100,12 +1102,7 @@ export class AsciiEditor {
       lines.push(line);
     }
     const text = lines.join('\n');
-    const blob = new Blob([text], { type: 'text/plain' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'ascii-art.txt';
-    a.click();
-    URL.revokeObjectURL(a.href);
+    downloadBlob(new Blob([text], { type: 'text/plain' }), 'ascii-art.txt');
     navigator.clipboard?.writeText(text).catch(() => {});
   }
 
@@ -1124,12 +1121,7 @@ export class AsciiEditor {
       }
       out += '\x1b[0m\n';
     }
-    const blob = new Blob([out], { type: 'text/plain' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'ascii-ansi.txt';
-    a.click();
-    URL.revokeObjectURL(a.href);
+    downloadBlob(new Blob([out], { type: 'text/plain' }), 'ascii-ansi.txt');
   }
 
   // ── Event / signal public API ─────────────────────────────────────────────────
@@ -1208,4 +1200,22 @@ registerDesktopFileType('ascii', {
       _frames: data.frames ?? null,
       ...pos,
     }),
+});
+
+// Code-generated window restore. See widget-restorer-registry.js.
+registerWidgetRestorer('ascii', (s) => {
+  const ws = s.widgetState ?? {};
+  new AsciiEditor({
+    cols: ws.cols ?? 64,
+    rows: ws.rows ?? 24,
+    cellW: ws.cellW ?? 10,
+    cellH: ws.cellH ?? 18,
+    fps: ws.fps ?? 8,
+    bg: ws.bg ?? '#0d0208',
+    title: s.title ?? 'ASCII Editor',
+    x: s.x,
+    y: s.y,
+    _desktopIconId: ws._desktopIconId,
+    _frames: ws.frames ?? null,
+  });
 });

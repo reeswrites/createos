@@ -3,6 +3,7 @@
 // or when an LLM generates GLSL because it has a much larger GLSL training corpus.
 
 import { resolveGLSL, library } from '../platform/library.js';
+import { isPaused } from '../../runtime/run-context.js';
 import { mountLayerCanvas } from '../visual/layer.js';
 import { onReset } from '../../runtime/reset-registry.js';
 import { notify } from '../../events/index.js';
@@ -369,7 +370,7 @@ export class GLShader extends ShaderLayerBase {
     }
     if (this._rafId) return this;
     const loop = (ts) => {
-      if (!window.__ar_paused) this._frame(ts);
+      if (!isPaused()) this._frame(ts);
       this._rafId = requestAnimationFrame(loop);
     };
     this._rafId = requestAnimationFrame(loop);

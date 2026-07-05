@@ -1,4 +1,5 @@
 import * as PIXI from 'pixi.js';
+import { isPaused } from '../../runtime/run-context.js';
 import { onReset } from '../../runtime/reset-registry.js';
 
 let _app = null;
@@ -33,7 +34,7 @@ export function initPixi() {
   // Pause integration — skip render when IDE is paused
   const _origRender = _app.renderer.render.bind(_app.renderer);
   _app.renderer.render = (stage) => {
-    if (!window.__ar_paused) _origRender(stage);
+    if (!isPaused()) _origRender(stage);
   };
 
   // Convenience: tracked tick — cleaned up on reset

@@ -2,6 +2,8 @@
 // Entry: new SpriteEditor(opts), Sprite.edit(opts), sp.edit(opts), toolbar button
 
 import { Sprite } from './sprite.js';
+import { snapshotFrameCanvases, paintFrameCanvas, downloadCanvasPng } from './frame-snapshot.js';
+import { registerWidgetRestorer } from '../wm/widget-restorer-registry.js';
 import { WidgetEvents } from './widget-events.js';
 import { insertSnippet } from '../../editor/active-editor.js';
 import {
@@ -313,13 +315,7 @@ export class SpriteEditor {
 
   _snapPixels() {
     const sp = this.sprite;
-    return {
-      fi: sp._fi,
-      frames: sp._frames.map((fc) => {
-        const id = fc.getContext('2d').getImageData(0, 0, sp._w, sp._h);
-        return new Uint8ClampedArray(id.data);
-      }),
-    };
+    return { fi: sp._fi, frames: snapshotFrameCanvases(sp._frames, sp._w, sp._h) };
   }
 
   _applyPixels(snap) {
@@ -327,10 +323,7 @@ export class SpriteEditor {
     // Reconcile frame count
     while (sp._frames.length < snap.frames.length) sp.addFrame();
     sp._frames.length = snap.frames.length;
-    snap.frames.forEach((data, i) => {
-      const ctx = sp._frames[i].getContext('2d');
-      ctx.putImageData(new ImageData(new Uint8ClampedArray(data), sp._w, sp._h), 0, 0);
-    });
+    snap.frames.forEach((data, i) => paintFrameCanvas(sp._frames[i], sp._w, sp._h, data));
     sp.frame(snap.fi);
     sp._render();
     this._refreshThumbs();
@@ -1092,13 +1085,7 @@ export class SpriteEditor {
     octx.imageSmoothingEnabled = false;
     octx.drawImage(src, 0, 0, out.width, out.height);
 
-    out.toBlob((blob) => {
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = sheet ? 'sprite-sheet.png' : 'sprite-frame.png';
-      a.click();
-      URL.revokeObjectURL(a.href);
-    }, 'image/png');
+    downloadCanvasPng(out, sheet ? 'sprite-sheet.png' : 'sprite-frame.png');
   }
 
   // ── Event / signal public API ─────────────────────────────────────────────────
@@ -1182,4 +1169,41 @@ registerDesktopFileType('sprite', {
       img.src = url;
     });
   },
+});
+
+// Code-generated window restore. Paints frames through the public
+// Sprite.drawImageToFrame (ADR 055) — no reach into Sprite privates.
+registerWidgetRestorer('spriteEditor', (s) => {
+  const ws = s.widgetState ?? {};
+  const sp = new Sprite({
+    width: ws.width ?? 16,
+    height: ws.height ?? 16,
+    scale: ws.scale ?? 20,
+    frames: ws.frames?.length ?? 1,
+  });
+  const frameUrls = ws.frames ?? [];
+  let loaded = 0;
+  const open = () =>
+    new SpriteEditor({
+      sprite: sp,
+      title: s.title,
+      x: s.x,
+      y: s.y,
+      _desktopIconId: ws._desktopIconId,
+    });
+  if (!frameUrls.length) {
+    open();
+    return;
+  }
+  frameUrls.forEach((url, i) => {
+    const img = new Image();
+    img.onload = () => {
+      sp.drawImageToFrame(i, img);
+      if (++loaded === frameUrls.length) open();
+    };
+    img.onerror = () => {
+      if (++loaded === frameUrls.length) open();
+    };
+    img.src = url;
+  });
 });

@@ -11,18 +11,17 @@
 import * as Tone from 'tone';
 import { connectSurfaceStrip } from './mixer.js';
 import { Voice } from './voice.js';
-import { notify } from '../../events/index.js';
 import { insertSnippet } from '../../editor/active-editor.js';
 import { mountWidgetShell, wireCaptureButton } from '../widgets/widget-shell.js';
 import { onReset } from '../../runtime/reset-registry.js';
 import { registerDesktopFileType } from '../platform/desktop-file-registry.js';
-import { replayActions } from '../signal/replay-clock.js';
 import { wireMidiInstrument } from './midi-bind.js';
 import {
   initTriggerSurface,
   enableSurfaceMidi,
   detachTriggerSurface,
   disposeTriggerSurface,
+  strikeCore,
 } from './trigger-surface.js';
 
 const _launchpads = [];
@@ -117,32 +116,24 @@ export class Launchpad {
     if (cell == null || cell < 0 || cell >= this._total) return;
     const time = Tone.now();
     const handle = this._bindings.voiceFor(cell);
-    if (!this._bindings.isSilent(cell)) {
-      try {
-        const h = handle ?? this._ensureDefault();
-        if (h?.kind === 'sample' && h.mode === 'chopped') h.triggerSlice(cell, time, vel);
-        else h?.trigger(this._noteFor(cell), '8n', time, vel);
-      } catch (_) {}
-    }
-    const action = this._bindings.actionFor(cell);
-    if (action) {
-      try {
-        notify(action.event, {
-          cell,
-          row: Math.floor(cell / this._cols),
-          col: cell % this._cols,
-          source,
-          velocity: vel,
-        });
-      } catch (_) {}
-    }
-    this._flashCell(cell);
-    this._events.emit('hit', {
+    const payload = {
       cell,
       row: Math.floor(cell / this._cols),
       col: cell % this._cols,
       source,
       velocity: vel,
+    };
+    strikeCore(this, cell, {
+      sound: () => {
+        const h = handle ?? this._ensureDefault();
+        if (h?.kind === 'sample' && h.mode === 'chopped') h.triggerSlice(cell, time, vel);
+        else h?.trigger(this._noteFor(cell), '8n', time, vel);
+      },
+      payload: () => payload,
+      after: () => {
+        this._flashCell(cell);
+        this._events.emit('hit', payload);
+      },
     });
   }
 
@@ -168,10 +159,6 @@ export class Launchpad {
 
   _applyAction(a) {
     if (a && a.cell != null) this._strike(a.cell, 'replay', a.vel ?? 1);
-  }
-
-  replay(actions, opts) {
-    return replayActions((a) => this._applyAction(a), actions, opts);
   }
 
   _perfCtor() {

@@ -72,3 +72,22 @@ constructor line, appending only the declarative body — one escaped source of 
   that genuinely differs per surface (attack/release vs one-shot vs chopped slice);
   sharing it would force a lowest-common-denominator template with per-surface branches —
   more coupling, not less.
+
+## Addendum (deepening pass #5) — the strike *envelope* was over-scoped
+
+The "fold the strike path in" rejection above conflated two things. The **sound core**
+(attack/release vs one-shot vs chopped slice) genuinely differs and stays per-surface —
+the LCD-template fear is real *for the core*. But the **strike envelope** wrapped around
+it was byte-identical three ways:
+
+1. play the sound **unless** the trigger is bound silent (`isSilent` gate + try/catch);
+2. fire the bound Action's named bus event, if any (`actionFor` → `notify`, try/catch);
+3. run the surface's post-hook (UI flash + `WidgetEvents` emit + Take capture).
+
+`strikeCore(self, key, { sound, payload, after })` (trigger-surface.js) now owns that
+ordering; the three variable parts are passed as **closures**, so there is no per-surface
+`if` inside the helper — the exact thing that would have made it an LCD template. The
+"silent action still emits" / "replay double-records" class of bug now has one home. The
+identical `replay(actions, opts)` method (only `_applyAction` differed) was likewise
+hoisted onto `self` in `initTriggerSurface`. Net: the ADR's conclusion was right about the
+sound core, over-broad about the envelope.

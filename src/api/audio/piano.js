@@ -14,18 +14,17 @@ import * as Tone from 'tone';
 import { registerWidgetRestorer } from '../wm/widget-restorer-registry.js';
 import { connectSurfaceStrip } from './mixer.js';
 import { Voice } from './voice.js';
-import { notify } from '../../events/index.js';
 import { insertSnippet } from '../../editor/active-editor.js';
 import { mountWidgetShell, wireCaptureButton } from '../widgets/widget-shell.js';
 import { onReset } from '../../runtime/reset-registry.js';
 import { registerDesktopFileType } from '../platform/desktop-file-registry.js';
-import { replayActions } from '../signal/replay-clock.js';
 import { wireMidiInstrument } from './midi-bind.js';
 import {
   initTriggerSurface,
   enableSurfaceMidi,
   detachTriggerSurface,
   disposeTriggerSurface,
+  strikeCore,
 } from './trigger-surface.js';
 
 // ── Module-level registry ─────────────────────────────────────────────────────
@@ -876,26 +875,21 @@ export class Piano {
   _triggerAttack(note, source, vel = 1) {
     if (this._heldNotes.has(note)) return;
     this._heldNotes.add(note);
-    if (!this._bindings.isSilent(note)) {
-      try {
-        this._attack(this._soundFor(note), note, vel);
-      } catch (_) {}
-    }
-    const action = this._bindings.actionFor(note);
-    if (action) {
-      try {
-        notify(action.event, { note, midi: noteToMidi(note), source, velocity: vel });
-      } catch (_) {}
-    }
-    this._setKeyActive(note, true);
-    this._fireNote(note, source, null, vel);
-    // Performance capture: record live attacks; dur is back-filled on release.
-    // Replay-driven attacks (source 'replay') are excluded so replay never
-    // re-records.
-    if (source !== 'replay') {
-      const rec = this._take.push({ note, dur: 0, vel });
-      if (rec) this._recNotes.set(note, { rec, start: performance.now() });
-    }
+    strikeCore(this, note, {
+      sound: () => this._attack(this._soundFor(note), note, vel),
+      payload: () => ({ note, midi: noteToMidi(note), source, velocity: vel }),
+      after: () => {
+        this._setKeyActive(note, true);
+        this._fireNote(note, source, null, vel);
+        // Performance capture: record live attacks; dur is back-filled on release.
+        // Replay-driven attacks (source 'replay') are excluded so replay never
+        // re-records.
+        if (source !== 'replay') {
+          const rec = this._take.push({ note, dur: 0, vel });
+          if (rec) this._recNotes.set(note, { rec, start: performance.now() });
+        }
+      },
+    });
   }
 
   /** pointerup / pointerleave / keyup → release note */
@@ -951,10 +945,6 @@ export class Piano {
 
   _applyAction(a) {
     if (a && a.note) this.strike(a.note, a.dur, a.vel ?? 1);
-  }
-
-  replay(actions, opts) {
-    return replayActions((act) => this._applyAction(act), actions, opts);
   }
 
   _perfCtor() {

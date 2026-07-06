@@ -13,18 +13,17 @@
 import * as Tone from 'tone';
 import { registerWidgetRestorer } from '../wm/widget-restorer-registry.js';
 import { connectSurfaceStrip } from './mixer.js';
-import { notify } from '../../events/index.js';
 import { insertSnippet } from '../../editor/active-editor.js';
 import { mountWidgetShell, wireCaptureButton } from '../widgets/widget-shell.js';
 import { onReset } from '../../runtime/reset-registry.js';
 import { registerDesktopFileType } from '../platform/desktop-file-registry.js';
-import { replayActions } from '../signal/replay-clock.js';
 import { wireMidiInstrument } from './midi-bind.js';
 import {
   initTriggerSurface,
   enableSurfaceMidi,
   detachTriggerSurface,
   disposeTriggerSurface,
+  strikeCore,
 } from './trigger-surface.js';
 
 // General MIDI percussion note → voice id (ADR 033). Common aliases included.
@@ -313,9 +312,10 @@ export class Drumpad {
     const v = this._voices[vi];
     if (!v) return;
     const vel = ctx.vel ?? 1;
+    const source = ctx.source ?? 'pad';
     const handle = this._bindings.voiceFor(vi);
-    if (!this._bindings.isSilent(vi)) {
-      try {
+    strikeCore(this, vi, {
+      sound: () => {
         if (handle) {
           if (v.note) handle.trigger(v.note, v.dur, time, vel);
           else handle.trigger('C2', v.dur, time, vel);
@@ -323,21 +323,10 @@ export class Drumpad {
           if (v.note) v.synth.triggerAttackRelease(v.note, v.dur, time, vel);
           else v.synth.triggerAttackRelease(v.dur, time, vel);
         }
-      } catch (_) {}
-    }
-    const action = this._bindings.actionFor(vi);
-    if (action) {
-      try {
-        notify(action.event, {
-          vi,
-          id: v.id,
-          label: v.label,
-          source: ctx.source ?? 'pad',
-          velocity: vel,
-        });
-      } catch (_) {}
-    }
-    this._fireHit(vi, ctx.source ?? 'pad', ctx.step ?? null, vel);
+      },
+      payload: () => ({ vi, id: v.id, label: v.label, source, velocity: vel }),
+      after: () => this._fireHit(vi, source, ctx.step ?? null, vel),
+    });
   }
 
   // ── Bindings (ADR 046) ──────────────────────────────────────────────────────
@@ -405,9 +394,6 @@ export class Drumpad {
   }
 
   // Replay a captured Take.
-  replay(actions, opts) {
-    return replayActions((a) => this._applyAction(a), actions, opts);
-  }
 
   // Self-contained constructor code for the emitted snippet/timeline track.
   _perfCtor() {

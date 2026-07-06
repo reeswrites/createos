@@ -1,7 +1,7 @@
 import esprima from 'esprima';
 import { EditorView, Decoration, WidgetType, ViewPlugin } from '@codemirror/view';
 import { StateField, StateEffect, RangeSetBuilder } from '@codemirror/state';
-import { PARAM_HINTS, calleePath } from './param-hints.js';
+import { resolveParamHint, calleePath } from './param-hints.js';
 
 // ── Color utilities ───────────────────────────────────────────────────────────
 
@@ -424,7 +424,10 @@ function buildInlayDecorations(code) {
     const callee = node.callee;
     const path = calleePath(callee);
     if (!path) return;
-    const params = PARAM_HINTS[path];
+    // Same resolver the cursor tooltip uses (manual → API Descriptor → Canvas
+    // method) so inlay hints appear for every descriptor-registered global, not
+    // just the residual manual table — one seam, one behaviour.
+    const params = resolveParamHint(path);
     if (!params) return;
     for (let i = 0; i < node.arguments.length; i++) {
       const paramName = params[i];

@@ -11,7 +11,7 @@
 // pipe.register() and runtime registerAPI() calls use to add a snippet to already-open
 // panels. Needs window.wm to spawn.
 
-import { TOOLKIT_CATEGORIES, addToolkitEntries } from '../../editor/completions.js';
+import { TOOLKIT_CATEGORIES, addToolkitEntries } from '../../editor/toolkit-catalog.js';
 import {
   initPaletteWorkspace,
   onPaletteClick,

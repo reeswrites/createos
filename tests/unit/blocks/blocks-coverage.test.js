@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { TOOLKIT_CATEGORIES } from '../../../src/editor/completions.js';
+import { TOOLKIT_CATEGORIES } from '../../../src/editor/toolkit-catalog.js';
 import { TOOLBOX } from '../../../src/blocks/blocks.js';
 
 // ── Blocks-coverage gate (ADR 011) ────────────────────────────────────────────

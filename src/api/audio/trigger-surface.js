@@ -14,6 +14,8 @@ import { BindingMap } from './binding.js';
 import { releaseStrip } from './mixer.js';
 import { registerMidiInstrument, unregisterMidiInstrument, notifyMidiFocus } from './midi-bind.js';
 import { Take } from '../signal/performance-recorder.js';
+import { replayActions } from '../signal/replay-clock.js';
+import { notify } from '../../events/index.js';
 
 // Install the shared chassis onto `self`. Call early in the constructor (Piano
 // needs self._out before it builds its preset synth). Sets:
@@ -36,7 +38,35 @@ export function initTriggerSurface(self, { registry, bindings } = {}) {
   if (bindings) self._bindings.restore(bindings);
   self._events = new WidgetEvents();
   self._take = new Take(self);
+  // Every surface's replay() was byte-identical — the only variation is the
+  // per-surface _applyAction it dispatches to. Install it here so each surface
+  // owns only _applyAction (ADR 031/056).
+  self.replay = (actions, opts) => replayActions((a) => self._applyAction(a), actions, opts);
   registry.push(self);
+}
+
+// The strike ENVELOPE — the dispatch scaffolding every Trigger Surface wraps its
+// sound production in (ADR 056 refinement). Owns the ordering that must not vary:
+//   1. play the sound UNLESS the trigger is bound silent  (isSilent gate)
+//   2. fire the bound Action's named bus event, if any    (actionFor → notify)
+//   3. run the surface's post-hook (UI flash + WidgetEvents emit + Take capture)
+// Each step's CONTENT is a per-surface closure — the sound core, the event payload,
+// and the after-hook genuinely differ (attack/release vs one-shot vs chopped slice;
+// {note} vs {vi} vs {cell}). What was copy-pasted three ways is the gate/try/notify
+// STRUCTURE, and the "silent action still emits" bug now has one home.
+export function strikeCore(self, key, { sound, payload, after }) {
+  if (!self._bindings.isSilent(key)) {
+    try {
+      sound();
+    } catch (_) {}
+  }
+  const action = self._bindings.actionFor(key);
+  if (action) {
+    try {
+      notify(action.event, payload());
+    } catch (_) {}
+  }
+  after?.();
 }
 
 // Enable MIDI input for the surface once its window exists. Call at the tail of

@@ -17,6 +17,7 @@ import { liveOutput } from '../../runtime/keep-alive.js';
 import { onReset } from '../../runtime/reset-registry.js';
 import { runScoped } from '../../runtime/run-scoped.js';
 import { notify, registerCommand } from '../../events/index.js';
+import { installPipeRegister } from './pipe-register.js';
 
 const _pipelines = new Set();
 const _stageRegistry = new Map(); // stageId → stage instance
@@ -947,22 +948,18 @@ export class Pipeline {
     return this;
   }
 
-  ascii(opts = {}, id) {
-    return this._pushStage(new AsciiStage(this._last(), opts), 'ascii', id);
-  }
-  pixelate(opts = {}, id) {
-    return this._pushStage(new PixelateStage(this._last(), opts), 'pixelate', id);
-  }
-  fx(filter, id) {
-    return this._pushStage(new FxStage(this._last(), filter), 'fx', id);
-  }
+  // NOTE: the uniform pixel/fx stages (tint, mask, negative, solarize, posterize,
+  // duotone, grain, strobe, blur, hue, ascii, pixelate, fx) are NOT hand-written
+  // here — they are generated from STAGE_CTORS after the class (single declaration).
+  // Only the special stages below stay explicit: non-uniform signatures + not
+  // live-mutable, so they have no STAGE_CTORS entry.
+
   glshader(body, opts = {}, id) {
     return this._pushStage(new GLShaderStage(this._last(), body, opts), 'glshader', id);
   }
   shader(body, opts = {}, id) {
     return this._pushStage(new ShaderStage(this._last(), body, opts), 'shader', id);
   }
-
   /** Custom stage — escape hatch. factory(upstream) must return { canvas, read() }. */
   use(factory, id) {
     return this._pushStage(new CustomStage(this._last(), factory), 'custom', id);
@@ -971,69 +968,38 @@ export class Pipeline {
   subtitle(srtText, opts = {}, id) {
     return this._pushStage(new SubtitleStage(this._last(), srtText, opts), 'subtitle', id);
   }
-  /** Tint the frame by compositing a solid color with 'multiply' blending. */
-  tint(color = '#ffffff', id) {
-    return this._pushStage(new TintStage(this._last(), color), 'tint', id);
-  }
-  /**
-   * Mask the frame to a drawable's region (ADR 054). source: any Drawable Source.
-   * opts: { channel: 'luminance'|'alpha', invert }. Chain .mask().mask() to
-   * intersect separate sources.
-   */
-  mask(source, opts = {}, id) {
-    return this._pushStage(new MaskStage(this._last(), source, opts), 'mask', id);
-  }
-  /** Invert all pixel values (photographic negative). */
-  negative(id) {
-    return this._pushStage(new NegativeStage(this._last()), 'negative', id);
-  }
-  /** Solarize: invert pixels whose luminance exceeds threshold (0–1). */
-  solarize(threshold = 0.5, id) {
-    return this._pushStage(new SolarizeStage(this._last(), threshold), 'solarize', id);
-  }
-  /** Posterize: reduce each channel to n discrete levels. */
-  posterize(levels = 4, id) {
-    return this._pushStage(new PosterizeStage(this._last(), levels), 'posterize', id);
-  }
-  /** Duotone: map luminance between two colors (darkColor → lightColor). */
-  duotone(darkColor = '#000000', lightColor = '#ffffff', id) {
-    return this._pushStage(new DuotoneStage(this._last(), darkColor, lightColor), 'duotone', id);
-  }
-  /** Add film grain (luminance noise). amount: 0–1. */
-  grain(amount = 0.15, id) {
-    return this._pushStage(new GrainStage(this._last(), amount), 'grain', id);
-  }
-  /** Strobe: alternate between source frame and black at fps rate. */
-  strobe(fps = 4, id) {
-    return this._pushStage(new StrobeStage(this._last(), fps), 'strobe', id);
-  }
-  /** CSS blur filter. r: radius in px. */
-  blur(r = 4, id) {
-    return this.fx(`blur(${r}px)`, id);
-  }
-  /** CSS hue-rotate filter. deg: degrees. */
-  hue(deg = 0, id) {
-    return this.fx(`hue-rotate(${deg}deg)`, id);
-  }
 
   // ── Live stage mutation (used by route() for temporal control) ────────────
 
-  // Named stage constructors — single source of truth for _createNamedStage and tests.
+  // Single source of truth for every built-in stage type: maps a type name to its
+  // constructor WITH the chain-method defaults baked in. Both the generated chain
+  // methods (see below the class) and _createNamedStage (route's live mutation) read
+  // this — so a stage type is declared exactly once. Defaults must match the doc'd
+  // chain signatures. Special stages (glshader/shader/use/subtitle) are NOT here —
+  // they take non-uniform signatures and/or can't be live-mutated (pre-existing gap).
   static get STAGE_CTORS() {
+    // `_a(fn, n)` tags a ctor with its arg-count after `up` (defaults hide it from
+    // fn.length). The generated chain method uses n to peel a trailing caller-supplied
+    // stage id (actor-registry addressing, ADR 017) off the ctor args. Kept beside the
+    // ctor so arity can't drift from the signature.
+    const _a = (fn, n) => Object.assign(fn, { _arity: n });
     return {
-      tint: (up, ...a) => new TintStage(up, ...a),
-      negative: (up) => new NegativeStage(up),
-      solarize: (up, ...a) => new SolarizeStage(up, ...a),
-      posterize: (up, ...a) => new PosterizeStage(up, ...a),
-      duotone: (up, ...a) => new DuotoneStage(up, ...a),
-      grain: (up, ...a) => new GrainStage(up, ...a),
-      strobe: (up, ...a) => new StrobeStage(up, ...a),
-      blur: (up, r = 4) => new FxStage(up, `blur(${r}px)`),
-      hue: (up, d = 0) => new FxStage(up, `hue-rotate(${d}deg)`),
-      ascii: (up, o = {}) => new AsciiStage(up, o),
-      pixelate: (up, o = {}) => new PixelateStage(up, o),
-      fx: (up, f) => new FxStage(up, f),
-      mask: (up, source, opts = {}) => new MaskStage(up, source, opts),
+      tint: _a((up, color = '#ffffff') => new TintStage(up, color), 1),
+      negative: _a((up) => new NegativeStage(up), 0),
+      solarize: _a((up, threshold = 0.5) => new SolarizeStage(up, threshold), 1),
+      posterize: _a((up, levels = 4) => new PosterizeStage(up, levels), 1),
+      duotone: _a(
+        (up, dark = '#000000', light = '#ffffff') => new DuotoneStage(up, dark, light),
+        2,
+      ),
+      grain: _a((up, amount = 0.15) => new GrainStage(up, amount), 1),
+      strobe: _a((up, fps = 4) => new StrobeStage(up, fps), 1),
+      blur: _a((up, r = 4) => new FxStage(up, `blur(${r}px)`), 1),
+      hue: _a((up, d = 0) => new FxStage(up, `hue-rotate(${d}deg)`), 1),
+      ascii: _a((up, o = {}) => new AsciiStage(up, o), 1),
+      pixelate: _a((up, o = {}) => new PixelateStage(up, o), 1),
+      fx: _a((up, f) => new FxStage(up, f), 1),
+      mask: _a((up, source, opts = {}) => new MaskStage(up, source, opts), 2),
     };
   }
 
@@ -1302,6 +1268,21 @@ export class Pipeline {
   }
 }
 
+// ── Generated built-in chain methods ─────────────────────────────────────────
+// Each uniform stage type is declared exactly once in STAGE_CTORS (ctor + defaults);
+// its chain method (pipe(cam).tint('#f00')) is synthesized here. This is the same
+// map _createNamedStage reads, so build-time and route's live mutation can never
+// drift. (blur/hue now label their stage 'blur'/'hue' rather than 'fx' — more
+// precise for route().toggle('blur').)
+for (const [_stageName, _ctor] of Object.entries(Pipeline.STAGE_CTORS)) {
+  const _arity = _ctor._arity ?? 0;
+  Pipeline.prototype[_stageName] = function (...args) {
+    // Args past the ctor's arity are a caller-supplied stage id (ADR 017).
+    const stage = _ctor(this._last(), ...args.slice(0, _arity));
+    return this._pushStage(stage, _stageName, args[_arity]);
+  };
+}
+
 // ── Public factory ────────────────────────────────────────────────────────────
 
 /**
@@ -1326,133 +1307,9 @@ export function pipe(source) {
   return p;
 }
 
-// ── pipe.register — user-extensible named stages ──────────────────────────────
-//
-// Registers a named pipeline stage so it becomes:
-//   • A chainable method on all Pipeline instances: pipe(cam).myStage(opts)
-//   • A draggable toolkit entry in the text editor sidebar
-//   • A Blockly block (auto-generated from descriptor.fields) draggable in blocks mode
-//
-// descriptor:
-//   label   — display name (default: name)
-//   hint    — tooltip text
-//   colour  — Blockly block hue (default: 80)
-//   fields  — array of field descriptors for auto-block generation:
-//             { name, label?, type: 'number'|'color'|'text'|'boolean', default }
-//   code    — custom toolkit snippet (auto-generated if omitted)
-//
-// The factory receives (srcDrawable, opts) — same as .use() but with opts injected.
-// Must return { canvas: HTMLCanvasElement, read() }.
-//
-// Example:
-//   pipe.register('glowAscii', (src, opts = {}) => {
-//     const canvas = document.createElement('canvas');
-//     canvas.width = 800; canvas.height = 600;
-//     const ctx = canvas.getContext('2d');
-//     return { canvas, read() { /* draw */ } };
-//   }, {
-//     label: 'Glow ASCII',
-//     hint:  'ASCII art with bloom glow',
-//     fields: [
-//       { name: 'cols',  label: 'cols',  type: 'number', default: 120 },
-//       { name: 'color', label: 'color', type: 'color',  default: '#00ff41' },
-//     ],
-//   });
-//
-//   pipe(cam).glowAscii({ cols: 120, color: '#00ff41' }).show('Glow', { w: 700, h: 500 });
-
-function _pipeBlockFieldDef(f) {
-  if (f.type === 'number') return { type: 'field_number', name: f.name, value: f.default ?? 0 };
-  if (f.type === 'color' || f.type === 'colour')
-    return { type: 'field_colour', name: f.name, colour: f.default ?? '#ffffff' };
-  if (f.type === 'boolean')
-    return { type: 'field_checkbox', name: f.name, checked: f.default ?? false };
-  return { type: 'field_input', name: f.name, text: String(f.default ?? '') };
-}
-
-function _generatePipeBlock(name, label, colour, fields) {
-  // Args: %1=camera index, %2..%N+1=user fields, %N+2=title, %N+3=W, %N+4=H
-  const fieldMsgs = fields.map((f, i) => `${f.label ?? f.name} %${i + 2}`).join(' ');
-  const ti = fields.length + 2; // title arg index
-  const sep = fieldMsgs ? ' ' + fieldMsgs : '';
-  const definition = {
-    type: `pipe_custom_${name}`,
-    message0: `pipe camera %1 → ${label}${sep} → window %${ti} %${ti + 1} × %${ti + 2}`,
-    args0: [
-      { type: 'field_number', name: 'INDEX', value: 0, min: 0, precision: 1 },
-      ...fields.map(_pipeBlockFieldDef),
-      { type: 'field_input', name: 'TITLE', text: label },
-      { type: 'field_number', name: 'W', value: 700, min: 100 },
-      { type: 'field_number', name: 'H', value: 500, min: 100 },
-    ],
-    previousStatement: null,
-    nextStatement: null,
-    colour,
-    tooltip: `${label} pipeline stage`,
-  };
-
-  const generator = (b) => {
-    const idx = b.getFieldValue('INDEX');
-    const opts = {};
-    for (const f of fields) {
-      const v = b.getFieldValue(f.name);
-      opts[f.name] = f.type === 'number' ? Number(v) : v;
-    }
-    const title = JSON.stringify(b.getFieldValue('TITLE'));
-    const w = b.getFieldValue('W');
-    const h = b.getFieldValue('H');
-    return (
-      `const _cam${idx} = await Camera.open({ index: ${idx} });\n` +
-      `pipe(_cam${idx}).${name}(${JSON.stringify(opts)}).show(${title}, { w: ${w}, h: ${h} });\n`
-    );
-  };
-
-  return { definition, generator };
-}
-
-pipe.register = function (name, factory, descriptor = {}) {
-  const label = descriptor.label ?? name;
-  const hint = descriptor.hint ?? `pipe().${name}() — custom pipeline stage`;
-  const colour = descriptor.colour ?? 80;
-  const fields = descriptor.fields ?? [];
-  const blockType = `pipe_custom_${name}`;
-
-  // 1. Add stage method to all Pipeline instances (persists across resets)
-  Pipeline.prototype[name] = function (opts = {}) {
-    this._stages.push(new CustomStage(this._last(), (src) => factory(src, opts)));
-    return this;
-  };
-
-  // 2. Build toolkit snippet
-  const optsStr = fields.length
-    ? `{ ${fields.map((f) => `${f.name}: ${JSON.stringify(f.default ?? '')}`).join(', ')} }`
-    : '';
-  const code =
-    descriptor.code ??
-    `const cam = await Camera.open();\npipe(cam)\n  .${name}(${optsStr})\n  .show('${label}', { w: 700, h: 500 });`;
-  const cmd = {
-    label,
-    code,
-    hint,
-    blockType, // enables drag-into-blocks-mode from text toolkit
-    tags: ['pipe', name, 'pipeline', 'custom'],
-  };
-
-  // 3. Live toolkit panel insertion (updates any currently-open toolkit windows)
-  if (window.__ar_addToolkitEntry) {
-    window.__ar_addToolkitEntry('Pipeline', cmd);
-  }
-
-  // 4. Blockly block + generator (registered even when no fields — allows blockType drag)
-  const blockDef = _generatePipeBlock(name, label, colour, fields);
-
-  // 5. Register block via API registry; skip toolkit if already injected live above
-  window.registerAPI?.(`_pipe_${name}`, null, {
-    category: 'Pipeline',
-    toolkit: window.__ar_addToolkitEntry ? [] : [cmd], // avoid double-add
-    blocks: [blockDef],
-  });
-};
+// pipe.register (user-extensible named stages + their Blockly codegen) lives in
+// pipe-register.js — a separate authoring-surface concern. Install it once here.
+installPipeRegister({ pipe, Pipeline, CustomStage });
 
 // ── Cleanup (called on every reset via editor-instance.js) ───────────────────
 

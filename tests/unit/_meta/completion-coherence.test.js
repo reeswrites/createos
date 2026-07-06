@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { TOOLKIT_CATEGORIES } from '../../../src/editor/completions.js';
+import { TOOLKIT_CATEGORIES } from '../../../src/editor/toolkit-catalog.js';
 import * as esprima from 'esprima';
 
 // ── Completion-snippet coherence gate (ADR Phase 4) ───────────────────────────

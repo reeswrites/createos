@@ -8,7 +8,7 @@
 // to derive KNOWN_GLOBALS — keep the literal-name form (no loops) so each name is seen.
 import { vision } from '../api/media/vision.js';
 import { lang } from '../api/lang/lang.js';
-import { addToolkitEntries } from '../editor/completions.js';
+import { addToolkitEntries } from '../editor/toolkit-catalog.js';
 import {
   _registerBuiltin,
   registerAPI,

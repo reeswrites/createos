@@ -32,3 +32,26 @@ Specific choices and their trade-offs:
 - Every instrument now carries an extra `Tone.Channel` node — slightly more nodes per run, and the instrument registry/strip teardown joins the reset path.
 - Re-patching a playing source when EQ is inserted, or when window media is rebridged, can click/pop — needs a short ramp/disconnect-reconnect guard.
 - Auto-name drift is a known wart: removing an instrument from code orphans its persisted strip settings.
+
+## Addendum (deepening pass #5) — strip identity stays name-keyed, on purpose
+
+An architecture review flagged the strip `name` as an overloaded identity (rename could
+orphan a strip; two same-titled surfaces collide) and proposed a stable ephemeral `id`
+with `name` demoted to a display label. **Rejected** — the friction is mostly intended
+behaviour, and the swap would *add* complexity, not remove it:
+
+- **`name` is the persistence key by design** (see "Settings persist by name" above). A
+  channel named "Bass" keeps its EQ/volume across sessions and projects *because* the key
+  is the stable user-facing name. A regenerated `id` can't persist across runs — you'd have
+  to store an `id → settings` map inside every project, i.e. **more** serialization.
+- **Collision → shared strip is intended** (CLAUDE.md, ADR 032/046): two same-titled
+  windows deliberately share one mixable channel, matching window-media naming. A stable id
+  would split them.
+- **`renameStrip`/`_renameStrip` is a real feature, not a workaround** — it is called only
+  from the mixer panel's name field (and the public rename), moving `_settings` so a
+  renamed channel keeps its mix. It is *not* invoked on window-title change.
+
+The one true grain: `name` does quadruple duty (identity + persist key + collision-share
+key + label). That is an accepted overload, documented here — not a defect to refactor.
+Future arch reviews: do not re-suggest a stable strip id without first reopening the
+persist-by-name model above.

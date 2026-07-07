@@ -1304,63 +1304,33 @@ export function restoreDesktop(icons = []) {
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
+// The icon-appearance opts DesktopAPI.add forwards to _addFileIcon as `iconOpts`.
+// One list so the destructure, the "any set?" test, and the repack can't drift.
+const ICON_OPT_KEYS = [
+  'rotation',
+  'tint',
+  'scale',
+  'animate',
+  'labelPosition',
+  'labelColor',
+  'glyph',
+  'glyphBg',
+  'glyphColor',
+  'labelSize',
+  'labelFont',
+  'badge',
+  'badgeColor',
+  'tooltip',
+];
+
 export const DesktopAPI = {
-  add(
-    url,
-    {
-      name = 'file',
-      type,
-      content,
-      x,
-      y,
-      rotation,
-      tint,
-      scale,
-      animate,
-      labelPosition,
-      labelColor,
-      glyph,
-      glyphBg,
-      glyphColor,
-      labelSize,
-      labelFont,
-      badge,
-      badgeColor,
-      tooltip,
-    } = {},
-  ) {
-    const iconOpts =
-      rotation != null ||
-      tint != null ||
-      scale != null ||
-      animate != null ||
-      labelPosition != null ||
-      labelColor != null ||
-      glyph != null ||
-      glyphBg != null ||
-      glyphColor != null ||
-      labelSize != null ||
-      labelFont != null ||
-      badge != null ||
-      badgeColor != null ||
-      tooltip != null
-        ? {
-            rotation,
-            tint,
-            scale,
-            animate,
-            labelPosition,
-            labelColor,
-            glyph,
-            glyphBg,
-            glyphColor,
-            labelSize,
-            labelFont,
-            badge,
-            badgeColor,
-            tooltip,
-          }
-        : null;
+  add(url, opts = {}) {
+    const { name = 'file', type, content, x, y } = opts;
+    // Gather the present icon-appearance opts; null when the caller set none.
+    let iconOpts = null;
+    for (const k of ICON_OPT_KEYS) {
+      if (opts[k] != null) (iconOpts ??= {})[k] = opts[k];
+    }
     const icon = _addFileIcon(
       name,
       type ? '' : name,

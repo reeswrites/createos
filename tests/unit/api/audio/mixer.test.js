@@ -6,7 +6,15 @@ vi.mock('tone', () => {
   return {
     default: {},
     Gain: vi.fn(function () {
-      return node();
+      return {
+        ...node(),
+        gain: {
+          value: 1,
+          rampTo(v) {
+            this.value = v;
+          },
+        },
+      };
     }),
     Volume: vi.fn(function () {
       return { ...node(), volume: { value: 0 } };
@@ -54,6 +62,21 @@ describe('Mixer strips', () => {
     mixer.strip('lead').volume(-6);
     expect(getStrip('lead')._channel.volume.value).toBe(-6);
     expect(serializeMixer().lead.volume).toBe(-6);
+  });
+
+  test('editorAudio scopes + persists per-editor mute (bus disposed on cleanup, settings survive)', () => {
+    acquireStrip('lead', { type: 'instrument', owner: 1, lifecycle: 'run' });
+    // muting editor 1 persists under a reserved @editor key and never touches master
+    expect(mixer.editorAudio(1, { db: 0, muted: true })).toBe(true);
+    expect(mixer.editorAudioState(1)).toEqual({ muted: true, db: 0 });
+    expect(serializeMixer()['@editor:1'].mute).toBe(true);
+    expect(serializeMixer().master?.mute).toBeFalsy(); // master unaffected
+    // state survives a reset (like strip settings) so it restores on refresh
+    cleanupMixer(1);
+    expect(mixer.editorAudioState(1)).toEqual({ muted: true, db: 0 });
+    // unmuting persists too
+    mixer.editorAudio(1, { db: 0, muted: false });
+    expect(mixer.editorAudioState(1).muted).toBe(false);
   });
 
   test('setting a strip before it exists is applied on creation', () => {

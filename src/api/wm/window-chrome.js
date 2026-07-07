@@ -14,6 +14,7 @@
 
 import { snapshotWindow, recordWindow } from '../media/window-capture.js';
 import { addPaintOverlay } from '../widgets/paint-overlay.js';
+import { subscribe } from '../../events/index.js';
 
 export function createWindowChrome({
   desktop,
@@ -209,7 +210,19 @@ export function createWindowChrome({
     const firstBtn = tb.querySelector('.wm-btn');
     tb.insertBefore(ctrl, firstBtn);
 
-    let _muted = videoEl ? videoEl.muted : false;
+    // Sketch window: its owning editor (tagged at spawn). Its mute/volume persist
+    // per-editor in the mixer, so restore that state into the button + slider on
+    // spawn — the control shows "muted" after a refresh instead of silently resetting.
+    const _owner =
+      !videoEl && win.dataset.ownerEditor ? parseInt(win.dataset.ownerEditor, 10) : null;
+    const _ownerId = _owner != null && !Number.isNaN(_owner) ? _owner : null;
+    const _saved = _ownerId != null ? window.mixer?.editorAudioState?.(_ownerId) : null;
+    if (_saved && typeof _saved.db === 'number') {
+      const lin = _saved.db <= -60 ? 0 : _saved.db / 40 + 1;
+      volSlider.value = String(Math.round(Math.max(0, Math.min(1, lin)) * 100));
+    }
+
+    let _muted = videoEl ? videoEl.muted : (_saved?.muted ?? false);
     if (_muted) {
       muteBtn.innerHTML = '<i class="fa-solid fa-volume-xmark"></i>';
       muteBtn.classList.add('muted');
@@ -231,12 +244,31 @@ export function createWindowChrome({
         const strip = getWindowStrip(win.id);
         window.mixer?.strip(strip.name).volume(db).mute(_muted);
       } else {
-        // Sketch window (canvas/html): instruments route straight to MASTER (their
-        // own instrument strips), NOT through this window's strip — so muting the
-        // window strip would be silent-but-useless. Drive master so the titlebar
-        // control actually mutes what you hear (matches the taskbar Audio chip).
-        window.mixer?.master?.volume(db).mute(_muted);
+        // Sketch window (canvas/html): scope mute/volume to THIS sketch's own audio
+        // via its editor submaster bus, so muting the window doesn't nuke the global
+        // master (and doesn't persist a master-mute that survives refresh). Falls
+        // back to master only if the sketch has no owning editor / made no sound yet.
+        const scoped =
+          _ownerId != null && window.mixer?.editorAudio?.(_ownerId, { db, muted: _muted });
+        if (!scoped) window.mixer?.master?.volume(db).mute(_muted);
       }
+    }
+
+    // A sketch re-run rebuilds its editor bus at unity, which would leave the
+    // titlebar showing "muted" while sound returns. Re-apply our state when this
+    // window's editor bus is (re)built so button and audio stay in sync.
+    if (_ownerId != null) {
+      // persistent: this sub lives with the WINDOW (cleaned via onDispose), not the
+      // run — else clearRunScoped() on the next reset would wipe it and the
+      // re-mute-on-rerun would never fire.
+      const unsub = subscribe(
+        'mixer:editorbus',
+        ({ editorId }) => {
+          if (editorId === _ownerId) _apply();
+        },
+        { persistent: true },
+      );
+      onDispose(win, unsub);
     }
 
     muteBtn.addEventListener('click', (e) => {

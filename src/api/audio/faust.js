@@ -15,6 +15,7 @@
 // dispose), so Faust voices drop into Piano/Drumpad/Launchpad + bindings for free.
 
 import * as Tone from 'tone';
+import { noteToMidi } from './music-theory.js';
 
 // ── libfaust compiler (lazy, shared) ────────────────────────────────────────────
 
@@ -63,15 +64,6 @@ export function _setFaustNodeFactoryForTesting(fn) {
 }
 
 // ── Note / duration helpers ─────────────────────────────────────────────────────
-
-function _noteToMidi(note) {
-  if (typeof note === 'number') return note;
-  try {
-    return Tone.Frequency(note).toMidi();
-  } catch (_) {
-    return 60;
-  }
-}
 
 function _durMs(dur) {
   try {
@@ -125,11 +117,11 @@ export function buildFaustHandle(desc) {
     },
     attack(note = 'C4', time, vel = 1) {
       if (isPoly())
-        node.keyOn(0, _noteToMidi(note), Math.round(Math.max(0, Math.min(1, vel)) * 127));
+        node.keyOn(0, noteToMidi(note), Math.round(Math.max(0, Math.min(1, vel)) * 127));
       else if (node) _monoGate(node, note, vel, true);
     },
     release(note = 'C4') {
-      if (isPoly()) node.keyOff(0, _noteToMidi(note));
+      if (isPoly()) node.keyOff(0, noteToMidi(note));
       else if (node) _monoGate(node, note, 0, false);
     },
     // One-shot: attack, then release after `dur` (Faust keyOn/off is immediate — the

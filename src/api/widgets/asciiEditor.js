@@ -7,11 +7,13 @@ import { downloadBlob } from './frame-snapshot.js';
 import { registerWidgetRestorer } from '../wm/widget-restorer-registry.js';
 import { insertSnippet } from '../../editor/active-editor.js';
 import { FrameDoc } from './frame-doc.js';
+import { hexToRgb } from '../visual/color.js';
 import {
   mountWidgetShell,
   buildFrameStrip,
   buildTransport,
   wireCaptureButton,
+  mkExportButton as mkExport,
 } from './widget-shell.js';
 import { onReset } from '../../runtime/reset-registry.js';
 import { registerDesktopFileType } from '../platform/desktop-file-registry.js';
@@ -83,10 +85,7 @@ const ACTIVE_COLOR = '#cba6f7';
 const INACTIVE_BORDER = '#45475a';
 
 function _hexToRgbStr(hex) {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `${r};${g};${b}`;
+  return hexToRgb(hex).join(';');
 }
 
 function _blank(fg = '#00ff41') {
@@ -319,14 +318,6 @@ export class AsciiEditor {
     const fd = this._fd;
     const strip = buildFrameStrip(fd, { minThumbW: 24 });
 
-    const mkExport = (html, color, fn) => {
-      const b = document.createElement('button');
-      b.innerHTML = html;
-      b.style.cssText = `background:#1e1e2e;color:${color};border:1px solid #313244;
-        border-radius:4px;padding:3px 8px;font-size:11px;cursor:pointer;`;
-      b.addEventListener('click', fn);
-      return b;
-    };
     const transport = buildTransport(fd, {
       onFpsChange: () => this._autoSave(),
       extraButtons: [

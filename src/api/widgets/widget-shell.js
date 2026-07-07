@@ -41,6 +41,20 @@ export function wireCaptureButton(btn, { take, widget, idleLabel = '● Rec' }) 
   return btn;
 }
 
+// ── Export button ─────────────────────────────────────────────────────────────
+// The small styled toolbar button every frame widget feeds to buildTransport's
+// `extraButtons`. Was copy-pasted byte-identical in Paint/AsciiEditor (and with a
+// title arg in SpriteEditor) right beside the chassis that owns every neighbour.
+export function mkExportButton(html, color, fn, title) {
+  const b = document.createElement('button');
+  b.innerHTML = html;
+  if (title) b.title = title;
+  b.style.cssText = `background:#1e1e2e;color:${color};border:1px solid #313244;
+    border-radius:4px;padding:3px 8px;font-size:11px;cursor:pointer;`;
+  b.addEventListener('click', fn);
+  return b;
+}
+
 // ── Frame strip ──────────────────────────────────────────────────────────────
 // `ctrl` is a FrameController (FrameDoc, or a Sprite adapter). The builder owns
 // only the thumbnail row; the widget wires ctrl events to render/history/save.

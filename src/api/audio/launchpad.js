@@ -10,6 +10,7 @@
 
 import * as Tone from 'tone';
 import { connectSurfaceStrip } from './mixer.js';
+import { midiToNote } from './music-theory.js';
 import { Voice } from './voice.js';
 import { insertSnippet } from '../../editor/active-editor.js';
 import { mountWidgetShell, wireCaptureButton } from '../widgets/widget-shell.js';
@@ -34,15 +35,6 @@ export function cleanupLaunchpads() {
 // Pad palette — cells cycle through these as visual identity for bound targets.
 const CELL_BG = '#1a1a2e';
 const CELL_BG_ACTIVE = '#313244';
-
-// midi note number → note name (e.g. 60 → 'C4'); guarded for the test mock.
-function _midiToNote(num) {
-  try {
-    return Tone.Frequency(num, 'midi').toNote();
-  } catch (_) {
-    return 'C4';
-  }
-}
 
 export class Launchpad {
   constructor({
@@ -98,7 +90,7 @@ export class Launchpad {
   }
 
   _noteFor(cell) {
-    return _midiToNote(this._baseNote + cell);
+    return midiToNote(this._baseNote + cell);
   }
 
   _ensureDefault() {

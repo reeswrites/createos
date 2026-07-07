@@ -7,6 +7,7 @@ import { runScoped } from '../../runtime/run-scoped.js';
 import { acquireMicRunScoped } from '../media/media-lease.js';
 import { readAnalyser } from '../audio/analyser-read.js';
 import { isAudioSignal } from '../signal/signal-shape.js';
+import { noteToMidi as _noteToMidi } from '../audio/music-theory.js';
 
 const _vizs = new Set();
 
@@ -579,33 +580,6 @@ function _hslToRgb(h, s, l) {
     b = x;
   }
   return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
-}
-
-function _noteToMidi(note) {
-  if (typeof note === 'number') return Math.round(note);
-  const semis = {
-    C: 0,
-    'C#': 1,
-    Db: 1,
-    D: 2,
-    'D#': 3,
-    Eb: 3,
-    E: 4,
-    F: 5,
-    'F#': 6,
-    Gb: 6,
-    G: 7,
-    'G#': 8,
-    Ab: 8,
-    A: 9,
-    'A#': 10,
-    Bb: 10,
-    B: 11,
-  };
-  const m = String(note).match(/^([A-Ga-g](?:#|b)?)(-?\d)$/);
-  if (!m) return 60;
-  const name = m[1].charAt(0).toUpperCase() + m[1].slice(1);
-  return (parseInt(m[2], 10) + 1) * 12 + (semis[name] ?? 0);
 }
 
 function _durToMs(dur) {

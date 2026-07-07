@@ -38,3 +38,14 @@ export function insertSnippet(code) {
   navigator.clipboard?.writeText(code).catch(() => {});
   return false;
 }
+
+// Replace an editor's entire document with `code`. Same cm.dispatch seam as
+// insertSnippet, but overwrites instead of appending — the entry point the
+// dev/e2e test harness (window.__ar_test.loadCode) drives. Targets `editorId`
+// when given, else the active instance. Returns true if replaced.
+export function replaceCode(code, { editorId } = {}) {
+  const inst = editorId != null ? window.__ar_instances?.get(editorId) : getActiveInstance();
+  if (!inst?.cm) return false;
+  inst.cm.dispatch({ changes: { from: 0, to: inst.cm.state.doc.length, insert: code } });
+  return true;
+}

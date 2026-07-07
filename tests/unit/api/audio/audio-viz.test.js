@@ -172,7 +172,18 @@ vi.mock('tone', () => {
     }),
     Transport: { bpm: { value: 120 } },
     Time: (t) => ({ toSeconds: () => (typeof t === 'number' ? t : 1) }),
-    Frequency: (_n) => ({ toFrequency: () => 440, toMidi: () => 60 }),
+    // toMidi models real note→midi (PianoRollViz now converts via music-theory.js,
+    // which wraps Tone.Frequency — a constant stub would put every note at midi 60).
+    Frequency: (n) => ({
+      toFrequency: () => 440,
+      toMidi: () => {
+        const m = String(n).match(/^([A-Ga-g])(#|b)?(-?\d+)$/);
+        if (!m) return 60;
+        const base = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 }[m[1].toLowerCase()];
+        const acc = m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0;
+        return (parseInt(m[3], 10) + 1) * 12 + base + acc;
+      },
+    }),
     Draw: { schedule: vi.fn() },
   };
 });

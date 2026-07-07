@@ -8,11 +8,13 @@ import { snapshotFrameCanvases, paintFrameCanvas, downloadCanvasPng } from './fr
 import { registerWidgetRestorer } from '../wm/widget-restorer-registry.js';
 import { insertSnippet } from '../../editor/active-editor.js';
 import { FrameDoc } from './frame-doc.js';
+import { drawCheckerboard } from '../visual/color.js';
 import {
   mountWidgetShell,
   buildFrameStrip,
   buildTransport,
   wireCaptureButton,
+  mkExportButton as mkExport,
 } from './widget-shell.js';
 import { onReset } from '../../runtime/reset-registry.js';
 import { registerDesktopFileType } from '../platform/desktop-file-registry.js';
@@ -325,14 +327,6 @@ export class Paint {
     const fd = this._fd;
     const strip = buildFrameStrip(fd);
 
-    const mkExport = (html, color, fn) => {
-      const b = document.createElement('button');
-      b.innerHTML = html;
-      b.style.cssText = `background:#1e1e2e;color:${color};border:1px solid #313244;
-        border-radius:4px;padding:3px 8px;font-size:11px;cursor:pointer;`;
-      b.addEventListener('click', fn);
-      return b;
-    };
     const transport = buildTransport(fd, {
       onFpsChange: () => this._autoSave(),
       extraButtons: [
@@ -919,13 +913,7 @@ export class Paint {
     checker.width = this._w;
     checker.height = this._h;
     const cctx = checker.getContext('2d');
-    const cs = 8;
-    for (let y = 0; y < checker.height; y += cs) {
-      for (let x = 0; x < checker.width; x += cs) {
-        cctx.fillStyle = (x / cs + y / cs) % 2 === 0 ? '#888' : '#aaa';
-        cctx.fillRect(x, y, cs, cs);
-      }
-    }
+    drawCheckerboard(cctx, checker.width, checker.height, 8);
     checker.style.cssText = 'position:absolute;top:0;left:0;';
     this._checkerEl = checker;
 

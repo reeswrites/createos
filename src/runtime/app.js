@@ -31,6 +31,7 @@ import { applyExternalBlocks, addBlockToCategoryMeta } from '../blocks/blocks.js
 import { initVoices } from '../api/audio/voice.js';
 import { EditorInstance } from '../editor/editor-instance.js';
 import { applyProject } from '../api/platform/project.js';
+import { installTestHarness } from './test-harness.js';
 import '../api/io/input.js'; // keyboard + mouse → bus (must load after events/index.js)
 
 import { initSpawnButtons } from './toolbar/spawn-buttons.js';
@@ -260,6 +261,11 @@ window.onload = () => {
   for (const id of manifest) createEditor(id);
 
   window.wm.restoreState();
+
+  // Dev/e2e-only automation seam (window.__ar_test). Absent from prod builds.
+  if (import.meta.env.DEV || _embedParams.has('e2e')) {
+    installTestHarness({ applyProject, appAPI });
+  }
 
   // Embed mode: restore project state (if full project) then auto-run all editors
   if (_isEmbed) {

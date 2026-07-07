@@ -1,69 +1,46 @@
-import { describe, it, expect, afterEach, vi } from 'vitest';
-import { SensorsAPI as sensors } from '../../../../src/api/io/sensors.js';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { emit } from '../../../../src/events/index.js';
+// Side-effect import: registers the haptics:* commands (ADR 014 — replaced the
+// deleted SensorsAPI.haptics with commandable bus events on device-sources.js).
+import '../../../../src/api/io/device-sources.js';
 
 afterEach(() => {
   vi.restoreAllMocks();
   delete navigator.vibrate;
 });
 
-describe('sensors.vibrate()', () => {
-  it('calls navigator.vibrate with pattern', () => {
-    navigator.vibrate = vi.fn();
-    sensors.vibrate(200);
-    expect(navigator.vibrate).toHaveBeenCalledWith(200);
-  });
-
-  it('accepts array pattern', () => {
-    navigator.vibrate = vi.fn();
-    sensors.vibrate([100, 50, 100]);
-    expect(navigator.vibrate).toHaveBeenCalledWith([100, 50, 100]);
-  });
-
-  it('is a no-op when navigator.vibrate missing', () => {
-    expect(() => sensors.vibrate(100)).not.toThrow();
-  });
-
-  it('returns sensors for chaining', () => {
-    navigator.vibrate = vi.fn();
-    expect(sensors.vibrate(100)).toBe(sensors);
-  });
-});
-
-describe('sensors.haptics', () => {
+describe('haptics:* bus commands', () => {
   beforeEach(() => {
     navigator.vibrate = vi.fn();
   });
 
-  it('tap() vibrates 40ms', () => {
-    sensors.haptics.tap();
+  it('haptics:vibrate passes its pattern to navigator.vibrate', () => {
+    emit('haptics:vibrate', { pattern: 200 });
+    expect(navigator.vibrate).toHaveBeenCalledWith(200);
+  });
+
+  it('haptics:vibrate accepts an array pattern', () => {
+    emit('haptics:vibrate', { pattern: [100, 50, 100] });
+    expect(navigator.vibrate).toHaveBeenCalledWith([100, 50, 100]);
+  });
+
+  it('haptics:tap vibrates 40ms', () => {
+    emit('haptics:tap');
     expect(navigator.vibrate).toHaveBeenCalledWith(40);
   });
 
-  it('doubleTap() vibrates [40,60,40]', () => {
-    sensors.haptics.doubleTap();
-    expect(navigator.vibrate).toHaveBeenCalledWith([40, 60, 40]);
-  });
-
-  it('buzz(ms) vibrates given ms', () => {
-    sensors.haptics.buzz(500);
+  it('haptics:buzz vibrates the given ms', () => {
+    emit('haptics:buzz', { ms: 500 });
     expect(navigator.vibrate).toHaveBeenCalledWith(500);
   });
 
-  it('pulse(intensity) scales 0–1 to 10–200ms', () => {
-    sensors.haptics.pulse(1);
-    expect(navigator.vibrate).toHaveBeenCalledWith(200);
-    navigator.vibrate.mockClear();
-    sensors.haptics.pulse(0);
-    expect(navigator.vibrate).toHaveBeenCalledWith(10);
-  });
-
-  it('stop() vibrates 0', () => {
-    sensors.haptics.stop();
+  it('haptics:stop vibrates 0', () => {
+    emit('haptics:stop');
     expect(navigator.vibrate).toHaveBeenCalledWith(0);
   });
 
-  it('pattern() passes through durations', () => {
-    sensors.haptics.pattern(100, 50, 100, 50, 200);
-    expect(navigator.vibrate).toHaveBeenCalledWith([100, 50, 100, 50, 200]);
+  it('is a no-op when navigator.vibrate is missing', () => {
+    delete navigator.vibrate;
+    expect(() => emit('haptics:tap')).not.toThrow();
   });
 });

@@ -15,7 +15,9 @@ import {
   reassertBuiltins,
   _setToolkitApplier,
   _setBlocksApplier,
+  deriveAudioDetectPattern,
 } from './api-registry.js';
+import { setAudioDetectPattern } from '../editor/api-detector.js';
 import { Camera } from '../api/media/camera.js';
 import { audio } from '../api/audio/audio.js';
 import { initStrudel, strudelGlobals } from '../api/audio/strudel.js';
@@ -111,6 +113,7 @@ export function registerBuiltins() {
       spectrogram: ['source', 'opts?'],
       pianoRoll: ['opts?'],
     },
+    detect: { effect: 'audio' },
   });
   _registerBuiltin('Shader', Shader, { params: ['fragmentBody', 'opts?'] });
   _registerBuiltin('ShaderFX', ShaderFX, { params: ['fragmentBody', 'opts?'] });
@@ -137,9 +140,9 @@ export function registerBuiltins() {
   _registerBuiltin('mixer', mixer, {
     params: { strip: ['name'], add: ['node', 'opts?'] },
   });
-  _registerBuiltin('Drumpad', Drumpad);
-  _registerBuiltin('Launchpad', Launchpad);
-  _registerBuiltin('Piano', Piano);
+  _registerBuiltin('Drumpad', Drumpad, { detect: { effect: 'audio' } });
+  _registerBuiltin('Launchpad', Launchpad, { detect: { effect: 'audio' } });
+  _registerBuiltin('Piano', Piano, { detect: { effect: 'audio' } });
   _registerBuiltin('Voice', Voice, {
     params: {
       define: ['name', 'desc'],
@@ -150,8 +153,12 @@ export function registerBuiltins() {
       sample: ['opts'],
       faust: ['name', 'code', 'opts?'],
     },
+    detect: { effect: 'audio' },
   });
-  _registerBuiltin('openSynthDesigner', openSynthDesigner, { params: ['seed?'] });
+  _registerBuiltin('openSynthDesigner', openSynthDesigner, {
+    params: ['seed?'],
+    detect: { effect: 'audio' },
+  });
   _registerBuiltin('Notepad', Notepad);
   _registerBuiltin('notepad', (opts) => new Notepad(opts));
   _registerBuiltin('Recording', Recording);
@@ -173,19 +180,24 @@ export function registerBuiltins() {
   // later init step threw. See api-registry.reassertBuiltins() + ADR 035.
   Promise.resolve(initStrudel()).finally(reassertBuiltins);
   const _S = strudelGlobals();
-  // sources
-  _registerBuiltin('note', _S.note, { params: ['pattern'] });
+  // sources — `note` also carries Strudel's universal `.play()` trigger (ADR 058).
+  // `s`/`n` stay undeclared: a single-letter name trigger would false-positive on
+  // any code; they surface as audio through `.play()`.
+  _registerBuiltin('note', _S.note, {
+    params: ['pattern'],
+    detect: { effect: 'audio', triggers: ['\\.play\\s*\\(\\s*\\)'] },
+  });
   _registerBuiltin('s', _S.s, { params: ['pattern'] });
   _registerBuiltin('n', _S.n, { params: ['pattern'] });
-  _registerBuiltin('sound', _S.sound, { params: ['pattern'] });
+  _registerBuiltin('sound', _S.sound, { params: ['pattern'], detect: { effect: 'audio' } });
   _registerBuiltin('silence', _S.silence);
   // combinators
-  _registerBuiltin('stack', _S.stack, { params: ['...patterns'] });
-  _registerBuiltin('cat', _S.cat, { params: ['...patterns'] });
+  _registerBuiltin('stack', _S.stack, { params: ['...patterns'], detect: { effect: 'audio' } });
+  _registerBuiltin('cat', _S.cat, { params: ['...patterns'], detect: { effect: 'audio' } });
   _registerBuiltin('slowcat', _S.slowcat);
   _registerBuiltin('fastcat', _S.fastcat);
-  _registerBuiltin('seq', _S.seq, { params: ['...patterns'] });
-  _registerBuiltin('sequence', _S.sequence);
+  _registerBuiltin('seq', _S.seq, { params: ['...patterns'], detect: { effect: 'audio' } });
+  _registerBuiltin('sequence', _S.sequence, { detect: { effect: 'audio' } });
   _registerBuiltin('timeCat', _S.timeCat);
   _registerBuiltin('arrange', _S.arrange);
   _registerBuiltin('polymeter', _S.polymeter);
@@ -212,10 +224,10 @@ export function registerBuiltins() {
   _registerBuiltin('pure', _S.pure);
   _registerBuiltin('reify', _S.reify);
   _registerBuiltin('mini', _S.mini);
-  _registerBuiltin('samples', _S.samples, { params: ['urlOrMap'] });
-  _registerBuiltin('setcps', _S.setcps, { params: ['cps'] });
-  _registerBuiltin('setcpm', _S.setcpm);
-  _registerBuiltin('hush', _S.hush);
+  _registerBuiltin('samples', _S.samples, { params: ['urlOrMap'], detect: { effect: 'audio' } });
+  _registerBuiltin('setcps', _S.setcps, { params: ['cps'], detect: { effect: 'audio' } });
+  _registerBuiltin('setcpm', _S.setcpm, { detect: { effect: 'audio' } });
+  _registerBuiltin('hush', _S.hush, { detect: { effect: 'audio' } });
 
   _registerBuiltin('Color', Color);
   _registerBuiltin('on', on);
@@ -242,11 +254,16 @@ export function registerBuiltins() {
   _registerBuiltin('asciiEditor', (opts) => new AsciiEditor(opts));
   _registerBuiltin('PluginHost', PluginHost);
   _registerBuiltin('shell', shell);
-  _registerBuiltin('midi', midi);
+  _registerBuiltin('midi', midi, { detect: { effect: 'audio' } });
   _registerBuiltin('external', external);
   _registerBuiltin('statusBar', statusBar);
 
   // Wire up extensibility appliers so registerAPI(name, impl, { blocks, toolkit }) works.
   _setBlocksApplier(applyExternalBlocks);
   _setToolkitApplier(addToolkitEntries);
+
+  // ADR 058: derive the audio-usage detection regex from the descriptors declared
+  // above (detect.effect === 'audio') and inject it into the detector, so run.js's
+  // usesAudio flag covers every registered instrument without a hand-maintained list.
+  setAudioDetectPattern(deriveAudioDetectPattern());
 }

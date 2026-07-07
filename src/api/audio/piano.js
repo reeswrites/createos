@@ -13,6 +13,7 @@
 import * as Tone from 'tone';
 import { registerWidgetRestorer } from '../wm/widget-restorer-registry.js';
 import { connectSurfaceStrip } from './mixer.js';
+import { noteToMidi, midiToNote } from './music-theory.js';
 import { Voice, normalizeVoice, buildSynthNode } from './voice.js';
 import { insertSnippet } from '../../editor/active-editor.js';
 import { mountWidgetShell, wireCaptureButton } from '../widgets/widget-shell.js';
@@ -43,23 +44,6 @@ const WHITE_NAMES = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
 // Maps white-key index within octave → the sharp/black note name that follows it.
 // white index: 0=C, 1=D, 2=E, 3=F, 4=G, 5=A, 6=B
 const BLACK_AFTER = { 0: 'C#', 1: 'D#', 3: 'F#', 4: 'G#', 5: 'A#' };
-
-const _CHROMA = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-
-function noteToMidi(note) {
-  const m = String(note).match(/^([A-G]#?)(-?\d+)$/);
-  if (!m) return 60;
-  const ci = _CHROMA.indexOf(m[1]);
-  if (ci < 0) return 60;
-  return (parseInt(m[2]) + 1) * 12 + ci;
-}
-
-// Inverse of noteToMidi: MIDI note number → note string (60 → 'C4').
-function midiToNote(num) {
-  const ci = ((num % 12) + 12) % 12;
-  const oct = Math.floor(num / 12) - 1;
-  return _CHROMA[ci] + oct;
-}
 
 // ── Built-in presets ──────────────────────────────────────────────────────────
 

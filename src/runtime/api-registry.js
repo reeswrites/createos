@@ -151,6 +151,31 @@ export function deriveParamHints() {
   return out;
 }
 
+/**
+ * Build the audio-usage detection regex from the registry (ADR 058). Every builtin
+ * whose descriptor carries `detect: { effect: 'audio' }` contributes a trigger,
+ * derived from its registered NAME so a rename can't silently break detection:
+ *   - capitalised name → `\bnew\s+Name\b|\bName\s*\.`  — covers BOTH a constructor
+ *     (`new Piano`) and a namespace object used via static methods (`Voice.make`);
+ *     `Voice` is `typeof 'object'`, so `new Voice` is invalid and only `Voice.` fires.
+ *   - lower-case name  → `\bname\s*[.(]`  (audio., note(, midi.…)
+ * Plus any literal regex sources in `detect.triggers` (e.g. Strudel's universal
+ * `.play()`). Injected into api-detector via setAudioDetectPattern() at boot; the
+ * detector keeps a static fallback for the no-boot (test) case.
+ * @returns {RegExp|null}
+ */
+export function deriveAudioDetectPattern() {
+  const parts = [];
+  for (const [name, desc] of _descriptors) {
+    const d = desc?.detect;
+    if (d?.effect !== 'audio') continue;
+    const isCap = /^[A-Z]/.test(name);
+    parts.push(isCap ? `\\bnew\\s+${name}\\b|\\b${name}\\s*\\.` : `\\b${name}\\s*[.(]`);
+    for (const t of d.triggers || []) parts.push(t);
+  }
+  return parts.length ? new RegExp(parts.join('|')) : null;
+}
+
 // ── Deferred hooks — called by blocks.js / completions.js after they init ────
 
 export function _setBlocksApplier(fn) {

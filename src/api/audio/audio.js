@@ -3,6 +3,7 @@ import { micAnalyser, micViz } from '../media/mic-state.js';
 import { activeEditorId } from '../../runtime/run-context.js';
 import { AudioViz, SpectrogramCanvas, PianoRollViz, _noteHooks } from '../visual/viz.js';
 import { acquireStrip } from './mixer.js';
+import { midiToNote } from './music-theory.js';
 import { Drumpad } from './drumpad.js';
 import { Launchpad } from './launchpad.js';
 import { Piano } from './piano.js';
@@ -272,13 +273,6 @@ const _SCALES = {
   blues: [0, 3, 5, 6, 7, 10],
   chromatic: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
 };
-
-const _NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-
-function _midiToNote(midi) {
-  const oct = Math.floor(midi / 12) - 1;
-  return _NOTE_NAMES[((midi % 12) + 12) % 12] + oct;
-}
 
 // ── Instrument wrapper ────────────────────────────────────────────────────
 
@@ -1029,7 +1023,7 @@ class AudioAPI {
   scale(root, name) {
     const intervals = _SCALES[name] ?? _SCALES.major;
     const rootMidi = Tone.Frequency(root).toMidi();
-    return intervals.map((i) => _midiToNote(rootMidi + i));
+    return intervals.map((i) => midiToNote(rootMidi + i));
   }
   note(scaleNotes, degree) {
     return scaleNotes[((degree % scaleNotes.length) + scaleNotes.length) % scaleNotes.length];

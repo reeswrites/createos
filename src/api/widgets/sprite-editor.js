@@ -7,11 +7,13 @@ import { snapshotFrameCanvases, paintFrameCanvas, downloadCanvasPng } from './fr
 import { registerWidgetRestorer } from '../wm/widget-restorer-registry.js';
 import { WidgetEvents } from './widget-events.js';
 import { insertSnippet } from '../../editor/active-editor.js';
+import { drawCheckerboard } from '../visual/color.js';
 import {
   mountWidgetShell,
   buildFrameStrip,
   buildTransport,
   wireCaptureButton,
+  mkExportButton,
 } from './widget-shell.js';
 import { onReset } from '../../runtime/reset-registry.js';
 import { registerDesktopFileType } from '../platform/desktop-file-registry.js';
@@ -216,15 +218,9 @@ export class SpriteEditor {
     const fd = this._fd;
     const strip = buildFrameStrip(fd);
 
-    const mkExport = (html, color, title, fn) => {
-      const b = document.createElement('button');
-      b.innerHTML = html;
-      b.title = title;
-      b.style.cssText = `background:#1e1e2e;color:${color};border:1px solid #313244;
-        border-radius:4px;padding:3px 8px;font-size:11px;cursor:pointer;`;
-      b.addEventListener('click', fn);
-      return b;
-    };
+    // title-first ergonomics over the shared chassis button (canonical order is
+    // html, color, fn, title — see widget-shell.mkExportButton).
+    const mkExport = (html, color, title, fn) => mkExportButton(html, color, fn, title);
     const transport = buildTransport(fd, {
       onFpsChange: () => this._autoSave(),
       extraButtons: [
@@ -495,13 +491,7 @@ export class SpriteEditor {
     checker.width = sp.canvas.width;
     checker.height = sp.canvas.height;
     const cctx = checker.getContext('2d');
-    const cs = 4;
-    for (let y = 0; y < checker.height; y += cs) {
-      for (let x = 0; x < checker.width; x += cs) {
-        cctx.fillStyle = (x / cs + y / cs) % 2 === 0 ? '#888' : '#aaa';
-        cctx.fillRect(x, y, cs, cs);
-      }
-    }
+    drawCheckerboard(cctx, checker.width, checker.height, 4);
     checker.style.cssText = 'position:absolute;top:0;left:0;image-rendering:pixelated;';
     this._checker = checker;
 
@@ -851,14 +841,7 @@ export class SpriteEditor {
   _paintChecker() {
     const ch = this._checker;
     if (!ch) return;
-    const cctx = ch.getContext('2d');
-    const cs = 4;
-    for (let y = 0; y < ch.height; y += cs) {
-      for (let x = 0; x < ch.width; x += cs) {
-        cctx.fillStyle = (x / cs + y / cs) % 2 === 0 ? '#888' : '#aaa';
-        cctx.fillRect(x, y, cs, cs);
-      }
-    }
+    drawCheckerboard(ch.getContext('2d'), ch.width, ch.height, 4);
   }
 
   // Resize the pixel grid to w×h. Existing art is kept top-left aligned (clipped).

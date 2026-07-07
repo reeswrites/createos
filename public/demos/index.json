@@ -1,5 +1,19 @@
 [
   {
+    "id": "chess-music",
+    "title": "Chess → Music",
+    "desc": "A full two-player chess game whose board is a sequencer. Legal moves, check/mate/stalemate, auto-promotion. A play-head sweeps the files voicing each piece (rank=octave, file=pentatonic degree); moves accent, captures thud, and a bass note tracks the material balance — the position IS the melody.",
+    "file": "chess-music.vljson",
+    "tags": [
+      "audio",
+      "canvas",
+      "generative",
+      "interactive",
+      "game",
+      "music"
+    ]
+  },
+  {
     "id": "auto-blur-faces",
     "title": "Auto-Blur Faces",
     "desc": "Privacy filter — MediaPipe face tracking + dynamic masking blurs every face in the camera feed. Sharp base plus a blurred layer masked to the face ovals (vision.faceMask, up to 5 faces).",
@@ -40,20 +54,6 @@
     ]
   },
   {
-    "id": "sound-lab",
-    "title": "Sound Lab",
-    "desc": "Design your own instruments — custom Voices, a Faust physical-model piano, a mappable Launchpad soundboard, and a swung Drumpad groove (ADR 046/047)",
-    "file": "sound-lab.vljson",
-    "tags": [
-      "audio",
-      "synth",
-      "voice",
-      "faust",
-      "launchpad",
-      "instrument"
-    ]
-  },
-  {
     "id": "plasma-shader",
     "title": "Plasma Shader",
     "desc": "Animated GLSL fragment shader — rainbow plasma effect driven by time",
@@ -73,17 +73,6 @@
       "draw",
       "animation",
       "2d"
-    ]
-  },
-  {
-    "id": "beat-pattern",
-    "title": "Beat Pattern",
-    "desc": "Live drum pattern using mini-notation + audio visualizer",
-    "file": "beat-pattern.vljson",
-    "tags": [
-      "audio",
-      "pattern",
-      "music"
     ]
   },
   {

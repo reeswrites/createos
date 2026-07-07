@@ -319,10 +319,6 @@ let _videoSource = null; // custom source override (video/canvas el)
 let _lastDetectionTime = 0;
 const DETECTION_INTERVAL_MS = 100;
 
-let _objectDetector = null;
-let _gestureRecognizer = null;
-let _faceLandmarker = null;
-
 // Hands: MediaPipe's GestureRecognizer defaults to numHands:1 — bump via
 // vision.configure({ hands }). Applied live via setOptions even after the
 // app-boot preload built the recognizer, so it works any time (not first-run-wins).
@@ -333,16 +329,25 @@ let _handsConfig = { numHands: 1 };
 let _faceConfig = { numFaces: 1 };
 
 // Pose: lazy init, configurable before first use.
-let _poseLandmarker = null;
-let _initPosePromise = null;
 let _poseConfig = { model: 'lite', numPoses: 1 };
 
-async function _init() {
-  if (_initPromise) return _initPromise;
-  _initPromise = (async () => {
-    const wasmFileset = await FilesetResolver.forVisionTasks(WASM_CDN);
-    [_objectDetector, _gestureRecognizer, _faceLandmarker] = await Promise.all([
-      ObjectDetector.createFromOptions(wasmFileset, {
+// ── Detector registry (register-beside-your-spec, ADR 008 discipline) ─────────
+// Each MediaPipe task is ONE spec: how to `build` it, how to `run` one frame (write
+// _cache + notify), whether it's `lazy` (built on first use, not at app-boot), and
+// how to push a live config change (`configure`). _init builds every non-lazy spec;
+// _ensure(key) builds a lazy one on demand. The loop, init, and configure all iterate
+// the specs — so adding a detector is one record, not five lockstep edits (the old
+// shape: a module var + a Promise.all arm + a try/catch loop block + a setOptions
+// branch + a _cache key, with pose forked into its own _initPose because eager
+// Promise.all couldn't express "load on demand").
+const _detectors = {}; // key → live MediaPipe task (persists across runs; models cache)
+const _detectorPromises = {}; // key → in-flight build promise (per-key idempotency guard)
+
+const DETECTOR_SPECS = [
+  {
+    key: 'object',
+    build: (fs) =>
+      ObjectDetector.createFromOptions(fs, {
         baseOptions: {
           modelAssetPath: `${MODEL_BASE}/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite`,
           delegate: 'GPU',
@@ -350,74 +355,8 @@ async function _init() {
         runningMode: 'VIDEO',
         scoreThreshold: 0.5,
       }),
-      GestureRecognizer.createFromOptions(wasmFileset, {
-        baseOptions: {
-          modelAssetPath: `${MODEL_BASE}/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task`,
-          delegate: 'GPU',
-        },
-        runningMode: 'VIDEO',
-        numHands: _handsConfig.numHands ?? 1,
-      }),
-      FaceLandmarker.createFromOptions(wasmFileset, {
-        baseOptions: {
-          modelAssetPath: `${MODEL_BASE}/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
-          delegate: 'GPU',
-        },
-        runningMode: 'VIDEO',
-        numFaces: _faceConfig.numFaces ?? 1,
-        outputFaceBlendshapes: true,
-        // Head pose matrix (ADR 034) — stabilizes gaze features against head movement.
-        outputFacialTransformationMatrixes: true,
-      }),
-    ]);
-    _ready = true;
-  })();
-  return _initPromise;
-}
-
-async function _initPose() {
-  if (_initPosePromise) return _initPosePromise;
-  _initPosePromise = (async () => {
-    const wasmFileset = await FilesetResolver.forVisionTasks(WASM_CDN);
-    const modelName =
-      _poseConfig.model === 'heavy'
-        ? 'pose_landmarker_heavy'
-        : _poseConfig.model === 'full'
-          ? 'pose_landmarker_full'
-          : 'pose_landmarker_lite';
-    _poseLandmarker = await PoseLandmarker.createFromOptions(wasmFileset, {
-      baseOptions: {
-        modelAssetPath: `${MODEL_BASE}/pose_landmarker/${modelName}/float16/1/${modelName}.task`,
-        delegate: 'GPU',
-      },
-      runningMode: 'VIDEO',
-      numPoses: _poseConfig.numPoses ?? 1,
-    });
-  })();
-  return _initPosePromise;
-}
-
-function _loop() {
-  if (!_running) return;
-  _rafId = requestAnimationFrame(_loop);
-
-  const video = _videoSource ?? window.__ar_video;
-  if (!video) return;
-  if (video instanceof HTMLVideoElement && video.readyState < video.HAVE_CURRENT_DATA) return;
-
-  const now = performance.now();
-  if (now - _lastDetectionTime < DETECTION_INTERVAL_MS) return;
-  _lastDetectionTime = now;
-
-  const vw = video instanceof HTMLVideoElement ? video.videoWidth || 600 : video.width || 600;
-  const vh = video instanceof HTMLVideoElement ? video.videoHeight || 600 : video.height || 600;
-  const canvasEl = document.getElementById('turtle');
-  const cw = canvasEl?.width ?? 600;
-  const ch = canvasEl?.height ?? 600;
-
-  try {
-    if (_objectDetector) {
-      const r = _objectDetector.detectForVideo(video, now);
+    run: (task, { video, now, vw, vh, cw, ch }) => {
+      const r = task.detectForVideo(video, now);
       _cache.objects = (r.detections ?? []).map((d) => {
         const bb = d.boundingBox;
         const px = bb.originX + bb.width / 2;
@@ -437,12 +376,22 @@ function _loop() {
       for (const obj of _cache.objects) {
         notify('gesture:object', { label: obj.label, confidence: obj.confidence, bbox: obj.bbox });
       }
-    }
-  } catch (_) {}
-
-  try {
-    if (_gestureRecognizer) {
-      const r = _gestureRecognizer.recognizeForVideo(video, now);
+    },
+  },
+  {
+    key: 'gesture',
+    build: (fs) =>
+      GestureRecognizer.createFromOptions(fs, {
+        baseOptions: {
+          modelAssetPath: `${MODEL_BASE}/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task`,
+          delegate: 'GPU',
+        },
+        runningMode: 'VIDEO',
+        numHands: _handsConfig.numHands ?? 1,
+      }),
+    configure: (task) => task.setOptions({ numHands: _handsConfig.numHands ?? 1 }),
+    run: (task, { video, now, vw, vh, cw, ch }) => {
+      const r = task.recognizeForVideo(video, now);
       _cache.hands = (r.gestures ?? []).map((g, i) => {
         const lm = r.landmarks?.[i] ?? [];
         let cx = 0,
@@ -460,12 +409,25 @@ function _loop() {
           landmarks: lm,
         };
       });
-    }
-  } catch (_) {}
-
-  try {
-    if (_faceLandmarker) {
-      const r = _faceLandmarker.detectForVideo(video, now);
+    },
+  },
+  {
+    key: 'face',
+    build: (fs) =>
+      FaceLandmarker.createFromOptions(fs, {
+        baseOptions: {
+          modelAssetPath: `${MODEL_BASE}/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
+          delegate: 'GPU',
+        },
+        runningMode: 'VIDEO',
+        numFaces: _faceConfig.numFaces ?? 1,
+        outputFaceBlendshapes: true,
+        // Head pose matrix (ADR 034) — stabilizes gaze features against head movement.
+        outputFacialTransformationMatrixes: true,
+      }),
+    configure: (task) => task.setOptions({ numFaces: _faceConfig.numFaces ?? 1 }),
+    run: (task, { video, now, vw, vh, cw, ch }) => {
+      const r = task.detectForVideo(video, now);
       if (r.faceLandmarks?.length) {
         // One entry per detected face. Blendshapes/matrices align by index.
         // Gaze + expression events fire for the primary face (index 0) only —
@@ -489,20 +451,93 @@ function _loop() {
         _cache.face = null;
         _cache.gaze = null;
       }
-    }
-  } catch (_) {}
-
-  try {
-    if (_poseLandmarker) {
-      const r = _poseLandmarker.detectForVideo(video, now);
+    },
+  },
+  {
+    key: 'pose',
+    lazy: true,
+    build: (fs) => {
+      const modelName =
+        _poseConfig.model === 'heavy'
+          ? 'pose_landmarker_heavy'
+          : _poseConfig.model === 'full'
+            ? 'pose_landmarker_full'
+            : 'pose_landmarker_lite';
+      return PoseLandmarker.createFromOptions(fs, {
+        baseOptions: {
+          modelAssetPath: `${MODEL_BASE}/pose_landmarker/${modelName}/float16/1/${modelName}.task`,
+          delegate: 'GPU',
+        },
+        runningMode: 'VIDEO',
+        numPoses: _poseConfig.numPoses ?? 1,
+      });
+    },
+    run: (task, { video, now }) => {
+      const r = task.detectForVideo(video, now);
       if (r.landmarks?.length) {
         _cache.pose = { landmarks: r.landmarks[0] };
         notify('gesture:pose', { landmarks: r.landmarks[0] });
       } else {
         _cache.pose = null;
       }
-    }
-  } catch (_) {}
+    },
+  },
+];
+
+const _specByKey = Object.fromEntries(DETECTOR_SPECS.map((s) => [s.key, s]));
+
+// Build one spec's task, idempotent per key (caches the in-flight promise so a lazy
+// detector builds once). `fsShared` lets _init resolve one WASM fileset for all
+// non-lazy specs; a lazy _ensure resolves its own.
+function _build(s, fsShared) {
+  if (_detectors[s.key]) return Promise.resolve(_detectors[s.key]);
+  if (_detectorPromises[s.key]) return _detectorPromises[s.key];
+  const p = (async () => {
+    const fs = fsShared ?? (await FilesetResolver.forVisionTasks(WASM_CDN));
+    const task = await s.build(fs);
+    _detectors[s.key] = task;
+    return task;
+  })();
+  _detectorPromises[s.key] = p;
+  return p;
+}
+
+async function _init() {
+  if (_initPromise) return _initPromise;
+  _initPromise = (async () => {
+    const wasmFileset = await FilesetResolver.forVisionTasks(WASM_CDN);
+    await Promise.all(DETECTOR_SPECS.filter((s) => !s.lazy).map((s) => _build(s, wasmFileset)));
+    _ready = true;
+  })();
+  return _initPromise;
+}
+
+function _loop() {
+  if (!_running) return;
+  _rafId = requestAnimationFrame(_loop);
+
+  const video = _videoSource ?? window.__ar_video;
+  if (!video) return;
+  if (video instanceof HTMLVideoElement && video.readyState < video.HAVE_CURRENT_DATA) return;
+
+  const now = performance.now();
+  if (now - _lastDetectionTime < DETECTION_INTERVAL_MS) return;
+  _lastDetectionTime = now;
+
+  const vw = video instanceof HTMLVideoElement ? video.videoWidth || 600 : video.width || 600;
+  const vh = video instanceof HTMLVideoElement ? video.videoHeight || 600 : video.height || 600;
+  const canvasEl = document.getElementById('turtle');
+  const cw = canvasEl?.width ?? 600;
+  const ch = canvasEl?.height ?? 600;
+
+  const ctx = { video, now, vw, vh, cw, ch };
+  for (const s of DETECTOR_SPECS) {
+    const task = _detectors[s.key];
+    if (!task) continue;
+    try {
+      s.run(task, ctx);
+    } catch (_) {}
+  }
 
   // Edge-triggered gesture handlers
   const g = _cache.hands[0]?.gesture;
@@ -652,9 +687,7 @@ function _ensureStarted() {
 
 function _ensurePoseStarted() {
   _ensureStarted();
-  if (!_poseLandmarker && !_initPosePromise) {
-    _initPose();
-  }
+  _build(_specByKey.pose); // idempotent: builds the lazy pose task once
 }
 
 export function preloadVision() {
@@ -836,24 +869,19 @@ function _removeGazeChip() {
 
 export const vision = {
   configure(opts = {}) {
-    if (opts.pose && !_initPosePromise) {
+    if (opts.pose && !_detectors.pose && !_detectorPromises.pose) {
       Object.assign(_poseConfig, opts.pose);
     }
+    // hands/face are built at app-boot preload (numHands/numFaces:1), so the pre-init
+    // guard never wins from user code. MediaPipe tasks accept live setOptions — push
+    // the new count onto the already-built task via its spec's configure().
     if (opts.hands) {
       Object.assign(_handsConfig, opts.hands);
-      // The GestureRecognizer is built at app-boot preload (numHands:1), so the
-      // pre-init guard never wins from user code. MediaPipe tasks accept live
-      // setOptions — push numHands onto the already-built recognizer too.
-      if (_gestureRecognizer) {
-        _gestureRecognizer.setOptions({ numHands: _handsConfig.numHands ?? 1 });
-      }
+      if (_detectors.gesture) _specByKey.gesture.configure(_detectors.gesture);
     }
     if (opts.face) {
       Object.assign(_faceConfig, opts.face);
-      // FaceLandmarker is built at app-boot preload (numFaces:1) — push live.
-      if (_faceLandmarker) {
-        _faceLandmarker.setOptions({ numFaces: _faceConfig.numFaces ?? 1 });
-      }
+      if (_detectors.face) _specByKey.face.configure(_detectors.face);
     }
     return this;
   },

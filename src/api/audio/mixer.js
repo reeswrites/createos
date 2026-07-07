@@ -17,6 +17,7 @@
 // per ADR 032: solo is a persisted per-strip flag, non-soloed sources duck.
 
 import * as Tone from 'tone';
+import { ensureAudioUnlocked } from './audio-unlock.js';
 import { registerWidgetRestorer } from '../wm/widget-restorer-registry.js';
 import { MIXER } from '../../runtime/storage-keys.js';
 import { activeEditorId } from '../../runtime/run-context.js';
@@ -29,6 +30,12 @@ const _STORE_KEY = MIXER;
 const _strips = new Map(); // name → Strip (live, has Tone nodes)
 const _settings = new Map(); // name → { volume, pan, mute, solo, eq } (persisted, survives teardown)
 const _changeListeners = new Set();
+// Per-editor submaster bus: every run-scoped instrument strip owned by editor N
+// sums into _editorBus(N) → masterIn, so a sketch window's titlebar mute/volume
+// can scope to just that sketch's audio instead of the global master (ADR 040
+// used to route sketch-window mute to master). Ephemeral — created on first run
+// strip, disposed with the editor's run; never persisted (no generic-name leak).
+const _editorBuses = new Map(); // editorId (number) → Tone.Gain
 
 let _masterIn = null,
   _masterVol = null,
@@ -103,6 +110,62 @@ function _ensureMaster() {
   if (s.eq) _ensureMasterEQ()._apply(s.eq);
 }
 
+// Persisted per-editor sketch-audio state lives in _settings under a reserved
+// name so it saves + travels with the project like strip settings, but never
+// collides with a strip name. Keyed by editorId → { mute, volume(db) }.
+const _EDITOR_KEY = (editorId) => `@editor:${editorId}`;
+function _editorGain(s) {
+  return s.mute || s.volume <= -60 ? 0 : Math.pow(10, s.volume / 20);
+}
+
+// Get-or-create the submaster Gain for an editor's run strips (→ masterIn).
+function _editorBus(editorId) {
+  let bus = _editorBuses.get(editorId);
+  if (!bus) {
+    _ensureMaster();
+    bus = new Tone.Gain(1);
+    bus.connect(_masterIn);
+    _editorBuses.set(editorId, bus);
+    // Apply any persisted mute/volume so a muted sketch comes back muted on refresh.
+    try {
+      bus.gain.value = _editorGain(_settingsFor(_EDITOR_KEY(editorId)));
+    } catch (_) {}
+    // Also let a sketch window's titlebar re-apply on re-run (keeps button ↔ audio synced).
+    notify('mixer:editorbus', { editorId });
+  }
+  return bus;
+}
+
+// Scope a sketch window's mute/volume to its own editor's audio (its submaster
+// bus) and PERSIST it, so the state survives refresh. db is the same curve
+// addAudioControls uses (0 = unity, ≤-60 = off). Always returns true for a valid
+// editor id (state persists even before the bus exists) so a sketch window never
+// falls back to muting the global master.
+export function editorAudio(editorId, { db = 0, muted = false } = {}) {
+  const s = _settingsFor(_EDITOR_KEY(editorId));
+  s.mute = !!muted;
+  s.volume = db;
+  _saveSettings();
+  _emitChange();
+  const bus = _editorBuses.get(editorId);
+  if (bus) {
+    const g = _editorGain(s);
+    try {
+      bus.gain.rampTo(g, 0.02);
+    } catch (_) {
+      bus.gain.value = g;
+    }
+  }
+  return true;
+}
+
+// Read persisted sketch-audio state so a titlebar can show the right button/slider
+// on spawn. Returns { muted, db }.
+export function editorAudioState(editorId) {
+  const s = _settingsFor(_EDITOR_KEY(editorId));
+  return { muted: !!s.mute, db: s.volume ?? 0 };
+}
+
 // Master EQ as a small object mirroring Strip EQ (lazy).
 function _ensureMasterEQ() {
   if (_masterEQ) return _masterEQ;
@@ -171,7 +234,10 @@ class Strip {
     this._eq = null; // lazy EQChain
 
     this._in.connect(this._channel);
-    this._channel.connect(_masterIn);
+    // Run strips owned by an editor sum through that editor's submaster bus so a
+    // sketch window can mute just its own audio; everything else → masterIn direct.
+    const scoped = lifecycle === 'run' && typeof owner === 'number';
+    this._channel.connect(scoped ? _editorBus(owner) : _masterIn);
     this._channel.connect(this._meter);
 
     this._applySettings();
@@ -321,6 +387,7 @@ function _autoName(label) {
 // Get-or-create a strip. Called by audio.js (instruments), wm.js (windows),
 // drumpad, mic, and mixer.add (raw nodes).
 export function acquireStrip(name, opts = {}) {
+  ensureAudioUnlocked(); // ADR 058: every sound-maker funnels here → unlock audio
   _ensureSettingsLoaded();
   const auto = !name;
   if (!name) name = _autoName(opts.nameHint || opts.type || 'node');
@@ -380,6 +447,14 @@ export function cleanupMixer(editorId) {
     strip.dispose();
     _strips.delete(name);
     notify('mixer:strip:remove', { name });
+  }
+  // Dispose the submaster bus for this editor (null id → all) once its strips are gone.
+  for (const [eid, bus] of [..._editorBuses]) {
+    if (editorId != null && eid !== editorId) continue;
+    try {
+      bus.dispose();
+    } catch (_) {}
+    _editorBuses.delete(eid);
   }
   _nameCounters = {};
   _recomputeDucking();
@@ -545,6 +620,14 @@ class Mixer {
   }
   names() {
     return liveStripNames();
+  }
+  // Scope mute/volume to one editor's sketch audio (its submaster bus). Used by a
+  // sketch window's titlebar control so muting the window doesn't mute the master.
+  editorAudio(editorId, opts) {
+    return editorAudio(editorId, opts);
+  }
+  editorAudioState(editorId) {
+    return editorAudioState(editorId);
   }
 }
 

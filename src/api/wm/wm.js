@@ -1550,6 +1550,10 @@ export function initWM(onContentResize) {
       const win = document.createElement('div');
       win.className = 'wm-win';
       win.id = id;
+      // Owner editor (set when spawned during a run) — lets a sketch window's audio
+      // control scope mute/volume to that editor's submaster bus, not the master.
+      const _ownerEd = activeEditorId();
+      if (_ownerEd != null) win.dataset.ownerEditor = String(_ownerEd);
       win.style.cssText = `left:${x}px;top:${y}px;width:${w}px;height:${h}px;display:flex;`;
       win.innerHTML = `
         <div class="wm-titlebar">

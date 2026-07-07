@@ -1,10 +1,15 @@
 // sensor-window.js — RAF gauge/bar renderer for a sensor window (motion / gamepad /
-// geo / battery). Extracted from wm.js (ADR: extract embedded renderers). Leaf: reads
-// only globals (window.sensors, window.__ar_battery_last, navigator.getBattery) and
-// draws into a canvas it owns. wm injects an onDispose callback so teardown joins the
-// window's dispose accumulator without this module importing wm.
+// geo / battery). Extracted from wm.js (ADR: extract embedded renderers). Leaf: draws
+// into a canvas it owns. motion/gamepad/geo readings come from the event bus
+// (`sensor:*`, device-sources.js — ADR 014, replacing the deleted `window.sensors`);
+// battery still reads navigator.getBattery. A persistent `subscribe` both caches the
+// latest reading for the RAF loop AND drives the lazy device source on/off (0→1 starts
+// the OS watch). wm injects an onDispose callback so teardown joins the window's dispose
+// accumulator without this module importing wm.
 //
 //   buildSensorWindow(win, body, opts, { onDispose })
+
+import { subscribe } from '../../events/index.js';
 
 export function buildSensorWindow(win, body, opts = {}, { onDispose } = {}) {
   const source = opts.source || 'motion'; // 'motion' | 'gamepad' | 'geo' | 'battery'
@@ -21,6 +26,25 @@ export function buildSensorWindow(win, body, opts = {}, { onDispose } = {}) {
 
   const dpr = () => devicePixelRatio;
   let rafId;
+
+  // Latest bus readings, cached for the RAF draw loop. A persistent subscribe drives
+  // the lazy device source (0→1 starts the OS watch) and survives editor resets.
+  let _motion = null;
+  let _gamepad = null;
+  let _geo = null;
+  if (source === 'motion') {
+    onDispose?.(subscribe('sensor:motion', (m) => (_motion = m), { persistent: true }));
+  } else if (source === 'gamepad') {
+    onDispose?.(
+      subscribe('sensor:gamepad', (p) => (p.index === 0 || !_gamepad) && (_gamepad = p), {
+        persistent: true,
+      }),
+    );
+  } else if (source === 'geo') {
+    onDispose?.(
+      subscribe('sensor:geo', (g) => (_geo = { ...g, ready: true }), { persistent: true }),
+    );
+  }
 
   function _gauge(ctx, cx, cy, r, value, min, max, label, color) {
     const pct = Math.max(0, Math.min(1, (value - min) / (max - min)));
@@ -71,10 +95,8 @@ export function buildSensorWindow(win, body, opts = {}, { onDispose } = {}) {
     ctx.fillStyle = '#0d0d1a';
     ctx.fillRect(0, 0, W, H);
 
-    const sensors = window.sensors;
-
     if (source === 'motion') {
-      const m = sensors?.motion?.() ?? {
+      const m = _motion ?? {
         ax: 0,
         ay: 0,
         az: 0,
@@ -112,9 +134,9 @@ export function buildSensorWindow(win, body, opts = {}, { onDispose } = {}) {
         );
       });
     } else if (source === 'gamepad') {
-      const pad = sensors?.gamepad?.(0) ?? {};
-      const axes = [0, 1, 2, 3].map((i) => pad.axis?.(i) ?? 0);
-      const btns = [0, 1, 2, 3].map((i) => pad.pressed?.(i) ?? false);
+      const pad = _gamepad ?? {};
+      const axes = [0, 1, 2, 3].map((i) => pad.axes?.[i] ?? 0);
+      const btns = [0, 1, 2, 3].map((i) => pad.pressed?.[i] ?? false);
       const n = axes.length;
       const r = Math.min(W / (n * 2.4), H * 0.34);
       const cols = ['#89b4fa', '#a6e3a1', '#f38ba8', '#fab387'];
@@ -134,7 +156,7 @@ export function buildSensorWindow(win, body, opts = {}, { onDispose } = {}) {
         ctx.fillText(`btn${i}`, bx, H * 0.82);
       });
     } else if (source === 'geo') {
-      const geo = sensors?.geo?.() ?? {};
+      const geo = _geo ?? {};
       const lines = [
         `lat:  ${geo.lat?.toFixed(5) ?? '—'}`,
         `lon:  ${geo.lon?.toFixed(5) ?? '—'}`,

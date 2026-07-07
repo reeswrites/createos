@@ -13,8 +13,11 @@ describe('buildRunScript', () => {
       preamble: 'const x = 1;',
       traceEnabled: false,
     });
-    expect(code).toContain('(async function(){\nconst x = 1;\nawait window.__ar_audioReady;');
+    expect(code).toContain('(async function(){\nconst x = 1;\n');
     expect(code).toContain('foo()');
+    // user code is NOT gated on audio-ready — that await would deadlock a
+    // gesture-less auto-exec (audio unlocks lazily at acquireStrip; ADR 058)
+    expect(code).not.toContain('await window.__ar_audioReady');
     // error + liveness tails are keyed to the editor id
     expect(code).toContain('__ar_e3_console.error');
     expect(code).toContain('__ar_instances?.get(3)?._checkLiveOrStop()');

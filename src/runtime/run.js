@@ -39,8 +39,14 @@ export function buildRunScript({ raw, id, preamble, traceEnabled }) {
   }
 
   const ns = `__ar_e${id}`;
+  // NOTE: user code is NOT gated on window.__ar_audioReady. Audio unlocks lazily
+  // at acquireStrip (ADR 058) + a gesture-armed listener, so awaiting audio here
+  // would deadlock a gesture-less run (auto-exec on refresh/resume): the context
+  // never resumes without a gesture, so the await would block ALL user code —
+  // including the visual output window — until the user happened to click. Sound
+  // still comes online on the first gesture; the window shows immediately.
   const code =
-    `(async function(){\n${preamble}\nawait window.__ar_audioReady;\n${protectedCode}\n})()` +
+    `(async function(){\n${preamble}\n${protectedCode}\n})()` +
     `.catch(e => { const msg = window.__ar_friendlyError(e); window.${ns}_console.error('Error: ' + msg); window.__ar_instances?.get(${id})?._onError(e); })` +
     `.then(() => { window.__ar_instances?.get(${id})?._checkLiveOrStop(); });`;
   return { code };

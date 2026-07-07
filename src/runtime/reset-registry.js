@@ -1,7 +1,7 @@
 // reset-registry.js — the single registry of teardown handlers run on every
 // execution reset. Each API module registers its own cleanup beside its own
 // code via onReset(); editor-instance.js calls runResetHandlers() in reset()
-// and _softReset() instead of hand-maintaining (and duplicating) a 27-entry
+// (soft and hard) instead of hand-maintaining (and duplicating) a 27-entry
 // call list. New subsystem → onReset(cleanupX) in its module, nothing else.
 // See ADR 008.
 

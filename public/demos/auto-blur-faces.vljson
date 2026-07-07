@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "toolbar": {
+    "micOn": false,
+    "cameraOn": false
+  },
+  "windows": [
+    {
+      "type": "editor",
+      "editorId": 1,
+      "title": "Auto-Blur Faces",
+      "x": 20,
+      "y": 20,
+      "w": 620,
+      "h": 460,
+      "visible": true,
+      "nochrome": false,
+      "transparent": false,
+      "audio": {
+        "muted": false,
+        "volume": 1
+      },
+      "mode": "text",
+      "blocksJson": null,
+      "executionState": "running",
+      "code": "// Auto-blur faces \u2014 MediaPipe face tracking + dynamic masking.\n// Paste into an editor and Run. Grants camera on first use.\n//\n// Two composited pipeline layers in one Canvas window:\n//   z=0  sharp camera feed\n//   z=1  the SAME camera, blurred, masked to the face oval \u2192 transparent\n//        everywhere else, so the sharp base shows through outside the face.\n// vision.faceMask() self-repaints a feathered white oval over the live FaceMesh\n// bbox each frame (mirror + smoothing handled); `.mask()` re-uploads it every\n// frame (dynamic mask, ADR 054). Single face (vision.face()).\n\nconst BLUR = 26; // blur strength (px)\n\nvision.configure({ face: { numFaces: 5 } }); // track up to 5 faces (default 1)\n\nconst c = new Canvas({ title: 'Auto-Blur Faces', w: 960, h: 540 });\n\npipe(Source.camera).layer(c, 0); // sharp base\npipe(Source.camera)\n  .blur(BLUR)\n  .mask(vision.faceMask({ pad: 0.35, feather: 0.25, smoothing: 0.3 }))\n  .layer(c, 1); // blurred \u2229 face\n"
+    }
+  ],
+  "desktop": []
+}

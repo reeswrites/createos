@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "toolbar": {
+    "micOn": false,
+    "cameraOn": false
+  },
+  "windows": [
+    {
+      "type": "editor",
+      "editorId": 1,
+      "title": "Finger-Frame ASCII",
+      "x": 20,
+      "y": 20,
+      "w": 640,
+      "h": 500,
+      "visible": true,
+      "nochrome": false,
+      "transparent": false,
+      "audio": {
+        "muted": false,
+        "volume": 1
+      },
+      "mode": "text",
+      "blocksJson": null,
+      "executionState": "running",
+      "code": "// Finger-Frame ASCII \u2014 make a rectangle with your hands, it turns to ASCII.\n// Paste into an editor and Run. Grants camera on first use. Needs TWO hands.\n//\n// Bring one fingertip on each hand (index tip) to opposite corners \u2014 the classic\n// \"director's frame\" gesture. The bbox between them becomes a viewfinder:\n//   z=0  sharp camera feed\n//   z=1  the camera rendered as ASCII, masked to the finger rectangle \u2192 only the\n//        framed area is ASCII; everything outside stays sharp.\n//   z=2  hand skeleton overlay (vision.drawHands)\n// vision.handRectMask() self-repaints the white rect from the live hand landmarks\n// each frame (mirror handled); `.mask()` re-uploads it every frame (ADR 054).\n\nconst W = 960,\n  H = 540;\n\nvision.configure({ hands: { numHands: 2 } }); // both hands (default 1)\n\nconst c = new Canvas({ title: 'Finger-Frame ASCII', w: W, h: H });\n\npipe(Source.camera).layer(c, 0); // sharp base\npipe(Source.camera)\n  .ascii({ cols: 90, color: '#00ff41', bg: '#0d0208', fit: true }) // fit: match camera aspect\n  .mask(vision.handRectMask({ pad: 0.04 }))\n  .layer(c, 1); // ASCII inside the finger frame\n\n// neon bloom on the ASCII plane (CSS glow around the glyphs)\nc.fx(1).filter('drop-shadow(0 0 2px #00ff41) drop-shadow(0 0 6px #00ff41) brightness(1.15)');\n\n// hand skeleton on top (raw 2D plane at z=2, sized to the logical canvas)\nconst octx = wm.layer(c.winId, 2, { raster: true, w: W, h: H }).getContext('2d');\ntick(() => {\n  octx.clearRect(0, 0, W, H);\n  vision.drawHands(octx, { color: '#00ff41', lineWidth: 2, pointSize: 4 });\n});\n"
+    }
+  ],
+  "desktop": []
+}

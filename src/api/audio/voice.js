@@ -136,7 +136,7 @@ export function normalizeVoice(descOrName) {
 // ── Synth node builder ──────────────────────────────────────────────────────────
 // Builds the inner Tone node (not connected anywhere). Returns { node, fx, noteless }.
 
-function buildSynthNode(desc) {
+export function buildSynthNode(desc) {
   const spec = ENGINES[desc.engine] ?? ENGINES.fm;
   const Ctor = spec.ctor();
   let node;

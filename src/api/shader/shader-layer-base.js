@@ -15,6 +15,7 @@ import { resolveDrawable } from '../visual/drawable-source.js';
 import { isBandsSignal } from '../signal/signal-shape.js';
 import { liveOutput } from '../../runtime/keep-alive.js';
 import { notify } from '../../events/index.js';
+import { isPaused } from '../../runtime/run-context.js';
 
 export class ShaderLayerBase {
   // ── Shared constructor state ─────────────────────────────────────────────
@@ -246,5 +247,63 @@ export class ShaderLayerBase {
   _releaseLive() {
     this._live?.release();
     this._live = null;
+  }
+
+  // ── Render-loop lifecycle (shared by Shader/GLShader — ADR 030 finish) ──────
+  // start() is a template method: guard-standalone → register live → init GPU
+  // (subclass `_initGpu`, may be async for WebGPU or sync for WebGL) → RAF loop.
+  // Subclasses supply only the GPU-specific `_initGpu()`, `_frame(ts)`, and the
+  // GPU-teardown tail of `_destroy()`. stop() + the loop are identical, so they
+  // live here (they were byte-for-byte duplicated between the two classes).
+  //
+  //   _initGpu()  — init GPU state if not already inited; return a promise (WebGPU)
+  //                 or undefined (WebGL). May throw synchronously (WebGL).
+  //   _engineLabel — 'Shader' | 'GLShader', used in the error log only.
+  start() {
+    // Detached (no .mount()/.show()) — spawn our own window so .start() works
+    // standalone, as the docs show. (The old editor-output fallback is gone — ADR 040.)
+    if (!this._container && !this._ownWinId) return this.show();
+    this._registerLive();
+    const onErr = (e) => {
+      console.error(`${this._engineLabel ?? 'Shader'} error:`, e.message);
+      this._releaseLive();
+    };
+    try {
+      const r = this._initGpu();
+      if (r && typeof r.then === 'function') r.then(() => this._startRenderLoop()).catch(onErr);
+      else this._startRenderLoop();
+    } catch (e) {
+      onErr(e);
+    }
+    return this;
+  }
+
+  _startRenderLoop() {
+    if (this._rafId) return;
+    const loop = (ts) => {
+      if (!isPaused()) this._frame(ts);
+      this._rafId = requestAnimationFrame(loop);
+    };
+    this._rafId = requestAnimationFrame(loop);
+    notify('shader:start', { id: this._id });
+  }
+
+  stop() {
+    if (this._rafId) {
+      cancelAnimationFrame(this._rafId);
+      this._rafId = null;
+      notify('shader:stop', { id: this._id });
+    }
+    return this;
+  }
+
+  // Shared prefix of _destroy(): stop the loop, drop liveness, close our window,
+  // disconnect the resize observer. Subclass _destroy() calls this, then frees GPU.
+  _teardownBase() {
+    this.stop();
+    this._releaseLive();
+    this._closeOwnWin();
+    this._resizeObserver?.disconnect();
+    this._resizeObserver = null;
   }
 }

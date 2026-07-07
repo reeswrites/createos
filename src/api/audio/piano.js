@@ -13,7 +13,7 @@
 import * as Tone from 'tone';
 import { registerWidgetRestorer } from '../wm/widget-restorer-registry.js';
 import { connectSurfaceStrip } from './mixer.js';
-import { Voice } from './voice.js';
+import { Voice, normalizeVoice, buildSynthNode } from './voice.js';
 import { insertSnippet } from '../../editor/active-editor.js';
 import { mountWidgetShell, wireCaptureButton } from '../widgets/widget-shell.js';
 import { onReset } from '../../runtime/reset-registry.js';
@@ -139,59 +139,19 @@ const BUILTIN_PRESETS = {
   },
 };
 
-// ── Effect + synth builders ───────────────────────────────────────────────────
-
-function _buildEffect(cfg) {
-  switch (cfg.type) {
-    case 'reverb':
-      return new Tone.Reverb({ decay: cfg.decay ?? 1.5, wet: cfg.wet ?? 0.3 });
-    case 'chorus': {
-      const fx = new Tone.Chorus({
-        frequency: cfg.frequency ?? 1.5,
-        delayTime: cfg.delayTime ?? 3.5,
-        depth: cfg.depth ?? 0.7,
-        wet: cfg.wet ?? 0.5,
-      });
-      fx.start(); // Chorus LFO must be started explicitly
-      return fx;
-    }
-    case 'delay':
-      return new Tone.FeedbackDelay({
-        delayTime: cfg.delayTime ?? '8n',
-        feedback: cfg.feedback ?? 0.3,
-        wet: cfg.wet ?? 0.3,
-      });
-    case 'distortion':
-      return new Tone.Distortion({ distortion: cfg.distortion ?? 0.4, wet: cfg.wet ?? 0.5 });
-    case 'compressor':
-      return new Tone.Compressor({ threshold: cfg.threshold ?? -24, ratio: cfg.ratio ?? 4 });
-    default:
-      return null;
-  }
-}
-
+// ── Synth builder ─────────────────────────────────────────────────────────────
+// Piano's preset shape `{ synth: { type, opts }, effects: [] }` is exactly the
+// "legacy piano" descriptor `normalizeVoice` understands, so the preset synth is
+// built through the SAME Voice chassis builders as every other surface (ADR 046) —
+// one effect/synth factory, no drift (Piano previously forked its own `_buildEffect`
+// that had already fallen behind Voice's — e.g. the `filter` effect). Returns the
+// `{ inner, effects }` pair the FX panel + step sequencer consume, unchanged.
 function _buildSynth(desc, out) {
-  const { synth: sc = {}, effects: ec = [] } = desc;
-  let inner;
-  switch (sc.type ?? 'FM') {
-    case 'FM':
-      inner = new Tone.PolySynth(Tone.FMSynth, sc.opts ?? {});
-      break;
-    case 'AM':
-      inner = new Tone.PolySynth(Tone.AMSynth, sc.opts ?? {});
-      break;
-    case 'basic':
-      inner = new Tone.PolySynth(Tone.Synth, sc.opts ?? {});
-      break;
-    default:
-      inner = new Tone.PolySynth(Tone.FMSynth, sc.opts ?? {});
-      break;
-  }
-  const effects = ec.map(_buildEffect).filter(Boolean);
+  const { node, fx } = buildSynthNode(normalizeVoice(desc));
   const target = out ?? Tone.getDestination();
-  if (effects.length) inner.chain(...effects, target);
-  else inner.connect(target);
-  return { inner, effects };
+  if (fx.length) node.chain(...fx, target);
+  else node.connect(target);
+  return { inner: node, effects: fx };
 }
 
 // ── Duration labels ───────────────────────────────────────────────────────────

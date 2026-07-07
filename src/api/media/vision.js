@@ -296,7 +296,7 @@ subscribe(
   { persistent: true },
 );
 
-const _cache = { objects: [], hands: [], face: null, pose: null, gaze: null };
+const _cache = { objects: [], hands: [], faces: [], face: null, pose: null, gaze: null };
 
 // Self-driving handMask RAF cancels (ADR 054) — cleared by stopVision on reset.
 // These are INPUTS to a masked shader, so they never join keep-alive.
@@ -327,6 +327,10 @@ let _faceLandmarker = null;
 // vision.configure({ hands }). Applied live via setOptions even after the
 // app-boot preload built the recognizer, so it works any time (not first-run-wins).
 let _handsConfig = { numHands: 1 };
+
+// Face: FaceLandmarker defaults to numFaces:1 — bump via vision.configure({ face }).
+// Applied live via setOptions on the already-built landmarker (like hands).
+let _faceConfig = { numFaces: 1 };
 
 // Pose: lazy init, configurable before first use.
 let _poseLandmarker = null;
@@ -360,6 +364,7 @@ async function _init() {
           delegate: 'GPU',
         },
         runningMode: 'VIDEO',
+        numFaces: _faceConfig.numFaces ?? 1,
         outputFaceBlendshapes: true,
         // Head pose matrix (ADR 034) — stabilizes gaze features against head movement.
         outputFacialTransformationMatrixes: true,
@@ -462,23 +467,25 @@ function _loop() {
     if (_faceLandmarker) {
       const r = _faceLandmarker.detectForVideo(video, now);
       if (r.faceLandmarks?.length) {
-        const lm = r.faceLandmarks[0];
-        const avgX = lm.reduce((s, p) => s + p.x, 0) / lm.length;
-        const avgY = lm.reduce((s, p) => s + p.y, 0) / lm.length;
-        const { cx, cy } = toTurtle(avgX * vw, avgY * vh, vw, vh, cw, ch);
-        const gaze = deriveGaze(r.faceBlendshapes, r.facialTransformationMatrixes?.[0], lm);
-        _cache.face = {
-          expression: classifyExpression(r.faceBlendshapes),
-          cx,
-          cy,
-          landmarks: lm,
-          gaze,
-        };
-        _cache.gaze = gaze;
+        // One entry per detected face. Blendshapes/matrices align by index.
+        // Gaze + expression events fire for the primary face (index 0) only —
+        // gaze calibration is single-user by nature (ADR 034).
+        _cache.faces = r.faceLandmarks.map((lm, i) => {
+          const avgX = lm.reduce((s, p) => s + p.x, 0) / lm.length;
+          const avgY = lm.reduce((s, p) => s + p.y, 0) / lm.length;
+          const { cx, cy } = toTurtle(avgX * vw, avgY * vh, vw, vh, cw, ch);
+          const bs = r.faceBlendshapes ? [r.faceBlendshapes[i]] : null;
+          const gaze = i === 0 ? deriveGaze(bs, r.facialTransformationMatrixes?.[i], lm) : null;
+          return { expression: classifyExpression(bs), cx, cy, landmarks: lm, gaze };
+        });
+        _cache.face = _cache.faces[0];
+        _cache.gaze = _cache.face.gaze;
         _resolveCalibLazy();
-        notify('gesture:face', { expression: _cache.face.expression, cx, cy, landmarks: lm });
-        if (gaze) _notifyGaze(gaze);
+        const { expression, cx, cy, landmarks } = _cache.face;
+        notify('gesture:face', { expression, cx, cy, landmarks });
+        if (_cache.gaze) _notifyGaze(_cache.gaze);
       } else {
+        _cache.faces = [];
         _cache.face = null;
         _cache.gaze = null;
       }
@@ -664,6 +671,7 @@ export function stopVision() {
   }
   _cache.objects = [];
   _cache.hands = [];
+  _cache.faces = [];
   _cache.face = null;
   _cache.pose = null;
   _cache.gaze = null;
@@ -840,6 +848,13 @@ export const vision = {
         _gestureRecognizer.setOptions({ numHands: _handsConfig.numHands ?? 1 });
       }
     }
+    if (opts.face) {
+      Object.assign(_faceConfig, opts.face);
+      // FaceLandmarker is built at app-boot preload (numFaces:1) — push live.
+      if (_faceLandmarker) {
+        _faceLandmarker.setOptions({ numFaces: _faceConfig.numFaces ?? 1 });
+      }
+    }
     return this;
   },
 
@@ -953,9 +968,173 @@ export const vision = {
     return canvas;
   },
 
+  // A ready-to-use mask over the tracked face(s) — a white (default feathered)
+  // oval over each FaceMesh bbox, black elsewhere. Drop into `.mask()` to blur /
+  // shade / reveal only faces: `pipe(cam).blur(24).mask(vision.faceMask())`.
+  //   pad      : grow the oval past the raw landmark bbox (0 = tight, 0.35 def)
+  //   feather  : soft-edge width as fraction of radius (0 = hard disc)
+  //   smoothing: 0 (raw, jittery) … 1 (heavy lag). Exponential per-face lerp.
+  //   mirror   : 'auto' | bool — align with the selfie-mirrored camera view.
+  // Unions every face in vision.faces() (bump via configure({ face:{ numFaces }})).
+  // Self-driving run-scoped RAF (stopped on reset); NOT a keep-alive — the masked
+  // layer it feeds holds the run alive.
+  faceMask({
+    pad = 0.35,
+    feather = 0.25,
+    smoothing = 0.3,
+    mirror = 'auto',
+    w = 512,
+    h = 512,
+  } = {}) {
+    _ensureStarted();
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    const smoothed = new Map(); // face index → smoothed { cx, cy, rx, ry } (normalized)
+    let rafId = null;
+    const draw = () => {
+      if (!isPaused() && ctx) {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.fillStyle = 'black';
+        ctx.fillRect(0, 0, w, h);
+        const seen = new Set();
+        ctx.save();
+        _applyMirror(ctx, mirror);
+        // Union overlapping ovals by max coverage — else a feathered edge would
+        // darken a neighbouring face's white.
+        ctx.globalCompositeOperation = 'lighten';
+        _cache.faces.forEach((face, fi) => {
+          const lm = face.landmarks;
+          if (!lm?.length) return;
+          seen.add(fi);
+          let minX = 1,
+            minY = 1,
+            maxX = 0,
+            maxY = 0;
+          for (const p of lm) {
+            if (p.x < minX) minX = p.x;
+            if (p.y < minY) minY = p.y;
+            if (p.x > maxX) maxX = p.x;
+            if (p.y > maxY) maxY = p.y;
+          }
+          const t = {
+            cx: (minX + maxX) / 2,
+            cy: (minY + maxY) / 2,
+            rx: ((maxX - minX) / 2) * (1 + pad),
+            ry: ((maxY - minY) / 2) * (1 + pad),
+          };
+          const prev = smoothed.get(fi);
+          const sm = prev
+            ? {
+                cx: prev.cx * smoothing + t.cx * (1 - smoothing),
+                cy: prev.cy * smoothing + t.cy * (1 - smoothing),
+                rx: prev.rx * smoothing + t.rx * (1 - smoothing),
+                ry: prev.ry * smoothing + t.ry * (1 - smoothing),
+              }
+            : t;
+          smoothed.set(fi, sm);
+          ctx.save();
+          ctx.translate(sm.cx * w, sm.cy * h);
+          ctx.scale(sm.rx * w, sm.ry * h); // unit circle → face oval
+          if (feather > 0) {
+            const g = ctx.createRadialGradient(0, 0, Math.max(0, 1 - feather), 0, 0, 1);
+            g.addColorStop(0, 'white');
+            g.addColorStop(1, 'black');
+            ctx.fillStyle = g;
+          } else {
+            ctx.fillStyle = 'white';
+          }
+          ctx.beginPath();
+          ctx.arc(0, 0, 1, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        });
+        ctx.restore();
+        // Drop smoothing state for faces that left frame (avoid unbounded map).
+        for (const k of smoothed.keys()) if (!seen.has(k)) smoothed.delete(k);
+      }
+      rafId = requestAnimationFrame(draw);
+    };
+    rafId = requestAnimationFrame(draw);
+    _maskLoops.push(() => cancelAnimationFrame(rafId));
+    return canvas;
+  },
+
+  // A ready-to-use mask spanning the rectangle framed by two hands — bring one
+  // fingertip on each hand to opposite corners (the classic "director's frame"
+  // gesture) and the bbox between them fills white, black elsewhere. Needs two
+  // hands (configure({ hands: { numHands: 2 } })); black until both are seen.
+  // Drop into `.mask()` to reveal a viewfinder — e.g. ASCII only inside the frame:
+  //   pipe(cam).ascii().mask(vision.handRectMask())
+  //   landmark : landmark used as each hand's corner. Default 5 (index-finger
+  //              knuckle) — the vertex of the L, so the rect spans the frame the
+  //              two hands enclose. (Index TIP 8 points inward → a tiny box.)
+  //   pad      : grow the rect past the two corners (normalized, 0.03 def)
+  //   smoothing: 0 (raw) … 1 (heavy lag). Exponential per-corner lerp.
+  //   mirror   : 'auto' | bool — align with the selfie-mirrored camera view.
+  // Self-driving run-scoped RAF (stopped on reset); NOT a keep-alive.
+  handRectMask({
+    landmark = 5,
+    pad = 0.03,
+    smoothing = 0.3,
+    mirror = 'auto',
+    w = 512,
+    h = 512,
+  } = {}) {
+    _ensureStarted();
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    const sm = [null, null]; // smoothed { x, y } per corner (normalized)
+    let rafId = null;
+    const draw = () => {
+      if (!isPaused() && ctx) {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.fillStyle = 'black';
+        ctx.fillRect(0, 0, w, h);
+        const hands = _cache.hands;
+        if (hands.length >= 2) {
+          ctx.save();
+          _applyMirror(ctx, mirror);
+          const pts = [];
+          for (let i = 0; i < 2; i++) {
+            const p = hands[i].landmarks?.[landmark];
+            if (!p) continue;
+            const prev = sm[i];
+            const x = prev ? prev.x * smoothing + p.x * (1 - smoothing) : p.x;
+            const y = prev ? prev.y * smoothing + p.y * (1 - smoothing) : p.y;
+            sm[i] = { x, y };
+            pts.push({ x, y });
+          }
+          if (pts.length === 2) {
+            const x0 = Math.min(pts[0].x, pts[1].x) - pad;
+            const y0 = Math.min(pts[0].y, pts[1].y) - pad;
+            const x1 = Math.max(pts[0].x, pts[1].x) + pad;
+            const y1 = Math.max(pts[0].y, pts[1].y) + pad;
+            ctx.fillStyle = 'white';
+            ctx.fillRect(x0 * w, y0 * h, (x1 - x0) * w, (y1 - y0) * h);
+          }
+          ctx.restore();
+        }
+      }
+      rafId = requestAnimationFrame(draw);
+    };
+    rafId = requestAnimationFrame(draw);
+    _maskLoops.push(() => cancelAnimationFrame(rafId));
+    return canvas;
+  },
+
   face() {
     _ensureStarted();
     return _cache.face;
+  },
+  // All tracked faces (default 1 — vision.configure({ face: { numFaces: N } })).
+  // Each: { expression, cx, cy, landmarks, gaze }. gaze is non-null on index 0 only.
+  faces() {
+    _ensureStarted();
+    return _cache.faces;
   },
   expression() {
     _ensureStarted();

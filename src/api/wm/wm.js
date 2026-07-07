@@ -134,19 +134,104 @@ export function initWM(onContentResize) {
     };
   }
 
+  // Shared type-payload writer for the two IN-SESSION serializers (undo `_captureState`
+  // and localStorage `_flushState`). Geometry lives in `_winBaseEntry`; this adds the
+  // spawned window's type-specific fields (title, toolkit, html/src/loop, blob handle,
+  // viz source/style/colors, widget state) so the two paths cannot drift — the bug this
+  // closes was undo omitting viz style + widget state + toolkit, respawning them bare.
+  // Returns false when the window must not be persisted at all (transient run-artifact).
+  // The portable-project path (Window Type Adapters) is deliberately NOT unified here:
+  // it emits an id-less, cross-machine record (fileKey not hasHandle, 'visualizer' not
+  // 'viz') — a different contract. See window-registry.js.
+  function _serializeSpawnedType(win, entry) {
+    const opts = win._wmSpawnOpts;
+    if (!opts || opts.transient) return false;
+    entry.spawned = true;
+    entry.title = win.querySelector('.wm-title')?.textContent ?? opts.title;
+    // Toolkit windows restored via app-level handler, not generic html spawn
+    if (win.id.startsWith('win-toolkit')) {
+      entry.type = 'toolkit';
+      return true;
+    }
+    entry.type = opts.type;
+    const isBlobSrc = opts.src?.startsWith('blob:');
+    if (opts.html !== undefined) entry.html = opts.html;
+    if (!isBlobSrc && opts.src !== undefined) entry.src = opts.src;
+    if (opts.loop !== undefined) entry.loop = opts.loop;
+    if (isBlobSrc) entry.hasHandle = true; // handle stored in IndexedDB
+    // Persist viz source/style so restored windows reuse them
+    if (opts.type === 'viz') {
+      entry.source = win._vizSourceEl?.value ?? opts.source ?? 'master';
+      entry.style = win._vizStyleEl?.value ?? opts.style ?? 'wave';
+      if (win._vizColors) entry.colors = { ...win._vizColors };
+    }
+    if (win._widgetType) {
+      entry.widgetType = win._widgetType;
+      entry.widgetState = win._widgetState?.() ?? {};
+    }
+    return true;
+  }
+
+  // Recreate a spawned window that no longer exists in the DOM, from a serialized entry.
+  // Shared by localStorage restore (restoreState) and undo apply (_applySnapshot) so both
+  // faithfully rebuild viz/widget/toolkit windows instead of a bare geometry spawn.
+  function _respawnEntry(s) {
+    if (s.hasHandle || s.fileKey) {
+      _restoreFileWindow(s);
+      return null;
+    }
+    if (s.widgetType) {
+      restoreWidget(s.widgetType, s);
+      return document.getElementById(s.id);
+    }
+    if (s.type === 'html' && !s.html) return null; // code-generated html — nothing static to rebuild
+    if (s.type === 'toolkit' && typeof window.__ar_createToolkit === 'function') {
+      const tkNum = s.id === 'win-toolkit' ? 1 : parseInt(s.id?.replace('win-toolkit-', '')) || 1;
+      const win = window.__ar_createToolkit(tkNum);
+      if (win) {
+        win.style.left = `${s.x}px`;
+        win.style.top = `${s.y}px`;
+        win.style.width = `${s.w}px`;
+        win.style.height = `${s.h}px`;
+        win.style.display = s.visible ? 'flex' : 'none';
+        if (s.maximized) _toggleMaximize(win);
+        if (s.nochrome) win.classList.add('wm-no-chrome');
+        if (s.transparent) win.classList.add('wm-transparent');
+      }
+      return win;
+    }
+    const id = api.spawn(s.title, {
+      id: s.id,
+      type: s.type,
+      x: s.x,
+      y: s.y,
+      w: s.w,
+      h: s.h,
+      html: s.html,
+      src: s.src,
+      loop: s.loop,
+      source: s.source,
+      style: s.style,
+      colors: s.colors,
+    });
+    const win = document.getElementById(id);
+    if (win) {
+      if (s.nochrome) win.classList.add('wm-no-chrome');
+      if (s.transparent) win.classList.add('wm-transparent');
+    }
+    return win;
+  }
+
   function _captureState() {
     const wins = [];
     desktop.querySelectorAll('.wm-win').forEach((win) => {
       const entry = { ..._winBaseEntry(win), _restore: win._wmRestoreHandler ?? null };
       if (spawnedIds.has(win.id)) {
         const opts = win._wmSpawnOpts;
-        if (opts && !opts.transient && !['canvas', 'shader', 'camera'].includes(opts.type)) {
-          entry.spawned = true;
-          entry.title = win.querySelector('.wm-title')?.textContent ?? opts.title;
-          entry.type = opts.type;
-          entry.html = opts.html;
-          entry.src = opts.src;
-          entry.loop = opts.loop;
+        // Undo deliberately excludes canvas/shader (run-artifacts) AND camera
+        // (respawning would re-grab the webcam) — an intentional difference from persist.
+        if (opts && !['canvas', 'shader', 'camera'].includes(opts.type)) {
+          _serializeSpawnedType(win, entry);
         }
       }
       wins.push(entry);
@@ -171,22 +256,7 @@ export function initWM(onContentResize) {
         win.classList.toggle('wm-no-chrome', !!entry.nochrome);
         win.classList.toggle('wm-transparent', !!entry.transparent);
       } else if (entry.spawned) {
-        const id = api.spawn(entry.title, {
-          id: entry.id,
-          type: entry.type,
-          x: entry.x,
-          y: entry.y,
-          w: entry.w,
-          h: entry.h,
-          html: entry.html,
-          src: entry.src,
-          loop: entry.loop,
-        });
-        const newWin = id && document.getElementById(id);
-        if (newWin) {
-          if (entry.nochrome) newWin.classList.add('wm-no-chrome');
-          if (entry.transparent) newWin.classList.add('wm-transparent');
-        }
+        _respawnEntry(entry);
       } else if (entry._restore) {
         entry._restore();
       }
@@ -253,32 +323,10 @@ export function initWM(onContentResize) {
       if (spawnedIds.has(win.id)) {
         const opts = win._wmSpawnOpts;
         if (!opts) return;
-        if (opts.transient) return; // pipe/route run-artifact windows — recreated when code runs
+        // Persist excludes canvas/shader (ADR 040 run-artifacts); transient dropped by
+        // the shared serializer. camera IS persisted here (unlike undo — see _captureState).
         if (['canvas', 'shader'].includes(opts.type)) return;
-        const isBlobSrc = opts.src?.startsWith('blob:');
-        entry.spawned = true;
-        entry.title = win.querySelector('.wm-title')?.textContent ?? opts.title;
-        // Toolkit windows restored via app-level handler, not generic html spawn
-        if (win.id.startsWith('win-toolkit')) {
-          entry.type = 'toolkit';
-          wins.push(entry);
-          return;
-        }
-        entry.type = opts.type;
-        if (opts.html !== undefined) entry.html = opts.html;
-        if (!isBlobSrc && opts.src !== undefined) entry.src = opts.src;
-        if (opts.loop !== undefined) entry.loop = opts.loop;
-        if (isBlobSrc) entry.hasHandle = true; // handle stored in IndexedDB
-        // Persist viz source/style so restored windows reuse them
-        if (opts.type === 'viz') {
-          entry.source = win._vizSourceEl?.value ?? opts.source ?? 'master';
-          entry.style = win._vizStyleEl?.value ?? opts.style ?? 'wave';
-          if (win._vizColors) entry.colors = { ...win._vizColors };
-        }
-        if (win._widgetType) {
-          entry.widgetType = win._widgetType;
-          entry.widgetState = win._widgetState?.() ?? {};
-        }
+        if (!_serializeSpawnedType(win, entry)) return; // transient → drop, don't push
       }
       wins.push(entry);
     });
@@ -997,6 +1045,31 @@ export function initWM(onContentResize) {
     const win = document.getElementById(id);
     if (s.nochrome) win?.classList.add('wm-no-chrome');
     if (s.transparent) win?.classList.add('wm-transparent');
+  }
+
+  // One directory-picker cascade: native (Electron) → File System Access API →
+  // hidden <input webkitdirectory> fallback. Returns { handle, name } (a dir handle),
+  // { fallback, name } (an input file list), or null on cancel. Callers own their own
+  // caching + cancel policy — this collapses the ladder that was copy-pasted three
+  // times (browse initial prompt, browse "+ Add folder", pickFolder).
+  async function _pickDirectory() {
+    const nativePick = nativeCap('pickDirectory');
+    if (nativePick) {
+      const res = await nativePick();
+      return res ? { handle: makeNativeDirHandle(res.path, res.name), name: res.name } : null;
+    }
+    if (window.showDirectoryPicker) {
+      try {
+        await _exitFullscreen();
+        const handle = await window.showDirectoryPicker({ mode: 'read' });
+        return { handle, name: handle.name };
+      } catch (err) {
+        if (err?.name === 'AbortError') return null;
+        // API present but blocked → fall through to the <input> fallback
+      }
+    }
+    const fallback = await _pickDirViaInput();
+    return fallback ? { fallback, name: fallback.name } : null;
   }
 
   // ── Public API (exposed as window.wm) ────────────────────────────────────
@@ -1749,25 +1822,13 @@ export function initWM(onContentResize) {
 
       // Only prompt when we have nothing cached yet (skip if dropped files already available)
       if (!handles.length && !fallback && !_droppedFileHandles.length) {
-        const nativePickDir = nativeCap('pickDirectory');
-        if (nativePickDir) {
-          const res = await nativePickDir();
-          if (!res) throw Object.assign(new Error('Cancelled'), { name: 'AbortError' });
-          handles.push(makeNativeDirHandle(res.path, res.name));
+        const picked = await _pickDirectory();
+        if (!picked) throw Object.assign(new Error('Cancelled'), { name: 'AbortError' });
+        if (picked.handle) {
+          handles.push(picked.handle);
           if (multiKey) fileHandles.set(multiKey, handles);
-        } else if (window.showDirectoryPicker) {
-          try {
-            await _exitFullscreen();
-            const h = await window.showDirectoryPicker({ mode: 'read' });
-            handles.push(h);
-            if (multiKey) fileHandles.set(multiKey, handles);
-          } catch (err) {
-            if (err?.name === 'AbortError') throw err;
-          }
-        }
-        if (!handles.length && !nativePickDir) {
-          fallback = await _pickDirViaInput();
-          if (!fallback) throw Object.assign(new Error('Cancelled'), { name: 'AbortError' });
+        } else if (picked.fallback) {
+          fallback = picked.fallback;
           if (fallbackKey) fileHandles.set(fallbackKey, fallback);
         }
       }
@@ -1837,27 +1898,15 @@ export function initWM(onContentResize) {
       });
 
       addBtn.addEventListener('click', async () => {
-        const nativePickDir = nativeCap('pickDirectory');
-        if (nativePickDir) {
-          const res = await nativePickDir();
-          if (!res) return;
-          handles.push(makeNativeDirHandle(res.path, res.name));
+        const picked = await _pickDirectory();
+        if (!picked) return;
+        if (picked.handle) {
+          handles.push(picked.handle);
           if (multiKey) fileHandles.set(multiKey, handles);
-        } else if (window.showDirectoryPicker) {
-          try {
-            await _exitFullscreen();
-            const h = await window.showDirectoryPicker({ mode: 'read' });
-            handles.push(h);
-            if (multiKey) fileHandles.set(multiKey, handles);
-          } catch (err) {
-            if (err?.name === 'AbortError') return;
-          }
-        } else {
-          const more = await _pickDirViaInput();
-          if (!more) return;
+        } else if (picked.fallback) {
           fallback = fallback
-            ? { name: fallback.name, files: [...fallback.files, ...more.files] }
-            : more;
+            ? { name: fallback.name, files: [...fallback.files, ...picked.fallback.files] }
+            : picked.fallback;
           if (fallbackKey) fileHandles.set(fallbackKey, fallback);
         }
         try {
@@ -1892,23 +1941,7 @@ export function initWM(onContentResize) {
     },
 
     async pickFolder() {
-      const nativePick = nativeCap('pickDirectory');
-      if (nativePick) {
-        const res = await nativePick();
-        if (!res) return null;
-        return { handle: makeNativeDirHandle(res.path, res.name), name: res.name };
-      }
-      if (window.showDirectoryPicker) {
-        try {
-          await _exitFullscreen();
-          const handle = await window.showDirectoryPicker({ mode: 'read' });
-          return { handle, name: handle.name };
-        } catch (err) {
-          if (err?.name === 'AbortError') return null;
-        }
-      }
-      const fallback = await _pickDirViaInput();
-      return fallback ? { fallback, name: fallback.name } : null;
+      return _pickDirectory();
     },
 
     /** Idempotently add mute/volume controls to a window (e.g. output windows that use audio) */
@@ -1984,49 +2017,9 @@ export function initWM(onContentResize) {
           if (s.transparent) existing.classList.add('wm-transparent');
           continue;
         }
-        // Widget windows (Drumpad, EQ, etc.) restored via the restorer each widget
-        // registered beside its own class — see widget-restorer-registry.js.
-        if (s.widgetType) {
-          restoreWidget(s.widgetType, s);
-          continue;
-        }
-        // Skip code-generated html windows with no static content
-        if (s.type === 'html' && !s.html) continue;
-        // Toolkit windows need app-level rebuild (content + audio:false)
-        if (s.type === 'toolkit' && typeof window.__ar_createToolkit === 'function') {
-          const tkNum =
-            s.id === 'win-toolkit' ? 1 : parseInt(s.id.replace('win-toolkit-', '')) || 1;
-          const win = window.__ar_createToolkit(tkNum);
-          if (win) {
-            win.style.left = `${s.x}px`;
-            win.style.top = `${s.y}px`;
-            win.style.width = `${s.w}px`;
-            win.style.height = `${s.h}px`;
-            win.style.display = s.visible ? 'flex' : 'none';
-            if (s.maximized) _toggleMaximize(win);
-            if (s.nochrome) win.classList.add('wm-no-chrome');
-            if (s.transparent) win.classList.add('wm-transparent');
-          }
-          continue;
-        }
-        const id = api.spawn(s.title, {
-          id: s.id,
-          type: s.type,
-          x: s.x,
-          y: s.y,
-          w: s.w,
-          h: s.h,
-          html: s.html,
-          src: s.src,
-          loop: s.loop,
-          source: s.source,
-          style: s.style,
-          colors: s.colors,
-        });
-        const win = document.getElementById(id);
-        if (!win) continue;
-        if (s.nochrome) win.classList.add('wm-no-chrome');
-        if (s.transparent) win.classList.add('wm-transparent');
+        // Recreate widget / toolkit / html / media windows via the shared respawn
+        // dispatch (also used by undo apply — one place owns type-aware rebuild).
+        _respawnEntry(s);
       }
 
       onContentResize?.();

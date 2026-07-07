@@ -76,6 +76,7 @@ import * as Tone from 'tone';
 import {
   Voice,
   normalizeVoice,
+  buildSynthNode,
   instantiateVoice,
   resolveVoice,
   engineNames,
@@ -120,6 +121,18 @@ describe('normalizeVoice', () => {
   it('normalizes a sample descriptor', () => {
     const v = normalizeVoice({ kind: 'sample', mode: 'chopped', blobKey: 'k1', slices: 8 });
     expect(v).toMatchObject({ kind: 'sample', mode: 'chopped', blobKey: 'k1', slices: 8 });
+  });
+
+  // Candidate 04 (6th arch pass): Piano's preset synth now builds through this
+  // chassis. A `filter` effect in a legacy-piano descriptor used to yield null in
+  // Piano's forked builder; via buildSynthNode it produces a real Tone.Filter node.
+  it('builds a filter effect from a legacy-piano descriptor (no fork drift)', () => {
+    const { fx } = buildSynthNode(
+      normalizeVoice({ synth: { type: 'basic' }, effects: [{ type: 'filter' }] }),
+    );
+    expect(Tone.Filter).toHaveBeenCalled();
+    expect(fx).toHaveLength(1);
+    expect(fx[0].__tag).toBe('Filter');
   });
 });
 

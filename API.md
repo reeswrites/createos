@@ -219,8 +219,15 @@ pipe(Source.camera).glshader(body, { mask }).show();  // forward a mask into a s
 ```
 
 **`vision.handMask(opts?)`** — a ready-to-use mask tracking hand landmarks (mirror + smoothing handled, self-driving). `opts`: `{ landmark = 8, radius = 0.12, shape = 'circle', smoothing = 0.3, mirror = 'auto' }`.
+
+**`vision.faceMask(opts?)`** — a ready-to-use mask over the tracked face(s) — a feathered oval over each FaceMesh bbox, black elsewhere (mirror + smoothing handled, self-driving). Unions every face in `vision.faces()`; default 1, bump with `vision.configure({ face: { numFaces: N } })`. Drop into `.mask()` to blur/shade/reveal only faces. `opts`: `{ pad = 0.35, feather = 0.25, smoothing = 0.3, mirror = 'auto' }`.
+
+**`vision.handRectMask(opts?)`** — a ready-to-use mask spanning the rectangle framed by two hands (bring one fingertip on each hand to opposite corners — the "director's frame" gesture). White bbox between the corners, black elsewhere (mirror + smoothing handled, self-driving). Needs `configure({ hands: { numHands: 2 } })`; black until both hands are seen. Drop into `.mask()` for a viewfinder — e.g. `pipe(cam).ascii().mask(vision.handRectMask())`. `opts`: `{ landmark = 5, pad = 0.03, smoothing = 0.3, mirror = 'auto' }` (landmark 5 = index knuckle, the L-vertex; use 8 for fingertips).
 ```js
 new Shader(body).mask(vision.handMask({ landmark: 8, radius: 0.15 })).start();
+// auto-blur the face: sharp base + blurred layer masked to the face oval
+pipe(Source.camera).layer(c, 0);
+pipe(Source.camera).blur(24).mask(vision.faceMask()).layer(c, 1);
 ```
 
 **Live control:** `emit('shader:mask', { id, source, opts })` swaps a running shader's mask from outside its own code.
@@ -712,8 +719,10 @@ pipe(cam)
 ### Stage methods (chainable, return `this`)
 
 ```js
-.ascii({ cols, rows, charset, bg, color, cellW, cellH })
+.ascii({ cols, rows, charset, bg, color, cellW, cellH, fit })
   // Render glyphs to canvas. Default charset: ' .:-=+*#%@'.
+  // fit: true derives rows from the source aspect so the ASCII isn't stretched
+  // (needed when compositing/masking ASCII over the same source, e.g. a viewfinder).
   // Luma weights match canvas.toASCII (0.299/0.587/0.114).
 
 .pixelate({ blockSize })
@@ -973,7 +982,8 @@ vision.any(label) / vision.count(label)
 vision.hands()                // → [{gesture, confidence, handedness, cx, cy, landmarks}, ...]  (handedness: 'Left'|'Right'|null)
 vision.gesture()              // → 'Thumb_Up'|'Open_Palm'|'Closed_Fist'|'Pointing_Up'|'Victory'|'ILoveYou'|null
 
-vision.face()                 // → {expression, cx, cy, landmarks} | null
+vision.face()                 // → {expression, cx, cy, landmarks, gaze} | null  (primary face)
+vision.faces()                // → [{expression, cx, cy, landmarks, gaze}, ...]  (gaze on index 0 only; needs configure({face:{numFaces}}))
 vision.expression()           // → 'smile'|'surprise'|'frown'|'mouth_open'|'neutral'|null
 
 vision.pose()                 // → {landmarks: [{x,y,z,visibility}×33]} | null  (lazy-loads PoseLandmarker)
@@ -998,9 +1008,10 @@ vision.drawHands(ctx?, { color, lineWidth, pointSize, mirror } = {})
 vision.drawPose(ctx?,  { color, lineWidth, pointSize, minVisibility, mirror } = {})
 
 // Config. pose is first-run-wins (call before first pose use; page refresh to change).
-// hands.numHands applies live (any time) — pushed to the recognizer via setOptions.
+// hands.numHands / face.numFaces apply live (any time) — pushed via setOptions.
 vision.configure({ pose:  { model: 'lite'|'full'|'heavy', numPoses: 1 } })
 vision.configure({ hands: { numHands: 2 } })   // default 1 — track both hands
+vision.configure({ face:  { numFaces: 5 } })   // default 1 — track up to N faces
 
 // Custom source — use any HTMLVideoElement or HTMLCanvasElement instead of the webcam
 vision.source(videoEl)   // e.g. from video.open() or a <video> element

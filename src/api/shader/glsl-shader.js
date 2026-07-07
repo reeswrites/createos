@@ -3,7 +3,6 @@
 // or when an LLM generates GLSL because it has a much larger GLSL training corpus.
 
 import { resolveGLSL, library } from '../platform/library.js';
-import { isPaused } from '../../runtime/run-context.js';
 import { mountLayerCanvas } from '../visual/layer.js';
 import { onReset } from '../../runtime/reset-registry.js';
 import { notify } from '../../events/index.js';
@@ -353,38 +352,13 @@ export class GLShader extends ShaderLayerBase {
   }
 
   // ── Public API (mirrors Shader) ──────────────────────────────────────────
+  // start()/stop()/_startRenderLoop() are the shared template in ShaderLayerBase.
+  // WebGL init is synchronous, so _initGpu() returns undefined (may throw).
 
-  start() {
-    // Detached (no .mount()/.show()) — spawn our own window so .start() works
-    // standalone, as the docs show. (The old editor-output fallback is gone — ADR 040.)
-    if (!this._container && !this._ownWinId) return this.show();
-    this._registerLive();
-    if (!this._gl) {
-      try {
-        this._init();
-      } catch (e) {
-        console.error('GLShader error:', e.message);
-        this._releaseLive();
-        return this;
-      }
-    }
-    if (this._rafId) return this;
-    const loop = (ts) => {
-      if (!isPaused()) this._frame(ts);
-      this._rafId = requestAnimationFrame(loop);
-    };
-    this._rafId = requestAnimationFrame(loop);
-    notify('shader:start', { id: this._id });
-    return this;
-  }
+  _engineLabel = 'GLShader';
 
-  stop() {
-    if (this._rafId) {
-      cancelAnimationFrame(this._rafId);
-      this._rafId = null;
-      notify('shader:stop', { id: this._id });
-    }
-    return this;
+  _initGpu() {
+    if (!this._gl) this._init();
   }
 
   // video(), set(), setUniform(), opacity(), z(), get canvas() — inherited from ShaderLayerBase
@@ -396,11 +370,7 @@ export class GLShader extends ShaderLayerBase {
   }
 
   _destroy() {
-    this.stop();
-    this._releaseLive();
-    this._closeOwnWin();
-    this._resizeObserver?.disconnect();
-    this._resizeObserver = null;
+    this._teardownBase();
     if (this._gl) {
       if (this._videoTex) this._gl.deleteTexture(this._videoTex);
       if (this._maskTex) this._gl.deleteTexture(this._maskTex);

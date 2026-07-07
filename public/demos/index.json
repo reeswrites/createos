@@ -1,5 +1,31 @@
 [
   {
+    "id": "auto-blur-faces",
+    "title": "Auto-Blur Faces",
+    "desc": "Privacy filter — MediaPipe face tracking + dynamic masking blurs every face in the camera feed. Sharp base plus a blurred layer masked to the face ovals (vision.faceMask, up to 5 faces).",
+    "file": "auto-blur-faces.vljson",
+    "tags": [
+      "vision",
+      "face",
+      "mask",
+      "camera",
+      "privacy"
+    ]
+  },
+  {
+    "id": "finger-frame-ascii",
+    "title": "Finger-Frame ASCII",
+    "desc": "Make a rectangle with two hands — the director's-frame gesture — and the framed area turns to green-on-black ASCII while everything outside stays sharp. Hand skeleton drawn on top (vision.handRectMask + pipe.ascii).",
+    "file": "finger-frame-ascii.vljson",
+    "tags": [
+      "vision",
+      "hands",
+      "ascii",
+      "mask",
+      "camera"
+    ]
+  },
+  {
     "id": "watch-your-mouth",
     "title": "Watch Your Mouth",
     "desc": "Say a curse word and your head goes boom (non-gory) — speech-to-text feeds lang.isProfane, vision finds your head, a cartoon fireball hides it then it grows back.",

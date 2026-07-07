@@ -91,8 +91,9 @@ export class Sprite {
   }
 
   // Draw frame `i` (default current) into a target canvas, sizing it to the
-  // pixel-resolution frame. Keeps the backing _frames array private — the seam
-  // the SpriteFrameAdapter reads through for thumbnails.
+  // pixel-resolution frame. A convenience method for thumbnail render — NOT an
+  // encapsulation seam: Sprite and SpriteEditor are one coupled unit (ADR 057),
+  // and the editor accesses _frames/_dctx/_render directly elsewhere.
   drawFrameTo(target, i = this._fi) {
     target.width = this._w;
     target.height = this._h;
@@ -101,8 +102,9 @@ export class Sprite {
   }
 
   // Paint an image (e.g. a restored PNG data URL) into frame `i`, then re-render.
-  // Inverse of drawFrameTo — the seam desktop restore reads through so it never
-  // touches the private _frames array.
+  // The door SpriteEditor's registered desktop `open()` restores through — which
+  // keeps the *platform* module (desktop-files.js) out of Sprite fields (ADR 055),
+  // NOT the editor (which is the same unit — ADR 057).
   drawImageToFrame(i, img) {
     const frame = this._frames[i];
     if (!frame) return this;

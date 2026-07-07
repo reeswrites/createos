@@ -1115,6 +1115,18 @@ setcps(0.5);`,
         tags: ['mask', 'vision', 'hand', 'tracking', 'handMask', 'camera'],
       },
       {
+        label: 'auto-blur faces (vision)',
+        code: "// Blur only faces: sharp base + blurred layer masked to the face ovals.\nvision.configure({ face: { numFaces: 5 } }); // default 1\nconst c = new Canvas({ title: 'Auto-Blur Faces', w: 960, h: 540 });\npipe(Source.camera).layer(c, 0);\npipe(Source.camera).blur(26).mask(vision.faceMask({ pad: 0.35, feather: 0.25 })).layer(c, 1);",
+        hint: 'vision.faceMask({pad, feather, smoothing, mirror}) returns a self-driving feathered oval mask unioning all tracked faces (bump count with vision.configure({face:{numFaces}})). Blur/shade a camera layer through it and composite over a sharp base with pipe.layer(c, z).',
+        tags: ['mask', 'vision', 'face', 'blur', 'privacy', 'faceMask', 'camera'],
+      },
+      {
+        label: 'finger-frame ASCII cam (vision)',
+        code: "// Make a rectangle with two hands — the framed area turns to ASCII (with bloom).\nconst W = 960, H = 540;\nvision.configure({ hands: { numHands: 2 } });\nconst c = new Canvas({ title: 'Finger-Frame ASCII', w: W, h: H });\npipe(Source.camera).layer(c, 0);\npipe(Source.camera).ascii({ cols: 90, color: '#00ff41', bg: '#0d0208', fit: true }).mask(vision.handRectMask({ pad: 0.04 })).layer(c, 1);\nc.fx(1).filter('drop-shadow(0 0 2px #00ff41) drop-shadow(0 0 6px #00ff41) brightness(1.15)');\nconst octx = wm.layer(c.winId, 2, { raster: true, w: W, h: H }).getContext('2d');\ntick(() => { octx.clearRect(0, 0, W, H); vision.drawHands(octx, { color: '#00ff41' }); });",
+        hint: 'vision.handRectMask({landmark, pad, smoothing, mirror}) returns a self-driving white-rect mask spanning the bbox between two hand fingertips (director-frame gesture; needs numHands:2). Mask a pipe.ascii() layer with it for an in-frame ASCII viewfinder; draw the skeleton with vision.drawHands on a higher plane.',
+        tags: ['mask', 'vision', 'hand', 'ascii', 'frame', 'handRectMask', 'camera'],
+      },
+      {
         label: 'temporal mask (route)',
         code: "// Mask on for 3s, off for 2s, on a loop.\nconst r = route(Source.camera)\n  .mask(Mask.circle({ r: 0.35 }))\n  .wait(3)\n  .clearEffects()\n  .wait(2)\n  .loop()\n  .show('Temporal Mask', { w: 700, h: 500 });\n// r.toggle('mask') from a beat/gesture handler",
         hint: "route(...).mask(source, opts) is a timeline-able stage — .wait()/.loop()/.toggle('mask'). Chain .mask(a).mask(b) to INTERSECT two separate sources (each is a multiply pass).",

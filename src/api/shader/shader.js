@@ -1,6 +1,5 @@
 import { jsToWGSL } from './js-to-wgsl.js';
 import { micViz } from '../media/mic-state.js';
-import { isPaused } from '../../runtime/run-context.js';
 import { resolveWGSL, library } from '../platform/library.js';
 import { onReset } from '../../runtime/reset-registry.js';
 import { mountLayerCanvas } from '../visual/layer.js';
@@ -543,45 +542,19 @@ export class Shader extends ShaderLayerBase {
   }
 
   // ── Public API ──────────────────────────────────────────────────────────
+  // start()/stop()/_startRenderLoop() are the shared template in ShaderLayerBase.
+  // WebGPU init is async, so _initGpu() returns a promise.
 
-  start() {
-    // Detached (no .mount()/.show()) — spawn our own window so .start() works
-    // standalone, as the docs show. (The old editor-output fallback is gone — ADR 040.)
-    if (!this._container && !this._ownWinId) return this.show();
-    this._registerLive();
-    (async () => {
-      if (!this._device) await this._init();
-      if (this._rafId) return;
-      const loop = (ts) => {
-        if (!isPaused()) this._frame(ts);
-        this._rafId = requestAnimationFrame(loop);
-      };
-      this._rafId = requestAnimationFrame(loop);
-      notify('shader:start', { id: this._id });
-    })().catch((e) => {
-      console.error('Shader error:', e.message);
-      this._releaseLive();
-    });
-    return this;
-  }
+  _engineLabel = 'Shader';
 
-  stop() {
-    if (this._rafId) {
-      cancelAnimationFrame(this._rafId);
-      this._rafId = null;
-      notify('shader:stop', { id: this._id });
-    }
-    return this;
+  async _initGpu() {
+    if (!this._device) await this._init();
   }
 
   // video(), set(), setUniform(), bind(), opacity(), z(), get canvas() — inherited from ShaderLayerBase
 
   _destroy() {
-    this.stop();
-    this._releaseLive();
-    this._closeOwnWin();
-    this._resizeObserver?.disconnect();
-    this._resizeObserver = null;
+    this._teardownBase();
     this._readable?.remove();
     this._readable = null;
     this._canvas?.remove();

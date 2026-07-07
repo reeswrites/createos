@@ -110,6 +110,13 @@ class AsciiStage {
     this._color = opts.color ?? '#0f0';
     this._cellW = opts.cellW ?? 8;
     this._cellH = opts.cellH ?? 14;
+    // fit: derive rows from the SOURCE aspect (once known) so the rendered ASCII
+    // has the same aspect as the input — otherwise the default rows (cols/2.5) plus
+    // a non-square cell make the picture stretch, and it won't line up with the
+    // source behind it (e.g. a masked ASCII viewfinder over a sharp camera).
+    this._fit = opts.fit ?? false;
+    this._userRows = opts.rows != null;
+    this._fitted = false;
     this._canvas = document.createElement('canvas');
     this._ctx = null;
     this._offCanvas = document.createElement('canvas');
@@ -117,7 +124,7 @@ class AsciiStage {
     this._isShader = false;
   }
 
-  _start() {
+  _sizeCanvases() {
     const { _cols: cols, _rows: rows, _cellW: cw, _cellH: ch } = this;
     this._canvas.width = cols * cw;
     this._canvas.height = rows * ch;
@@ -131,10 +138,25 @@ class AsciiStage {
     this._offCtx = this._offCanvas.getContext('2d', { willReadFrequently: true });
   }
 
+  _start() {
+    this._sizeCanvases();
+  }
+
   read() {
     if (!this._ctx) return;
     const src = this._upstream._getSource();
     if (_isVideo(src) && src.readyState < 2) return;
+
+    // One-time aspect fit: rows = cols · (cellW/cellH) / srcAspect.
+    if (this._fit && !this._fitted && !this._userRows) {
+      const srcAspect = _srcWidth(src) / _srcHeight(src);
+      const rows = Math.max(1, Math.round((this._cols * (this._cellW / this._cellH)) / srcAspect));
+      if (rows !== this._rows) {
+        this._rows = rows;
+        this._sizeCanvases();
+      }
+      this._fitted = true;
+    }
 
     const {
       _cols: cols,
@@ -1187,6 +1209,11 @@ export class Pipeline {
         if (this._displayCtx) {
           const src = this._last()._getSource() ?? this._head._getSource();
           if (src) {
+            // Clear first: a masked/transparent terminal (e.g. .mask() output that
+            // is transparent outside its region) would otherwise composite over
+            // last frame's pixels with source-over — stale content accumulates and
+            // the lit region only ever grows. Opaque full-frame output is unaffected.
+            this._displayCtx.clearRect(0, 0, this._displayCanvas.width, this._displayCanvas.height);
             this._displayCtx.drawImage(
               src,
               0,

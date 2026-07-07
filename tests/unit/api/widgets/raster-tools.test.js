@@ -1,0 +1,62 @@
+import { describe, it, expect } from 'vitest';
+import { floodFill, resolveColorRGBA, expandBbox } from '../../../../src/api/widgets/raster-tools.js';
+
+// Candidate 03 (6th arch pass): the flood fill + bbox accumulator were byte-identical
+// in Paint and Sprite and had NO test — the only way to reach them was a full editor
+// drag through the DOM. Now they are a pure leaf. floodFill takes a pre-resolved RGBA
+// so the algorithm is DOM-free; here we back a fake 2D context with a plain array.
+
+function fakeCtx(w, h, init) {
+  const data = init ?? new Uint8ClampedArray(w * h * 4);
+  return { getImageData: () => ({ data }), putImageData: () => {}, data };
+}
+const px = (ctx, w, x, y) => {
+  const i = (y * w + x) * 4;
+  return [ctx.data[i], ctx.data[i + 1], ctx.data[i + 2], ctx.data[i + 3]];
+};
+
+describe('raster-tools.resolveColorRGBA', () => {
+  it('maps transparent to zeroes without touching a canvas', () => {
+    expect(resolveColorRGBA('transparent')).toEqual([0, 0, 0, 0]);
+  });
+});
+
+describe('raster-tools.floodFill', () => {
+  it('fills a blank region and reports it changed', () => {
+    const ctx = fakeCtx(4, 4);
+    expect(floodFill(ctx, 4, 4, 0, 0, [0, 255, 0, 255])).toBe(true);
+    expect(px(ctx, 4, 3, 3)).toEqual([0, 255, 0, 255]);
+  });
+
+  it('is a no-op when the target already equals the fill', () => {
+    const filled = new Uint8ClampedArray(4 * 4 * 4);
+    for (let i = 0; i < filled.length; i += 4) {
+      filled[i + 2] = 255; // blue
+      filled[i + 3] = 255; // opaque
+    }
+    const ctx = fakeCtx(4, 4, filled);
+    expect(floodFill(ctx, 4, 4, 1, 1, [0, 0, 255, 255])).toBe(false);
+  });
+
+  it('stops at a colour boundary (does not bleed past a wall)', () => {
+    // 4×1 strip, opaque-black wall at x=2 (blank elsewhere).
+    const arr = new Uint8ClampedArray(4 * 1 * 4);
+    arr[2 * 4 + 3] = 255; // wall alpha
+    const ctx = fakeCtx(4, 1, arr);
+    floodFill(ctx, 4, 1, 0, 0, [255, 0, 0, 255]); // fill the left region
+    expect(px(ctx, 4, 1, 0)).toEqual([255, 0, 0, 255]); // left filled
+    expect(px(ctx, 4, 3, 0)).toEqual([0, 0, 0, 0]); // right side untouched
+  });
+});
+
+describe('raster-tools.expandBbox', () => {
+  it('creates a point bbox when none exists', () => {
+    expect(expandBbox(null, 3, 5)).toEqual({ minX: 3, minY: 5, maxX: 3, maxY: 5 });
+  });
+  it('grows an existing bbox in both directions', () => {
+    let b = expandBbox(null, 3, 5);
+    b = expandBbox(b, 1, 9);
+    b = expandBbox(b, 7, 2);
+    expect(b).toEqual({ minX: 1, minY: 2, maxX: 7, maxY: 9 });
+  });
+});

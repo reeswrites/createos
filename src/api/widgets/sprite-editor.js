@@ -2,6 +2,7 @@
 // Entry: new SpriteEditor(opts), Sprite.edit(opts), sp.edit(opts), toolbar button
 
 import { Sprite } from './sprite.js';
+import { floodFill, resolveColorRGBA, expandBbox } from './raster-tools.js';
 import { snapshotFrameCanvases, paintFrameCanvas, downloadCanvasPng } from './frame-snapshot.js';
 import { registerWidgetRestorer } from '../wm/widget-restorer-registry.js';
 import { WidgetEvents } from './widget-events.js';
@@ -547,14 +548,7 @@ export class SpriteEditor {
   }
 
   _expandBbox(x, y) {
-    if (!this._strokeBbox) {
-      this._strokeBbox = { minX: x, minY: y, maxX: x, maxY: y };
-    } else {
-      if (x < this._strokeBbox.minX) this._strokeBbox.minX = x;
-      if (y < this._strokeBbox.minY) this._strokeBbox.minY = y;
-      if (x > this._strokeBbox.maxX) this._strokeBbox.maxX = x;
-      if (y > this._strokeBbox.maxY) this._strokeBbox.maxY = y;
-    }
+    this._strokeBbox = expandBbox(this._strokeBbox, x, y);
   }
 
   _emitStroke() {
@@ -673,43 +667,7 @@ export class SpriteEditor {
     const sp = this.sprite;
     const ctx = sp.ctx();
     if (!ctx) return;
-    const W = sp._w,
-      H = sp._h;
-    const img = ctx.getImageData(0, 0, W, H);
-    const d = img.data;
-
-    const idx = (x, y) => (y * W + x) * 4;
-    const i0 = idx(px, py);
-    const [tr, tg, tb, ta] = [d[i0], d[i0 + 1], d[i0 + 2], d[i0 + 3]];
-
-    // Resolve fill color to RGBA
-    let [fr, fg, fb, fa] = [0, 0, 0, 0];
-    if (this._color !== 'transparent') {
-      const tmp = document.createElement('canvas');
-      tmp.width = tmp.height = 1;
-      const tx = tmp.getContext('2d');
-      tx.fillStyle = this._color;
-      tx.fillRect(0, 0, 1, 1);
-      const td = tx.getImageData(0, 0, 1, 1).data;
-      [fr, fg, fb, fa] = [td[0], td[1], td[2], td[3]];
-    }
-
-    if (tr === fr && tg === fg && tb === fb && ta === fa) return;
-
-    const stack = [[px, py]];
-    while (stack.length) {
-      const [cx, cy] = stack.pop();
-      if (cx < 0 || cx >= W || cy < 0 || cy >= H) continue;
-      const ci = idx(cx, cy);
-      if (d[ci] !== tr || d[ci + 1] !== tg || d[ci + 2] !== tb || d[ci + 3] !== ta) continue;
-      d[ci] = fr;
-      d[ci + 1] = fg;
-      d[ci + 2] = fb;
-      d[ci + 3] = fa;
-      stack.push([cx - 1, cy], [cx + 1, cy], [cx, cy - 1], [cx, cy + 1]);
-    }
-
-    ctx.putImageData(img, 0, 0);
+    if (!floodFill(ctx, sp._w, sp._h, px, py, resolveColorRGBA(this._color))) return;
     sp._render();
     this._events.emit('stroke', {
       tool: 'fill',
@@ -1142,7 +1100,8 @@ export class SpriteEditor {
 onReset(cleanupSpriteEditors);
 
 // Desktop File-Type Adapter (ADR 055) — owns 'sprite' icon glyph + restore.
-// Frame reconstruction lives here (drawImageToFrame keeps Sprite._frames private).
+// Frame reconstruction lives here so the platform module (desktop-files.js) never
+// reaches into Sprite fields; drawImageToFrame is the door it restores through.
 registerDesktopFileType('sprite', {
   glyph: 'fa-solid fa-border-all',
   cssClass: 'dt-sprite-icon',

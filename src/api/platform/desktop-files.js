@@ -6,6 +6,7 @@ import {
   isDesktopFileType,
   desktopFileGlyphs,
   desktopFileCssClass,
+  desktopFileGlyphStyles,
 } from './desktop-file-registry.js';
 // desktop-files.js — file icons on the IDE desktop (project-scoped)
 //
@@ -150,6 +151,12 @@ function _injectCSS() {
   if (document.getElementById('dt-styles')) return;
   const s = document.createElement('style');
   s.id = 'dt-styles';
+  // Widget glyph rules are derived from the desktop-file registry (each widget declares
+  // its own glyphStyle beside registerDesktopFileType) — only base types (folder/editor)
+  // stay hardcoded above.
+  const _widgetGlyphRules = desktopFileGlyphStyles()
+    .map((g) => `.dt-icon.${g.cssClass} .dt-glyph { ${g.glyphStyle} }`)
+    .join('\n');
   s.textContent = `
 .dt-icon {
   position: absolute; width: 76px; text-align: center;
@@ -175,12 +182,6 @@ function _injectCSS() {
 .dt-trash.dt-trash-show { opacity: 1; }
 .dt-trash.dt-trash-hover { background: rgba(200,50,50,0.45); transform: translateX(-50%) scale(1.18); color: rgba(255,80,80,0.9); }
 .dt-icon.dt-folder-icon .dt-glyph { background: #2a2010; border: 1px solid #5a4010; font-size: 26px; color: #f0a830; }
-.dt-icon.dt-beat-icon .dt-glyph { background: #1a0d2e; border: 1px solid #4a2a6a; font-size: 26px; color: #cba6f7; }
-.dt-icon.dt-sprite-icon .dt-glyph { background: #0d1a2e; border: 1px solid #2a4a6a; font-size: 22px; color: #89b4fa; }
-.dt-icon.dt-note-icon .dt-glyph { background: #1a1810; border: 1px solid #4a3a10; font-size: 22px; color: #e8d5a0; }
-.dt-icon.dt-paint-icon .dt-glyph { background: #1a0d1a; border: 1px solid #4a2a4a; font-size: 22px; color: #cba6f7; }
-.dt-icon.dt-ascii-icon .dt-glyph { background: #0d1a10; border: 1px solid #2a4a2a; font-size: 22px; color: #a6e3a1; }
-.dt-icon.dt-piano-icon .dt-glyph { background: #0d0d1a; border: 1px solid #313244; font-size: 22px; color: #cba6f7; }
 .dt-thumb {
   width: 60px; height: 60px; object-fit: cover; border-radius: 5px;
   display: block; margin: 0 auto 5px; background: #222; pointer-events: none;
@@ -232,6 +233,7 @@ function _injectCSS() {
   padding: 8px 20px; border-radius: 20px; font-size: 13px;
   pointer-events: none; z-index: 99998; border: 1px dashed rgba(255,255,255,0.2);
 }
+${_widgetGlyphRules}
   `;
   document.head.appendChild(s);
 }
@@ -1312,14 +1314,22 @@ const ICON_OPT_KEYS = [
   'tooltip',
 ];
 
+// Pull the present icon-appearance opts off a caller bag → object, or null when none
+// set. The single reader of ICON_OPT_KEYS for the "set-time" callers (add/addBlob) so
+// the key list, the "any set?" test, and the repack can't drift (update() iterates the
+// same list with `in` semantics — it must allow explicit null to CLEAR a value).
+function pickIconOpts(src) {
+  let out = null;
+  for (const k of ICON_OPT_KEYS) {
+    if (src[k] != null) (out ??= {})[k] = src[k];
+  }
+  return out;
+}
+
 export const DesktopAPI = {
   add(url, opts = {}) {
     const { name = 'file', type, content, x, y } = opts;
-    // Gather the present icon-appearance opts; null when the caller set none.
-    let iconOpts = null;
-    for (const k of ICON_OPT_KEYS) {
-      if (opts[k] != null) (iconOpts ??= {})[k] = opts[k];
-    }
+    const iconOpts = pickIconOpts(opts);
     const icon = _addFileIcon(
       name,
       type ? '' : name,
@@ -1332,63 +1342,10 @@ export const DesktopAPI = {
     );
     return { id: icon.id, name: icon.name, type: icon.type, url: icon.url };
   },
-  addBlob(
-    blob,
-    {
-      name = 'capture',
-      type,
-      download = false,
-      x,
-      y,
-      rotation,
-      tint,
-      scale,
-      animate,
-      labelPosition,
-      labelColor,
-      glyph,
-      glyphBg,
-      glyphColor,
-      labelSize,
-      labelFont,
-      badge,
-      badgeColor,
-      tooltip,
-    } = {},
-  ) {
+  addBlob(blob, opts = {}) {
+    const { name = 'capture', type, download = false, x, y } = opts;
     const url = URL.createObjectURL(blob);
-    const iconOpts =
-      rotation != null ||
-      tint != null ||
-      scale != null ||
-      animate != null ||
-      labelPosition != null ||
-      labelColor != null ||
-      glyph != null ||
-      glyphBg != null ||
-      glyphColor != null ||
-      labelSize != null ||
-      labelFont != null ||
-      badge != null ||
-      badgeColor != null ||
-      tooltip != null
-        ? {
-            rotation,
-            tint,
-            scale,
-            animate,
-            labelPosition,
-            labelColor,
-            glyph,
-            glyphBg,
-            glyphColor,
-            labelSize,
-            labelFont,
-            badge,
-            badgeColor,
-            tooltip,
-          }
-        : null;
+    const iconOpts = pickIconOpts(opts);
     const icon = _addFileIcon(
       name,
       '',
@@ -1416,27 +1373,12 @@ export const DesktopAPI = {
     if (opts.name !== undefined) icon.name = opts.name;
     if (opts.x !== undefined) icon.x = opts.x;
     if (opts.y !== undefined) icon.y = opts.y;
-    const VISUAL_KEYS = [
-      'rotation',
-      'tint',
-      'scale',
-      'animate',
-      'labelPosition',
-      'labelColor',
-      'glyph',
-      'glyphBg',
-      'glyphColor',
-      'labelSize',
-      'labelFont',
-      'badge',
-      'badgeColor',
-      'tooltip',
-    ];
-    const hasVisual = VISUAL_KEYS.some((k) => k in opts);
+    // update() uses `in` (not pickIconOpts's `!= null`) so an explicit null CLEARS.
+    const hasVisual = ICON_OPT_KEYS.some((k) => k in opts);
     if (hasVisual || opts.name !== undefined) {
       if (hasVisual) {
         const merged = { ...icon.iconOpts };
-        for (const k of VISUAL_KEYS) {
+        for (const k of ICON_OPT_KEYS) {
           if (k in opts) merged[k] = opts[k];
         }
         icon.iconOpts = Object.keys(merged).length ? merged : null;

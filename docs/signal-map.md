@@ -32,6 +32,8 @@ only thing that converts one kind to another.
 | discrete | STT taps (ADR 039) | `route(src, 'audio:transcript')` |
 | continuous | mic level | `route(Source.mic)` |
 | continuous | gaze | `route(Source.gaze.x \| .y \| .vx \| .vy)` |
+| continuous | physics-sim channel (ADR 059) | `route(physics('pendulum').theta2)` |
+| discrete | physics-sim event (ADR 059) | `route('physics:pendulum:flip')` · `route('physics:{id}:bounce')` |
 | continuous | fn / signal-obj / `AudioParam` | `route(() => v)` |
 | frame | camera | `route(Source.camera)` / `pipe(Source.camera)` |
 | frame | canvas / video element | `route(canvasEl)` / `pipe(canvasEl)` |
@@ -39,7 +41,8 @@ only thing that converts one kind to another.
 Discrete event namespaces: `midi:*`, `beat:*`, `window:key:*`, `window:mouse:*`
 (+ window-scoped `wm:{id}:*`), `sensor:*` (incl. `sensor:serial:data`),
 `gesture:*`, `gaze:*`, `gpio:pin`, `serial:status`, `note:*`, `audio:*`,
-`midi:cc/clock/note:on/note:off/open`, paint/widget events.
+`midi:cc/clock/note:on/note:off/open`, `physics:{name}:*` + `physics:{id}:*`,
+paint/widget events.
 
 ### Authored sources (you make the signal)
 

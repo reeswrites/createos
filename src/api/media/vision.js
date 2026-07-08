@@ -302,6 +302,31 @@ const _cache = { objects: [], hands: [], faces: [], face: null, pose: null, gaze
 // These are INPUTS to a masked shader, so they never join keep-alive.
 const _maskLoops = [];
 
+// The mask-canvas RAF skeleton shared by handMask/faceMask/handRectMask (ADR 054):
+// a black w×h canvas repainted each frame by paint(ctx) — white coverage on black —
+// self-driving on a run-scoped RAF, stopped on reset (NOT keep-alive; the masked layer
+// it feeds holds the run alive). paint(ctx) owns its own mirror save/restore + any
+// per-detection smoothing state — only the black-fill/schedule/cleanup are shared.
+function _makeMaskCanvas({ w = 512, h = 512 }, paint) {
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  let rafId = null;
+  const draw = () => {
+    if (!isPaused() && ctx) {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.fillStyle = 'black';
+      ctx.fillRect(0, 0, w, h);
+      paint(ctx);
+    }
+    rafId = requestAnimationFrame(draw);
+  };
+  rafId = requestAnimationFrame(draw);
+  _maskLoops.push(() => cancelAnimationFrame(rafId));
+  return canvas;
+}
+
 const _gestureHandlers = [];
 const _expressionHandlers = [];
 const _gazeDirHandlers = []; // { dir, fn, prev }
@@ -950,50 +975,36 @@ export const vision = {
     h = 512,
   } = {}) {
     _ensureStarted();
-    const canvas = document.createElement('canvas');
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d');
     const rpx = radius * Math.min(w, h);
     const idxs = Array.isArray(landmark) ? landmark : [landmark];
     const smoothed = new Map(); // 'hand:landmark' → { x, y } (normalized)
-    let rafId = null;
-    const draw = () => {
-      if (!isPaused() && ctx) {
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.fillStyle = 'black';
-        ctx.fillRect(0, 0, w, h);
-        ctx.save();
-        _applyMirror(ctx, mirror);
-        ctx.fillStyle = 'white';
-        _cache.hands.forEach((hand, hi) => {
-          const lm = hand.landmarks;
-          if (!lm?.length) return;
-          for (const li of idxs) {
-            const p = lm[li];
-            if (!p) continue;
-            const key = hi + ':' + li;
-            const prev = smoothed.get(key);
-            const sx = prev ? prev.x * smoothing + p.x * (1 - smoothing) : p.x;
-            const sy = prev ? prev.y * smoothing + p.y * (1 - smoothing) : p.y;
-            smoothed.set(key, { x: sx, y: sy });
-            const cx = sx * w,
-              cy = sy * h;
-            if (shape === 'square') ctx.fillRect(cx - rpx, cy - rpx, rpx * 2, rpx * 2);
-            else {
-              ctx.beginPath();
-              ctx.arc(cx, cy, rpx, 0, Math.PI * 2);
-              ctx.fill();
-            }
+    return _makeMaskCanvas({ w, h }, (ctx) => {
+      ctx.save();
+      _applyMirror(ctx, mirror);
+      ctx.fillStyle = 'white';
+      _cache.hands.forEach((hand, hi) => {
+        const lm = hand.landmarks;
+        if (!lm?.length) return;
+        for (const li of idxs) {
+          const p = lm[li];
+          if (!p) continue;
+          const key = hi + ':' + li;
+          const prev = smoothed.get(key);
+          const sx = prev ? prev.x * smoothing + p.x * (1 - smoothing) : p.x;
+          const sy = prev ? prev.y * smoothing + p.y * (1 - smoothing) : p.y;
+          smoothed.set(key, { x: sx, y: sy });
+          const cx = sx * w,
+            cy = sy * h;
+          if (shape === 'square') ctx.fillRect(cx - rpx, cy - rpx, rpx * 2, rpx * 2);
+          else {
+            ctx.beginPath();
+            ctx.arc(cx, cy, rpx, 0, Math.PI * 2);
+            ctx.fill();
           }
-        });
-        ctx.restore();
-      }
-      rafId = requestAnimationFrame(draw);
-    };
-    rafId = requestAnimationFrame(draw);
-    _maskLoops.push(() => cancelAnimationFrame(rafId));
-    return canvas;
+        }
+      });
+      ctx.restore();
+    });
   },
 
   // A ready-to-use mask over the tracked face(s) — a white (default feathered)
@@ -1015,78 +1026,64 @@ export const vision = {
     h = 512,
   } = {}) {
     _ensureStarted();
-    const canvas = document.createElement('canvas');
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d');
     const smoothed = new Map(); // face index → smoothed { cx, cy, rx, ry } (normalized)
-    let rafId = null;
-    const draw = () => {
-      if (!isPaused() && ctx) {
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.fillStyle = 'black';
-        ctx.fillRect(0, 0, w, h);
-        const seen = new Set();
+    return _makeMaskCanvas({ w, h }, (ctx) => {
+      const seen = new Set();
+      ctx.save();
+      _applyMirror(ctx, mirror);
+      // Union overlapping ovals by max coverage — else a feathered edge would
+      // darken a neighbouring face's white.
+      ctx.globalCompositeOperation = 'lighten';
+      _cache.faces.forEach((face, fi) => {
+        const lm = face.landmarks;
+        if (!lm?.length) return;
+        seen.add(fi);
+        let minX = 1,
+          minY = 1,
+          maxX = 0,
+          maxY = 0;
+        for (const p of lm) {
+          if (p.x < minX) minX = p.x;
+          if (p.y < minY) minY = p.y;
+          if (p.x > maxX) maxX = p.x;
+          if (p.y > maxY) maxY = p.y;
+        }
+        const t = {
+          cx: (minX + maxX) / 2,
+          cy: (minY + maxY) / 2,
+          rx: ((maxX - minX) / 2) * (1 + pad),
+          ry: ((maxY - minY) / 2) * (1 + pad),
+        };
+        const prev = smoothed.get(fi);
+        const sm = prev
+          ? {
+              cx: prev.cx * smoothing + t.cx * (1 - smoothing),
+              cy: prev.cy * smoothing + t.cy * (1 - smoothing),
+              rx: prev.rx * smoothing + t.rx * (1 - smoothing),
+              ry: prev.ry * smoothing + t.ry * (1 - smoothing),
+            }
+          : t;
+        smoothed.set(fi, sm);
         ctx.save();
-        _applyMirror(ctx, mirror);
-        // Union overlapping ovals by max coverage — else a feathered edge would
-        // darken a neighbouring face's white.
-        ctx.globalCompositeOperation = 'lighten';
-        _cache.faces.forEach((face, fi) => {
-          const lm = face.landmarks;
-          if (!lm?.length) return;
-          seen.add(fi);
-          let minX = 1,
-            minY = 1,
-            maxX = 0,
-            maxY = 0;
-          for (const p of lm) {
-            if (p.x < minX) minX = p.x;
-            if (p.y < minY) minY = p.y;
-            if (p.x > maxX) maxX = p.x;
-            if (p.y > maxY) maxY = p.y;
-          }
-          const t = {
-            cx: (minX + maxX) / 2,
-            cy: (minY + maxY) / 2,
-            rx: ((maxX - minX) / 2) * (1 + pad),
-            ry: ((maxY - minY) / 2) * (1 + pad),
-          };
-          const prev = smoothed.get(fi);
-          const sm = prev
-            ? {
-                cx: prev.cx * smoothing + t.cx * (1 - smoothing),
-                cy: prev.cy * smoothing + t.cy * (1 - smoothing),
-                rx: prev.rx * smoothing + t.rx * (1 - smoothing),
-                ry: prev.ry * smoothing + t.ry * (1 - smoothing),
-              }
-            : t;
-          smoothed.set(fi, sm);
-          ctx.save();
-          ctx.translate(sm.cx * w, sm.cy * h);
-          ctx.scale(sm.rx * w, sm.ry * h); // unit circle → face oval
-          if (feather > 0) {
-            const g = ctx.createRadialGradient(0, 0, Math.max(0, 1 - feather), 0, 0, 1);
-            g.addColorStop(0, 'white');
-            g.addColorStop(1, 'black');
-            ctx.fillStyle = g;
-          } else {
-            ctx.fillStyle = 'white';
-          }
-          ctx.beginPath();
-          ctx.arc(0, 0, 1, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.restore();
-        });
+        ctx.translate(sm.cx * w, sm.cy * h);
+        ctx.scale(sm.rx * w, sm.ry * h); // unit circle → face oval
+        if (feather > 0) {
+          const g = ctx.createRadialGradient(0, 0, Math.max(0, 1 - feather), 0, 0, 1);
+          g.addColorStop(0, 'white');
+          g.addColorStop(1, 'black');
+          ctx.fillStyle = g;
+        } else {
+          ctx.fillStyle = 'white';
+        }
+        ctx.beginPath();
+        ctx.arc(0, 0, 1, 0, Math.PI * 2);
+        ctx.fill();
         ctx.restore();
-        // Drop smoothing state for faces that left frame (avoid unbounded map).
-        for (const k of smoothed.keys()) if (!seen.has(k)) smoothed.delete(k);
-      }
-      rafId = requestAnimationFrame(draw);
-    };
-    rafId = requestAnimationFrame(draw);
-    _maskLoops.push(() => cancelAnimationFrame(rafId));
-    return canvas;
+      });
+      ctx.restore();
+      // Drop smoothing state for faces that left frame (avoid unbounded map).
+      for (const k of smoothed.keys()) if (!seen.has(k)) smoothed.delete(k);
+    });
   },
 
   // A ready-to-use mask spanning the rectangle framed by two hands — bring one
@@ -1111,47 +1108,32 @@ export const vision = {
     h = 512,
   } = {}) {
     _ensureStarted();
-    const canvas = document.createElement('canvas');
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d');
     const sm = [null, null]; // smoothed { x, y } per corner (normalized)
-    let rafId = null;
-    const draw = () => {
-      if (!isPaused() && ctx) {
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.fillStyle = 'black';
-        ctx.fillRect(0, 0, w, h);
-        const hands = _cache.hands;
-        if (hands.length >= 2) {
-          ctx.save();
-          _applyMirror(ctx, mirror);
-          const pts = [];
-          for (let i = 0; i < 2; i++) {
-            const p = hands[i].landmarks?.[landmark];
-            if (!p) continue;
-            const prev = sm[i];
-            const x = prev ? prev.x * smoothing + p.x * (1 - smoothing) : p.x;
-            const y = prev ? prev.y * smoothing + p.y * (1 - smoothing) : p.y;
-            sm[i] = { x, y };
-            pts.push({ x, y });
-          }
-          if (pts.length === 2) {
-            const x0 = Math.min(pts[0].x, pts[1].x) - pad;
-            const y0 = Math.min(pts[0].y, pts[1].y) - pad;
-            const x1 = Math.max(pts[0].x, pts[1].x) + pad;
-            const y1 = Math.max(pts[0].y, pts[1].y) + pad;
-            ctx.fillStyle = 'white';
-            ctx.fillRect(x0 * w, y0 * h, (x1 - x0) * w, (y1 - y0) * h);
-          }
-          ctx.restore();
-        }
+    return _makeMaskCanvas({ w, h }, (ctx) => {
+      const hands = _cache.hands;
+      if (hands.length < 2) return;
+      ctx.save();
+      _applyMirror(ctx, mirror);
+      const pts = [];
+      for (let i = 0; i < 2; i++) {
+        const p = hands[i].landmarks?.[landmark];
+        if (!p) continue;
+        const prev = sm[i];
+        const x = prev ? prev.x * smoothing + p.x * (1 - smoothing) : p.x;
+        const y = prev ? prev.y * smoothing + p.y * (1 - smoothing) : p.y;
+        sm[i] = { x, y };
+        pts.push({ x, y });
       }
-      rafId = requestAnimationFrame(draw);
-    };
-    rafId = requestAnimationFrame(draw);
-    _maskLoops.push(() => cancelAnimationFrame(rafId));
-    return canvas;
+      if (pts.length === 2) {
+        const x0 = Math.min(pts[0].x, pts[1].x) - pad;
+        const y0 = Math.min(pts[0].y, pts[1].y) - pad;
+        const x1 = Math.max(pts[0].x, pts[1].x) + pad;
+        const y1 = Math.max(pts[0].y, pts[1].y) + pad;
+        ctx.fillStyle = 'white';
+        ctx.fillRect(x0 * w, y0 * h, (x1 - x0) * w, (y1 - y0) * h);
+      }
+      ctx.restore();
+    });
   },
 
   face() {

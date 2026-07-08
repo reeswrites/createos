@@ -1092,6 +1092,7 @@ onReset(cleanupPianos);
 registerDesktopFileType('piano', {
   glyph: 'fa-solid fa-music',
   cssClass: 'dt-piano-icon',
+  glyphStyle: 'background: #0d0d1a; border: 1px solid #313244; font-size: 22px; color: #cba6f7;',
   open: (data, pos) => {
     const p = new Piano({
       title: data.title ?? 'Piano',

@@ -814,6 +814,7 @@ onReset(cleanupNotepads);
 registerDesktopFileType('note', {
   glyph: 'fa-solid fa-file-lines',
   cssClass: 'dt-note-icon',
+  glyphStyle: 'background: #1a1810; border: 1px solid #4a3a10; font-size: 22px; color: #e8d5a0;',
   open: (data, pos) => new Notepad({ ...data, ...pos }),
 });
 

@@ -41,3 +41,15 @@ export function desktopFileGlyphs() {
 export function desktopFileCssClass(type) {
   return _types.get(type)?.cssClass ?? '';
 }
+
+// The per-type glyph appearance (bg/border/color) as [{cssClass, glyphStyle}] records,
+// so desktop-files' _injectCSS derives the `.dt-icon.<cssClass> .dt-glyph { … }` rules
+// instead of hardcoding them — appearance lives beside the widget's own registration
+// (closes ADR 055's remaining split between widget cssClass and platform rule body).
+export function desktopFileGlyphStyles() {
+  const out = [];
+  for (const a of _types.values()) {
+    if (a.cssClass && a.glyphStyle) out.push({ cssClass: a.cssClass, glyphStyle: a.glyphStyle });
+  }
+  return out;
+}

@@ -785,6 +785,8 @@ describe('Pipeline.STAGE_CTORS', () => {
     'ascii',
     'pixelate',
     'fx',
+    'glshader',
+    'shader',
   ];
 
   it('contains all expected stage types', () => {
@@ -822,5 +824,15 @@ describe('Pipeline.STAGE_CTORS', () => {
     const { canvas: src } = makeCanvas();
     const p = pipe(src);
     expect(() => p._createNamedStage('unicorn', [])).toThrow(/unknown stage type/);
+  });
+
+  it('_createNamedStage builds a glshader stage (temporal route path no longer throws)', () => {
+    const { canvas: src } = makeCanvas();
+    const p = pipe(src);
+    // route(cam).glshader(b).wait(2).negative() drives the timeline through
+    // _addNamedStage → _createNamedStage; glshader must resolve, not throw.
+    const stage = p._createNamedStage('glshader', ['void main(){}', {}]);
+    expect(stage._isShader).toBe(true);
+    expect(typeof stage.read).toBe('function');
   });
 });

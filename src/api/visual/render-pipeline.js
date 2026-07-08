@@ -971,17 +971,13 @@ export class Pipeline {
   }
 
   // NOTE: the uniform pixel/fx stages (tint, mask, negative, solarize, posterize,
-  // duotone, grain, strobe, blur, hue, ascii, pixelate, fx) are NOT hand-written
-  // here — they are generated from STAGE_CTORS after the class (single declaration).
-  // Only the special stages below stay explicit: non-uniform signatures + not
-  // live-mutable, so they have no STAGE_CTORS entry.
+  // duotone, grain, strobe, blur, hue, ascii, pixelate, fx) plus glshader/shader are
+  // NOT hand-written here — they are generated from STAGE_CTORS after the class (single
+  // declaration). glshader/shader take a uniform (body, opts) signature, so they live in
+  // STAGE_CTORS too: this is what lets route()'s temporal path (.glshader(b).wait(2)…)
+  // build them via _createNamedStage instead of throwing 'unknown stage type'.
+  // Only use/subtitle stay explicit below — route() never exposes them temporally.
 
-  glshader(body, opts = {}, id) {
-    return this._pushStage(new GLShaderStage(this._last(), body, opts), 'glshader', id);
-  }
-  shader(body, opts = {}, id) {
-    return this._pushStage(new ShaderStage(this._last(), body, opts), 'shader', id);
-  }
   /** Custom stage — escape hatch. factory(upstream) must return { canvas, read() }. */
   use(factory, id) {
     return this._pushStage(new CustomStage(this._last(), factory), 'custom', id);
@@ -997,8 +993,8 @@ export class Pipeline {
   // constructor WITH the chain-method defaults baked in. Both the generated chain
   // methods (see below the class) and _createNamedStage (route's live mutation) read
   // this — so a stage type is declared exactly once. Defaults must match the doc'd
-  // chain signatures. Special stages (glshader/shader/use/subtitle) are NOT here —
-  // they take non-uniform signatures and/or can't be live-mutated (pre-existing gap).
+  // chain signatures. use/subtitle are NOT here — route() never exposes them temporally,
+  // and use() takes a factory fn rather than a uniform value signature.
   static get STAGE_CTORS() {
     // `_a(fn, n)` tags a ctor with its arg-count after `up` (defaults hide it from
     // fn.length). The generated chain method uses n to peel a trailing caller-supplied
@@ -1022,6 +1018,11 @@ export class Pipeline {
       pixelate: _a((up, o = {}) => new PixelateStage(up, o), 1),
       fx: _a((up, f) => new FxStage(up, f), 1),
       mask: _a((up, source, opts = {}) => new MaskStage(up, source, opts), 2),
+      // Shader stages: uniform (body, opts) signature. Live-mutable so route()'s
+      // temporal/toggle path can build them — closes the pre-existing gap where
+      // route(cam).glshader(b).wait(2).negative().show() threw at RAF time.
+      glshader: _a((up, body, opts = {}) => new GLShaderStage(up, body, opts), 2),
+      shader: _a((up, body, opts = {}) => new ShaderStage(up, body, opts), 2),
     };
   }
 

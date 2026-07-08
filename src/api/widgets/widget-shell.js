@@ -12,8 +12,48 @@ import { WidgetHistory } from './widget-history.js';
 import { insertSnippet } from '../../editor/active-editor.js';
 import { buildReplayCode } from '../signal/performance-recorder.js';
 
-const ACTIVE_COLOR = '#cba6f7';
-const INACTIVE_BORDER = '#45475a';
+export const ACTIVE_COLOR = '#cba6f7';
+export const INACTIVE_BORDER = '#45475a';
+
+// Build the tool-select button row shared by Paint / SpriteEditor / AsciiEditor.
+// Each was a verbatim TOOLS.forEach loop (same cssText, same "re-border every
+// sibling on click", same emit) plus a triplicated copy of the two colour consts.
+// The per-tool side effects (Paint's text layer, Ascii's caret) stay in the
+// widget via onSelect(id, prev). Widgets append their own extra buttons
+// (backdrop, view controls) to the returned row afterward.
+//   tools:    [{ id, title, icon }]
+//   active:   the initially-highlighted tool id
+//   onSelect: (id, prev) => void
+export function buildToolButtonRow(tools, { active, onSelect } = {}) {
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:3px;padding:5px 8px 3px;flex-shrink:0;flex-wrap:wrap;';
+  let current = active;
+  const reborder = (id) => {
+    row.querySelectorAll('button[data-tool]').forEach((b) => {
+      b.style.borderColor = b.dataset.tool === id ? ACTIVE_COLOR : INACTIVE_BORDER;
+    });
+  };
+  tools.forEach((t) => {
+    const btn = document.createElement('button');
+    btn.title = t.title;
+    btn.dataset.tool = t.id;
+    btn.style.cssText = [
+      `background:#313244;border:2px solid ${t.id === active ? ACTIVE_COLOR : INACTIVE_BORDER};`,
+      'border-radius:5px;color:#cdd6f4;font-size:14px;width:30px;height:28px;',
+      'cursor:pointer;display:flex;align-items:center;justify-content:center;',
+      'padding:0;transition:border-color 0.1s;',
+    ].join('');
+    btn.innerHTML = t.icon;
+    btn.addEventListener('click', () => {
+      const prev = current;
+      current = t.id;
+      reborder(current);
+      onSelect?.(t.id, prev);
+    });
+    row.appendChild(btn);
+  });
+  return row;
+}
 
 // ── Capture button (Performance recording, ADR 031) ───────────────────────────
 // Wire a widget-supplied button to toggle a Take: first click arms, second click

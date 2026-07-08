@@ -23,6 +23,7 @@ import {
   detachTriggerSurface,
   disposeTriggerSurface,
   strikeCore,
+  surfaceState,
 } from './trigger-surface.js';
 
 const _launchpads = [];
@@ -250,15 +251,12 @@ export class Launchpad {
       widgetType: 'launchpad',
       bg: '#0d0d1a',
       rows: [],
-      getState: () => ({
-        title: this._title,
-        rows: this._rows,
-        cols: this._cols,
-        baseNote: this._baseNote,
-        voice: this._defaultDesc,
-        bindings: this._bindings.serialize(),
-        _desktopIconId: this._desktopIconId,
-      }),
+      getState: () =>
+        surfaceState(this, {
+          rows: this._rows,
+          cols: this._cols,
+          baseNote: this._baseNote,
+        }),
       save: {
         name: (this._title || 'Launchpad') + '.pad',
         type: 'launchpad',

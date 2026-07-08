@@ -13,6 +13,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 function makeIDBMock() {
   const stores = {};
+  const deletions = [];
   const openReq = (storeName) => ({
     transaction(_s, _mode) {
       if (!stores[storeName]) stores[storeName] = {};
@@ -29,6 +30,7 @@ function makeIDBMock() {
               return req;
             },
             delete(key) {
+              deletions.push(key);
               delete stores[storeName][key];
               return {};
             },
@@ -48,6 +50,7 @@ function makeIDBMock() {
     },
   });
   const mock = {
+    deletions,
     open(name) {
       const req = {};
       const db = openReq(name);
@@ -194,6 +197,37 @@ describe('desktop.remove', () => {
     const beforeCount = document.querySelectorAll('[data-dt-id]').length;
     DesktopAPI.remove(id);
     expect(document.querySelectorAll('[data-dt-id]').length).toBe(beforeCount - 1);
+  });
+});
+
+// Regression: every destroy path routes through _disposeIcon, so capture blobs
+// are freed from IDB — clear() and the restore-wipe used to leak them.
+describe('capture blob cleanup (IDB leak regression)', () => {
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+
+  it('remove() frees the icon capture blob from IDB', async () => {
+    const { id } = DesktopAPI.addBlob(new Blob(['x'], { type: 'image/jpeg' }), {
+      name: 'r.jpg',
+      type: 'image',
+    });
+    DesktopAPI.remove(id);
+    await flush();
+    expect(global.indexedDB.deletions).toContain(id);
+  });
+
+  it('clear() frees every capture blob (previously leaked)', async () => {
+    const a = DesktopAPI.addBlob(new Blob(['a'], { type: 'image/jpeg' }), {
+      name: 'a.jpg',
+      type: 'image',
+    });
+    const b = DesktopAPI.addBlob(new Blob(['b'], { type: 'video/webm' }), {
+      name: 'b.webm',
+      type: 'video',
+    });
+    DesktopAPI.clear();
+    await flush();
+    expect(global.indexedDB.deletions).toContain(a.id);
+    expect(global.indexedDB.deletions).toContain(b.id);
   });
 });
 

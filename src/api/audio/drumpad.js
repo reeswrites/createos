@@ -24,6 +24,8 @@ import {
   detachTriggerSurface,
   disposeTriggerSurface,
   strikeCore,
+  surfaceState,
+  createStepClock,
 } from './trigger-surface.js';
 
 // General MIDI percussion note → voice id (ADR 033). Common aliases included.
@@ -235,15 +237,12 @@ export class Drumpad {
     });
     this._swing = initSwing ?? 0;
     this._bpm = initBpm ?? 120;
-    this._playing = false;
-    this._paused = false;
-    this._sequence = null;
+    this._clock = null; // StepClock (ADR 056) — owns _playing/_paused/sequence
     this._winId = null;
     this._keyMap = {};
     this._onKey = null;
     this._title = title;
     this._desktopIconId = existingIconId ?? null;
-    this._playBtn = null; // set in _init; used by onDestroy
 
     // Replaced per-instance by the shell in _init(); no-op until then.
     this._autoSave = () => {};
@@ -419,17 +418,15 @@ export class Drumpad {
       widgetType: 'drumpad',
       bg: '#0d0d1a',
       rows: [],
-      getState: () => ({
-        title: this._title,
-        bpm: this._bpm,
-        steps: this._steps,
-        pads: this._voices.length,
-        swing: this._swing,
-        patterns: this._voices.map((v) => [...v.steps]),
-        velocities: this._voices.map((v) => [...v.vels]),
-        bindings: this._bindings.serialize(),
-        _desktopIconId: this._desktopIconId,
-      }),
+      getState: () =>
+        surfaceState(this, {
+          bpm: this._bpm,
+          steps: this._steps,
+          pads: this._voices.length,
+          swing: this._swing,
+          patterns: this._voices.map((v) => [...v.steps]),
+          velocities: this._voices.map((v) => [...v.vels]),
+        }),
       save: {
         name: (this._title || 'Beat') + '.beat',
         type: 'beat',
@@ -461,7 +458,7 @@ export class Drumpad {
         },
       },
       keepIconOnClose: true,
-      onDestroy: () => this._destroy(this._playBtn),
+      onDestroy: () => this._destroy(),
     });
     if (!shell) return;
     this._winId = shell.winId;
@@ -594,58 +591,43 @@ export class Drumpad {
     bpmIn.style.cssText =
       'width:52px;background:#1e1e2e;color:#cdd6f4;border:1px solid #313244;border-radius:3px;padding:2px 4px;font-size:11px;font-family:monospace;text-align:center;';
 
-    playBtn.addEventListener('click', () => {
-      if (!this._playing) {
-        // Start fresh
-        this._playing = true;
-        this._paused = false;
+    // Sequencer transport lives in the shared StepClock (ADR 056); the per-step
+    // body below is the Drumpad's sound-core and stays here.
+    this._clock = createStepClock({
+      steps: () => this._steps,
+      playBtn,
+      onStart: () => {
         Tone.getTransport().bpm.value = parseInt(bpmIn.value) || 120;
         this._applySwing();
-        let step = 0;
-        this._sequence = new Tone.Sequence(
-          (time) => {
-            const s = step;
-            requestAnimationFrame(() => {
-              this._voices.forEach((v) => {
-                v._cells.forEach((c, i) => {
-                  c.style.boxShadow = i === s ? `0 0 0 2px ${v.color}` : '';
-                });
-              });
-            });
-            const activeVoices = [];
-            this._voices.forEach((v, vi) => {
-              if (v.steps[s]) {
-                this._trigger(vi, time, { source: 'seq', step: s, vel: v.vels[s] ?? 1 });
-                activeVoices.push(vi);
-              }
-            });
-            const stepEv = { step: s, activeVoices };
-            this._events.emit('step', stepEv);
-            step = (step + 1) % this._steps;
-          },
-          [...Array(this._steps).keys()],
-          '16n',
+      },
+      onStop: () => {
+        this._voices.forEach((v) =>
+          v._cells.forEach((c) => {
+            c.style.boxShadow = '';
+          }),
         );
-        this._sequence.start(0);
-        Tone.getTransport().start();
-        playBtn.textContent = '⏸ Pause';
-        playBtn.style.background = '#1a3d1a';
-      } else if (!this._paused) {
-        // Pause — freeze at current step
-        this._paused = true;
-        Tone.getTransport().pause();
-        playBtn.textContent = '▶ Play';
-        playBtn.style.background = '#1e1e2e';
-      } else {
-        // Resume from pause
-        this._paused = false;
-        Tone.getTransport().start();
-        playBtn.textContent = '⏸ Pause';
-        playBtn.style.background = '#1a3d1a';
-      }
+      },
+      perStep: (s, time) => {
+        requestAnimationFrame(() => {
+          this._voices.forEach((v) => {
+            v._cells.forEach((c, i) => {
+              c.style.boxShadow = i === s ? `0 0 0 2px ${v.color}` : '';
+            });
+          });
+        });
+        const activeVoices = [];
+        this._voices.forEach((v, vi) => {
+          if (v.steps[s]) {
+            this._trigger(vi, time, { source: 'seq', step: s, vel: v.vels[s] ?? 1 });
+            activeVoices.push(vi);
+          }
+        });
+        this._events.emit('step', { step: s, activeVoices });
+      },
     });
 
-    stopBtn.addEventListener('click', () => this._stop(playBtn));
+    playBtn.addEventListener('click', () => this._clock.toggle());
+    stopBtn.addEventListener('click', () => this._stop());
 
     clearBtn.addEventListener('click', () => {
       this._voices.forEach((v) => {
@@ -741,9 +723,6 @@ export class Drumpad {
       }
     };
     document.addEventListener('keydown', this._onKey);
-
-    // playBtn is captured for the shell's onDestroy (see _init head).
-    this._playBtn = playBtn;
   }
 
   // ── Public methods ────────────────────────────────────────────────────────────
@@ -850,32 +829,12 @@ export class Drumpad {
     this._events.clear();
   }
 
-  _stop(playBtn) {
-    if (this._sequence) {
-      try {
-        this._sequence.stop();
-        this._sequence.dispose();
-      } catch (_) {}
-      this._sequence = null;
-    }
-    try {
-      Tone.getTransport().stop();
-    } catch (_) {}
-    this._playing = false;
-    this._paused = false;
-    this._voices.forEach((v) =>
-      v._cells.forEach((c) => {
-        c.style.boxShadow = '';
-      }),
-    );
-    if (playBtn) {
-      playBtn.textContent = '▶ Play';
-      playBtn.style.background = '#1e1e2e';
-    }
+  _stop() {
+    this._clock?.stop();
   }
 
-  _destroy(playBtn) {
-    this._stop(playBtn);
+  _destroy() {
+    this._stop();
     this._clearHooks();
     detachTriggerSurface(this, _drumpads);
     if (this._onKey) {

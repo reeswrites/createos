@@ -69,6 +69,113 @@ export function strikeCore(self, key, { sound, payload, after }) {
   after?.();
 }
 
+// The serialized state envelope every surface shares (ADR 056). The chassis
+// already RESTORES bindings inbound (initTriggerSurface); this is the outbound
+// twin — the identity fields (title, default voice, bindings, desktop icon) that
+// were hand-written the same way in all three getState()s. Each surface passes
+// only its own `extras` (bpm/steps/octaves…). Drumpad has no default voice, so
+// `voice` resolves to undefined and JSON drops it — behaviourally identical to
+// its old envelope that omitted the key.
+export function surfaceState(self, extras = {}) {
+  return {
+    title: self._title,
+    voice: self._defaultDesc ?? undefined,
+    bindings: self._bindings.serialize(),
+    _desktopIconId: self._desktopIconId,
+    ...extras,
+  };
+}
+
+// StepClock — the step-sequencer transport envelope shared by Piano and Drumpad
+// (Launchpad has no sequencer and never constructs one). The chassis unified the
+// STRIKE path with strikeCore; this unifies the SEQUENCER path: the identical
+// _playing/_paused state machine, the Tone.Sequence lifecycle, Transport
+// start/stop, and the play-button label/colour flip. Only the per-step body, the
+// step count, the pre-start hook (bpm/swing), and the highlight-clear genuinely
+// differ, and those are passed in as config (ADR 056 discipline — the sound-core
+// stays per-surface; only the envelope moves here).
+class StepClock {
+  // steps: number | () => number · perStep(s, time) · playBtn: HTMLElement|null
+  // onStart?: before the Sequence starts (set bpm, apply swing)
+  // onStop?: clear the per-cell highlight (surfaces paint different cells)
+  constructor({ steps, perStep, playBtn = null, onStart, onStop }) {
+    this._steps = steps;
+    this._perStep = perStep;
+    this._playBtn = playBtn;
+    this._onStart = onStart;
+    this._onStop = onStop;
+    this.playing = false;
+    this.paused = false;
+    this._sequence = null;
+    this._step = 0;
+  }
+
+  _count() {
+    return typeof this._steps === 'function' ? this._steps() : this._steps;
+  }
+
+  _setBtn(playing) {
+    const b = this._playBtn;
+    if (!b) return;
+    b.textContent = playing ? '⏸ Pause' : '▶ Play';
+    b._active = playing;
+    b.style.background = playing ? '#1a3d1a' : '#1e1e2e';
+  }
+
+  // Three-way play → pause → resume, matching the old click handlers exactly.
+  toggle() {
+    if (!this.playing) {
+      this.playing = true;
+      this.paused = false;
+      this._step = 0;
+      this._onStart?.();
+      const n = this._count();
+      this._sequence = new Tone.Sequence(
+        (time) => {
+          const s = this._step;
+          this._perStep(s, time);
+          this._step = (this._step + 1) % n;
+        },
+        [...Array(n).keys()],
+        '16n',
+      );
+      this._sequence.start(0);
+      Tone.getTransport().start();
+      this._setBtn(true);
+    } else if (!this.paused) {
+      this.paused = true;
+      Tone.getTransport().pause();
+      this._setBtn(false);
+    } else {
+      this.paused = false;
+      Tone.getTransport().start();
+      this._setBtn(true);
+    }
+  }
+
+  stop() {
+    if (this._sequence) {
+      try {
+        this._sequence.stop();
+        this._sequence.dispose();
+      } catch (_) {}
+      this._sequence = null;
+    }
+    try {
+      Tone.getTransport().stop();
+    } catch (_) {}
+    this.playing = false;
+    this.paused = false;
+    this._step = 0;
+    this._onStop?.();
+    this._setBtn(false);
+  }
+}
+
+export function createStepClock(cfg) {
+  return new StepClock(cfg);
+}
+
 // Enable MIDI input for the surface once its window exists. Call at the tail of
 // the constructor, after _init() has set self._winId. Registers the surface as a
 // MIDI instrument and claims focus (the window just spawned frontmost); permission

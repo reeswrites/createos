@@ -6,14 +6,17 @@ import { WidgetEvents } from './widget-events.js';
 import { downloadBlob } from './frame-snapshot.js';
 import { registerWidgetRestorer } from '../wm/widget-restorer-registry.js';
 import { insertSnippet } from '../../editor/active-editor.js';
-import { FrameDoc } from './frame-doc.js';
+import { FrameDoc, restoreFrames } from './frame-doc.js';
 import { hexToRgb } from '../visual/color.js';
 import {
   mountWidgetShell,
   buildFrameStrip,
   buildTransport,
+  buildToolButtonRow,
   wireCaptureButton,
   mkExportButton as mkExport,
+  ACTIVE_COLOR,
+  INACTIVE_BORDER,
 } from './widget-shell.js';
 import { onReset } from '../../runtime/reset-registry.js';
 import { registerDesktopFileType } from '../platform/desktop-file-registry.js';
@@ -80,9 +83,6 @@ const GRID_PRESETS = [
   { label: '40×20', cols: 40, rows: 20 },
   { label: '120×48', cols: 120, rows: 48 },
 ];
-
-const ACTIVE_COLOR = '#cba6f7';
-const INACTIVE_BORDER = '#45475a';
 
 function _hexToRgbStr(hex) {
   return hexToRgb(hex).join(';');
@@ -482,12 +482,17 @@ export class AsciiEditor {
   }
 
   _applyCells(snap) {
-    while (this._frames.length < snap.frames.length) this._frames.push(this._blankFrame());
-    this._frames.length = snap.frames.length;
-    snap.frames.forEach((f, i) => {
-      this._frames[i] = f.map((cell) => ({ ...cell }));
+    restoreFrames({
+      frames: this._frames,
+      snap,
+      grow: () => this._frames.push(this._blankFrame()),
+      paint: (_frame, cells, i) => {
+        this._frames[i] = cells.map((cell) => ({ ...cell }));
+      },
+      setIndex: (fi) => {
+        this._fi = fi;
+      },
     });
-    this._fi = snap.fi;
     this._render();
     this._refreshThumbs();
   }
@@ -511,33 +516,15 @@ export class AsciiEditor {
   // ── Tool row ──────────────────────────────────────────────────────────────────
 
   _buildToolRow() {
-    const row = document.createElement('div');
-    row.style.cssText = 'display:flex;gap:3px;padding:5px 8px 3px;flex-shrink:0;flex-wrap:wrap;';
-
-    TOOLS.forEach((t) => {
-      const btn = document.createElement('button');
-      btn.title = t.title;
-      btn.dataset.tool = t.id;
-      btn.style.cssText = [
-        `background:#313244;border:2px solid ${t.id === this._tool ? ACTIVE_COLOR : INACTIVE_BORDER};`,
-        'border-radius:5px;color:#cdd6f4;font-size:14px;width:30px;height:28px;',
-        'cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;transition:border-color 0.1s;',
-      ].join('');
-      btn.innerHTML = t.icon;
-      btn.addEventListener('click', () => {
-        const prev = this._tool;
-        this._tool = t.id;
-        row.querySelectorAll('button[data-tool]').forEach((b) => {
-          b.style.borderColor = b.dataset.tool === this._tool ? ACTIVE_COLOR : INACTIVE_BORDER;
-        });
-        if (this._tool !== 'type') this._clearOverlay();
+    return buildToolButtonRow(TOOLS, {
+      active: this._tool,
+      onSelect: (id, prev) => {
+        this._tool = id;
+        if (id !== 'type') this._clearOverlay();
         else this._drawCaret();
-        this._events.emit('tool', { tool: this._tool, prev });
-      });
-      row.appendChild(btn);
+        this._events.emit('tool', { tool: id, prev });
+      },
     });
-
-    return row;
   }
 
   // ── Palette row ───────────────────────────────────────────────────────────────

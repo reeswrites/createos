@@ -4,6 +4,7 @@
 import { Sprite } from './sprite.js';
 import { floodFill, resolveColorRGBA, expandBbox } from './raster-tools.js';
 import { snapshotFrameCanvases, paintFrameCanvas, downloadCanvasPng } from './frame-snapshot.js';
+import { restoreFrames } from './frame-doc.js';
 import { registerWidgetRestorer } from '../wm/widget-restorer-registry.js';
 import { WidgetEvents } from './widget-events.js';
 import { insertSnippet } from '../../editor/active-editor.js';
@@ -12,8 +13,11 @@ import {
   mountWidgetShell,
   buildFrameStrip,
   buildTransport,
+  buildToolButtonRow,
   wireCaptureButton,
   mkExportButton,
+  ACTIVE_COLOR,
+  INACTIVE_BORDER,
 } from './widget-shell.js';
 import { onReset } from '../../runtime/reset-registry.js';
 import { registerDesktopFileType } from '../platform/desktop-file-registry.js';
@@ -139,9 +143,6 @@ const TOOLS = [
 
 // Drag-shape tools: pointerdown sets a start cell, drag previews, pointerup commits.
 const SHAPE_TOOLS = ['line', 'rect', 'rectfill', 'circle', 'circlefill'];
-
-const ACTIVE_COLOR = '#cba6f7';
-const INACTIVE_BORDER = '#45475a';
 
 export class SpriteEditor {
   constructor({
@@ -317,11 +318,13 @@ export class SpriteEditor {
 
   _applyPixels(snap) {
     const sp = this.sprite;
-    // Reconcile frame count
-    while (sp._frames.length < snap.frames.length) sp.addFrame();
-    sp._frames.length = snap.frames.length;
-    snap.frames.forEach((data, i) => paintFrameCanvas(sp._frames[i], sp._w, sp._h, data));
-    sp.frame(snap.fi);
+    restoreFrames({
+      frames: sp._frames,
+      snap,
+      grow: () => sp.addFrame(),
+      paint: (fc, data) => paintFrameCanvas(fc, sp._w, sp._h, data),
+      setIndex: (fi) => sp.frame(fi),
+    });
     sp._render();
     this._refreshThumbs();
   }
@@ -350,29 +353,13 @@ export class SpriteEditor {
   }
 
   _buildToolRow() {
-    const row = document.createElement('div');
-    row.style.cssText = 'display:flex;gap:3px;padding:5px 8px 3px;flex-shrink:0;flex-wrap:wrap;';
-
-    TOOLS.forEach((t) => {
-      const btn = document.createElement('button');
-      btn.title = t.title;
-      btn.dataset.tool = t.id;
-      btn.style.cssText = [
-        `background:#313244;border:2px solid ${t.id === this._tool ? ACTIVE_COLOR : INACTIVE_BORDER};`,
-        'border-radius:5px;color:#cdd6f4;font-size:14px;width:30px;height:28px;',
-        'cursor:pointer;display:flex;align-items:center;justify-content:center;',
-        'padding:0;transition:border-color 0.1s;',
-      ].join('');
-      btn.innerHTML = t.icon;
-      btn.addEventListener('click', () => {
-        const prev = this._tool;
-        this._tool = t.id;
-        row.querySelectorAll('button[data-tool]').forEach((b) => {
-          b.style.borderColor = b.dataset.tool === this._tool ? ACTIVE_COLOR : INACTIVE_BORDER;
-        });
-        this._events.emit('tool', { tool: this._tool, prev });
-      });
-      row.appendChild(btn);
+    // The tool buttons live in the shared row; view controls append to it below.
+    const row = buildToolButtonRow(TOOLS, {
+      active: this._tool,
+      onSelect: (id, prev) => {
+        this._tool = id;
+        this._events.emit('tool', { tool: id, prev });
+      },
     });
 
     // Divider between tools and view controls.

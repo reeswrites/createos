@@ -577,7 +577,7 @@ describe('drumpad mixer strip', () => {
 
   it('releases the strip on destroy', () => {
     const dp = new Drumpad({ title: 'Beat2' });
-    dp._destroy(dp._playBtn);
+    dp._destroy();
     expect(releaseStrip).toHaveBeenCalledWith('Beat2');
   });
 });

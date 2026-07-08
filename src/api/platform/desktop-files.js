@@ -450,12 +450,7 @@ function _buildEl(icon) {
         const toDelete = isMulti ? [..._selIds] : [icon.id];
         for (const id of toDelete) {
           const ic = _icons.get(id);
-          if (ic && ic.type !== 'editor') {
-            ic.el?.remove();
-            _icons.delete(id);
-            _selIds.delete(id);
-            if (ic.blobKey) _delCaptureBlob(ic.blobKey);
-          }
+          if (ic && ic.type !== 'editor') _disposeIcon(ic);
         }
         _clearSel();
         _saveDesktopState();
@@ -489,6 +484,20 @@ let _selIds = new Set();
 function _clearSel() {
   _selIds.forEach((id) => _icons.get(id)?.el?.classList.remove('dt-sel'));
   _selIds.clear();
+}
+
+// The single "destroy one icon" path. Every removal (context menu, trash drop,
+// clear, restore-wipe, project bridge) must free the icon's IDB capture blob,
+// detach its element, and drop it from the icon + selection maps — in that order.
+// Hand-rolled ~10× before, and the blob-free had already drifted off several
+// copies (clear()/restore-wipe/context-Release leaked capture blobs in IDB). One
+// home now; callers keep only the surrounding save/notify, which genuinely varies.
+function _disposeIcon(icon) {
+  if (!icon) return;
+  if (icon.blobKey) _delCaptureBlob(icon.blobKey);
+  icon.el?.remove();
+  _icons.delete(icon.id);
+  _selIds.delete(icon.id);
 }
 
 function _sel(id) {
@@ -747,9 +756,7 @@ function _ctx(icon, cx, cy) {
         return;
       window.__ar_instances?.get(icon.editorId)?.destroy();
     } else {
-      icon.el?.remove();
-      _icons.delete(icon.id);
-      _selIds.delete(icon.id);
+      _disposeIcon(icon);
       _saveDesktopState();
     }
   });
@@ -764,8 +771,7 @@ function _ctx(icon, cx, cy) {
         if (ic.type === 'editor') {
           window.__ar_instances?.get(ic.editorId)?.destroy();
         } else {
-          ic.el?.remove();
-          _icons.delete(id);
+          _disposeIcon(ic);
         }
       }
       _clearSel();
@@ -1155,9 +1161,7 @@ export function removeEditorIcon(editorId) {
   const id = 'dt-editor-' + editorId;
   const icon = _icons.get(id);
   if (!icon) return;
-  icon.el?.remove();
-  _icons.delete(id);
-  _selIds.delete(id);
+  _disposeIcon(icon);
   _saveDesktopState();
 }
 
@@ -1172,55 +1176,40 @@ export function updateEditorIconLabel(editorId, label) {
 
 // ── Project serialization ─────────────────────────────────────────────────────
 
+// A single non-editor icon → its portable record (the blobKey → content → HTTP-url
+// cascade). The one home for "icon → record" — serializeDesktop and the project
+// bridge's getIconSerializedData were branch-for-branch copies of this. `forProject`
+// drops the IDB blob stub (blobs don't travel in .vljson). Returns null for an icon
+// with nothing portable (a blob: URL not yet read, or too large).
+function _iconRecord(icon, { forProject = false } = {}) {
+  const { type, name, x, y } = icon;
+  const iconOpts = icon.iconOpts ?? undefined;
+  if (icon.blobKey && !forProject) return { type, name, blobKey: icon.blobKey, x, y, iconOpts };
+  if (icon.content) return { type, name, content: icon.content, x, y, iconOpts };
+  if (icon.url && !icon.url.startsWith('blob:'))
+    return { type, name, url: icon.url, x, y, iconOpts };
+  return null;
+}
+
 export function serializeDesktop({ forProject = false } = {}) {
   const out = [];
   for (const icon of _icons.values()) {
     if (icon.type === 'folder') continue;
     if (icon.type === 'editor') {
       out.push({ type: 'editor', editorId: icon.editorId, name: icon.name, x: icon.x, y: icon.y });
-    } else if (icon.blobKey && !forProject) {
-      // IDB-backed capture (photo/video) — persist key only; excluded from project files
-      out.push({
-        type: icon.type,
-        name: icon.name,
-        blobKey: icon.blobKey,
-        x: icon.x,
-        y: icon.y,
-        iconOpts: icon.iconOpts ?? undefined,
-      });
-    } else if (icon.content) {
-      // content = data URL (images) or plain text (code)
-      out.push({
-        type: icon.type,
-        name: icon.name,
-        content: icon.content,
-        x: icon.x,
-        y: icon.y,
-        iconOpts: icon.iconOpts ?? undefined,
-      });
-    } else if (icon.url && !icon.url.startsWith('blob:')) {
-      // HTTP URL — save directly
-      out.push({
-        type: icon.type,
-        name: icon.name,
-        url: icon.url,
-        x: icon.x,
-        y: icon.y,
-        iconOpts: icon.iconOpts ?? undefined,
-      });
+      continue;
     }
-    // blob URL without content = dropped file too large or not read yet — skip
+    const rec = _iconRecord(icon, { forProject });
+    if (rec) out.push(rec);
   }
   return out;
 }
 
 export function restoreDesktop(icons = []) {
-  // Remove all non-editor icons (editor icons are removed when editors are destroyed)
-  for (const [id, icon] of _icons) {
-    if (icon.type !== 'editor') {
-      icon.el?.remove();
-      _icons.delete(id);
-    }
+  // Remove all non-editor icons (editor icons are removed when editors are destroyed).
+  // _disposeIcon frees each capture blob too — the old inline wipe leaked them in IDB.
+  for (const icon of [..._icons.values()]) {
+    if (icon.type !== 'editor') _disposeIcon(icon);
   }
   _restoredPositions.clear();
 
@@ -1492,19 +1481,13 @@ export const DesktopAPI = {
   remove(id) {
     const icon = _icons.get(id);
     if (!icon) return;
-    if (icon.blobKey) _delCaptureBlob(icon.blobKey);
-    icon.el?.remove();
-    _icons.delete(id);
-    _selIds.delete(id);
+    _disposeIcon(icon);
     notify('desktop:file-removed', { id, name: icon.name, type: icon.type });
     _saveDesktopState();
   },
   clear() {
-    for (const icon of _icons.values()) {
-      if (icon.type !== 'editor') {
-        icon.el?.remove();
-        _icons.delete(icon.id);
-      }
+    for (const icon of [..._icons.values()]) {
+      if (icon.type !== 'editor') _disposeIcon(icon);
     }
     _clearSel();
     _saveDesktopState();
@@ -1605,11 +1588,7 @@ export function initDesktop(wmApi) {
     e.preventDefault();
     for (const id of [..._selIds]) {
       const icon = _icons.get(id);
-      if (icon && icon.type !== 'editor') {
-        if (icon.blobKey) _delCaptureBlob(icon.blobKey);
-        icon.el?.remove();
-        _icons.delete(id);
-      }
+      if (icon && icon.type !== 'editor') _disposeIcon(icon);
     }
     _clearSel();
     _saveDesktopState();
@@ -1624,45 +1603,12 @@ onReset(cleanupDesktop);
 export function getIconSerializedData(id) {
   const icon = _icons.get(id);
   if (!icon) return null;
-  if (icon.blobKey) {
-    return {
-      type: icon.type,
-      name: icon.name,
-      blobKey: icon.blobKey,
-      x: icon.x,
-      y: icon.y,
-      iconOpts: icon.iconOpts ?? undefined,
-    };
-  }
-  if (icon.content) {
-    return {
-      type: icon.type,
-      name: icon.name,
-      content: icon.content,
-      x: icon.x,
-      y: icon.y,
-      iconOpts: icon.iconOpts ?? undefined,
-    };
-  }
-  if (icon.url && !icon.url.startsWith('blob:')) {
-    return {
-      type: icon.type,
-      name: icon.name,
-      url: icon.url,
-      x: icon.x,
-      y: icon.y,
-      iconOpts: icon.iconOpts ?? undefined,
-    };
-  }
-  return null;
+  return _iconRecord(icon);
 }
 
 export function removeIconById(id) {
   const icon = _icons.get(id);
   if (!icon || icon.type === 'editor') return;
-  if (icon.blobKey) _delCaptureBlob(icon.blobKey);
-  icon.el?.remove();
-  _icons.delete(id);
-  _selIds.delete(id);
+  _disposeIcon(icon);
   _saveDesktopState();
 }

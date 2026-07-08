@@ -7,14 +7,17 @@ import { floodFill, resolveColorRGBA, expandBbox } from './raster-tools.js';
 import { snapshotFrameCanvases, paintFrameCanvas, downloadCanvasPng } from './frame-snapshot.js';
 import { registerWidgetRestorer } from '../wm/widget-restorer-registry.js';
 import { insertSnippet } from '../../editor/active-editor.js';
-import { FrameDoc } from './frame-doc.js';
+import { FrameDoc, restoreFrames } from './frame-doc.js';
 import { drawCheckerboard } from '../visual/color.js';
 import {
   mountWidgetShell,
   buildFrameStrip,
   buildTransport,
+  buildToolButtonRow,
   wireCaptureButton,
   mkExportButton as mkExport,
+  ACTIVE_COLOR,
+  INACTIVE_BORDER,
 } from './widget-shell.js';
 import { onReset } from '../../runtime/reset-registry.js';
 import { registerDesktopFileType } from '../platform/desktop-file-registry.js';
@@ -56,9 +59,6 @@ const TOOLS = [
   { id: 'eye', icon: '<i class="fa-solid fa-eye-dropper"></i>', title: 'Eyedropper (pick color)' },
   { id: 'text', icon: '<i class="fa-solid fa-font"></i>', title: 'Text (T)' },
 ];
-
-const ACTIVE_COLOR = '#cba6f7';
-const INACTIVE_BORDER = '#45475a';
 
 export class Paint {
   constructor({
@@ -580,10 +580,15 @@ export class Paint {
   }
 
   _applyFrames(snap) {
-    while (this._frames.length < snap.frames.length) this.addFrame();
-    this._frames.length = snap.frames.length;
-    snap.frames.forEach((data, i) => paintFrameCanvas(this._frames[i], this._w, this._h, data));
-    this._fi = snap.fi;
+    restoreFrames({
+      frames: this._frames,
+      snap,
+      grow: () => this.addFrame(),
+      paint: (fc, data) => paintFrameCanvas(fc, this._w, this._h, data),
+      setIndex: (fi) => {
+        this._fi = fi;
+      },
+    });
     this._render();
     this._refreshThumbs();
   }
@@ -618,27 +623,11 @@ export class Paint {
   // ── Tool row ──────────────────────────────────────────────────────────────────
 
   _buildToolRow() {
-    const row = document.createElement('div');
-    row.style.cssText = 'display:flex;gap:3px;padding:5px 8px 3px;flex-shrink:0;flex-wrap:wrap;';
-
-    TOOLS.forEach((t) => {
-      const btn = document.createElement('button');
-      btn.title = t.title;
-      btn.dataset.tool = t.id;
-      btn.style.cssText = [
-        `background:#313244;border:2px solid ${t.id === this._tool ? ACTIVE_COLOR : INACTIVE_BORDER};`,
-        'border-radius:5px;color:#cdd6f4;font-size:14px;width:30px;height:28px;',
-        'cursor:pointer;display:flex;align-items:center;justify-content:center;',
-        'padding:0;transition:border-color 0.1s;',
-      ].join('');
-      btn.innerHTML = t.icon;
-      btn.addEventListener('click', () => {
-        const prev = this._tool;
-        this._tool = t.id;
-        row.querySelectorAll('button[data-tool]').forEach((b) => {
-          b.style.borderColor = b.dataset.tool === this._tool ? ACTIVE_COLOR : INACTIVE_BORDER;
-        });
-        if (t.id === 'text') {
+    const row = buildToolButtonRow(TOOLS, {
+      active: this._tool,
+      onSelect: (id, prev) => {
+        this._tool = id;
+        if (id === 'text') {
           if (this._textLayer) {
             this._textLayer.setDefaults({
               color: this._color,
@@ -651,9 +640,8 @@ export class Paint {
           this._textLayer?.setActive(false);
           if (this._hitCanvas) this._hitCanvas.style.pointerEvents = 'auto';
         }
-        this._events.emit('tool', { tool: this._tool, prev });
-      });
-      row.appendChild(btn);
+        this._events.emit('tool', { tool: id, prev });
+      },
     });
 
     // Separator before backdrop button

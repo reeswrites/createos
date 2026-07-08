@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { FrameDoc } from '../../../../src/api/widgets/frame-doc.js';
+import { FrameDoc, restoreFrames } from '../../../../src/api/widgets/frame-doc.js';
 
 // FrameDoc is the DOM-free frame model. Frames here are simple tagged objects
 // so the model logic is testable without canvases or cell grids.
@@ -131,5 +131,49 @@ describe('FrameDoc model', () => {
     fd.onion = true;
     expect(fd.onion).toBe(true);
     expect(on).toEqual([true]);
+  });
+});
+
+describe('restoreFrames (undo reconcile)', () => {
+  // frames are plain strings; grow appends '', paint replaces by index.
+  const run = (frames, snap) => {
+    let grows = 0;
+    let index = null;
+    restoreFrames({
+      frames,
+      snap,
+      grow: () => {
+        frames.push('');
+        grows++;
+      },
+      paint: (_f, data, i) => {
+        frames[i] = data;
+      },
+      setIndex: (fi) => (index = fi),
+    });
+    return { grows, index };
+  };
+
+  it('grows the list when the snapshot has more frames', () => {
+    const frames = ['a'];
+    const { grows, index } = run(frames, { fi: 2, frames: ['x', 'y', 'z'] });
+    expect(frames).toEqual(['x', 'y', 'z']);
+    expect(grows).toBe(2);
+    expect(index).toBe(2);
+  });
+
+  it('truncates the list when the snapshot has fewer frames', () => {
+    const frames = ['a', 'b', 'c', 'd'];
+    const { grows, index } = run(frames, { fi: 0, frames: ['x'] });
+    expect(frames).toEqual(['x']);
+    expect(grows).toBe(0);
+    expect(index).toBe(0);
+  });
+
+  it('restores in place when counts match', () => {
+    const frames = ['a', 'b'];
+    const { index } = run(frames, { fi: 1, frames: ['x', 'y'] });
+    expect(frames).toEqual(['x', 'y']);
+    expect(index).toBe(1);
   });
 });

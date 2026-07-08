@@ -1,5 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
-import { buildFrameStrip, buildTransport } from '../../../../src/api/widgets/widget-shell.js';
+import {
+  buildFrameStrip,
+  buildTransport,
+  buildToolButtonRow,
+} from '../../../../src/api/widgets/widget-shell.js';
 
 // A minimal FrameController stand-in — exercises the shared strip/transport
 // wiring without a real FrameDoc or widget.
@@ -97,5 +101,44 @@ describe('buildTransport', () => {
     expect(ctrl.fps).toBe(24);
     expect(onFpsChange).toHaveBeenCalledWith(24);
     expect([...row.querySelectorAll('button')].some((b) => b.textContent === 'Code')).toBe(true);
+  });
+});
+
+describe('buildToolButtonRow', () => {
+  const TOOLS = [
+    { id: 'pen', icon: 'P', title: 'Pen' },
+    { id: 'eraser', icon: 'E', title: 'Eraser' },
+    { id: 'fill', icon: 'F', title: 'Fill' },
+  ];
+
+  it('renders one button per tool with the active one bordered', () => {
+    const row = buildToolButtonRow(TOOLS, { active: 'eraser', onSelect: () => {} });
+    const btns = [...row.querySelectorAll('button[data-tool]')];
+    expect(btns.map((b) => b.dataset.tool)).toEqual(['pen', 'eraser', 'fill']);
+    // jsdom renders the hex borders as rgb(); the active button differs from inactive.
+    const active = btns.find((b) => b.dataset.tool === 'eraser');
+    const inactive = btns.find((b) => b.dataset.tool === 'pen');
+    expect(active.style.borderColor).not.toBe(inactive.style.borderColor);
+    expect(active.style.borderColor).toBeTruthy();
+  });
+
+  it('re-borders on click and reports (id, prev) to onSelect', () => {
+    const seen = [];
+    const row = buildToolButtonRow(TOOLS, {
+      active: 'pen',
+      onSelect: (id, prev) => seen.push([id, prev]),
+    });
+    const btns = [...row.querySelectorAll('button[data-tool]')];
+    const fill = btns.find((b) => b.dataset.tool === 'fill');
+    const pen = btns.find((b) => b.dataset.tool === 'pen');
+    fill.dispatchEvent(new Event('click'));
+    expect(seen).toEqual([['fill', 'pen']]);
+    // active button gets a different (highlight) border than the inactive one
+    expect(fill.style.borderColor).not.toBe(pen.style.borderColor);
+
+    // second click threads the new prev and moves the highlight
+    pen.dispatchEvent(new Event('click'));
+    expect(seen[1]).toEqual(['pen', 'fill']);
+    expect(pen.style.borderColor).not.toBe(fill.style.borderColor);
   });
 });

@@ -26,6 +26,8 @@ import {
   detachTriggerSurface,
   disposeTriggerSurface,
   strikeCore,
+  surfaceState,
+  createStepClock,
 } from './trigger-surface.js';
 
 // ── Module-level registry ─────────────────────────────────────────────────────
@@ -180,10 +182,7 @@ export class Piano {
     this._recNotes = new Map(); // note → { rec, start } for dur back-fill
     this._steps = Array.from({ length: 16 }, () => new Set());
     this._selectedStep = null;
-    this._seqStep = 0;
-    this._playing = false;
-    this._paused = false;
-    this._sequence = null;
+    this._clock = null; // StepClock (ADR 056) — owns _playing/_paused/sequence
     this._winId = null;
     this._onKey = null;
     this._keyEls = {}; // note → { el, isBlack, origBg }
@@ -266,18 +265,15 @@ export class Piano {
       widgetType: 'piano',
       bg: '#0d0d1a',
       rows: [],
-      getState: () => ({
-        title: this._title,
-        bpm: this._bpm,
-        duration: this._duration,
-        baseOctave: this._baseOctave,
-        octaves: this._octaves,
-        preset: this._presetName,
-        steps: this._steps.map((s) => [...s]),
-        voice: this._defaultDesc ?? undefined,
-        bindings: this._bindings.serialize(),
-        _desktopIconId: this._desktopIconId,
-      }),
+      getState: () =>
+        surfaceState(this, {
+          bpm: this._bpm,
+          duration: this._duration,
+          baseOctave: this._baseOctave,
+          octaves: this._octaves,
+          preset: this._presetName,
+          steps: this._steps.map((s) => [...s]),
+        }),
       save: {
         name: (this._title || 'Piano') + '.piano',
         type: 'piano',
@@ -498,57 +494,38 @@ export class Piano {
     const stopBtn = _mkBtn('■ Stop', '#f38ba8');
     this._playBtnEl = playBtn;
 
-    playBtn.addEventListener('click', () => {
-      if (!this._playing) {
-        // Start fresh
-        this._playing = true;
-        this._paused = false;
-        this._seqStep = 0;
+    // Sequencer transport lives in the shared StepClock (ADR 056); the per-step
+    // body below is Piano's sound-core and stays here.
+    this._clock = createStepClock({
+      steps: 16,
+      playBtn,
+      onStart: () => {
         Tone.getTransport().bpm.value = this._bpm;
-        this._sequence = new Tone.Sequence(
-          (time) => {
-            const s = this._seqStep;
-            const notes = [...this._steps[s]];
-            requestAnimationFrame(() => {
-              this._stepBtns.forEach((b, i) => {
-                b.style.boxShadow = i === s ? '0 0 0 2px #cba6f7' : '';
-              });
-              notes.forEach((note) => this._flashKeyBrief(note));
-            });
-            if (notes.length) {
-              try {
-                this._synth.triggerAttackRelease(notes, this._duration, time);
-              } catch (_) {}
-              notes.forEach((note) => this._fireNote(note, 'seq', s));
-            }
-            this._events.emit('step', { step: s, notes });
-            this._seqStep = (this._seqStep + 1) % 16;
-          },
-          [...Array(16).keys()],
-          '16n',
-        );
-        this._sequence.start(0);
-        Tone.getTransport().start();
-        playBtn.textContent = '⏸ Pause';
-        playBtn._active = true;
-        playBtn.style.background = '#1a3d1a';
-      } else if (!this._paused) {
-        // Pause
-        this._paused = true;
-        Tone.getTransport().pause();
-        playBtn.textContent = '▶ Play';
-        playBtn._active = false;
-        playBtn.style.background = '#1e1e2e';
-      } else {
-        // Resume
-        this._paused = false;
-        Tone.getTransport().start();
-        playBtn.textContent = '⏸ Pause';
-        playBtn._active = true;
-        playBtn.style.background = '#1a3d1a';
-      }
+      },
+      onStop: () => {
+        this._stepBtns.forEach((b) => {
+          b.style.boxShadow = '';
+        });
+      },
+      perStep: (s, time) => {
+        const notes = [...this._steps[s]];
+        requestAnimationFrame(() => {
+          this._stepBtns.forEach((b, i) => {
+            b.style.boxShadow = i === s ? '0 0 0 2px #cba6f7' : '';
+          });
+          notes.forEach((note) => this._flashKeyBrief(note));
+        });
+        if (notes.length) {
+          try {
+            this._synth.triggerAttackRelease(notes, this._duration, time);
+          } catch (_) {}
+          notes.forEach((note) => this._fireNote(note, 'seq', s));
+        }
+        this._events.emit('step', { step: s, notes });
+      },
     });
 
+    playBtn.addEventListener('click', () => this._clock.toggle());
     stopBtn.addEventListener('click', () => this._stop());
 
     // BPM
@@ -565,7 +542,7 @@ export class Piano {
       'width:50px;background:#1e1e2e;color:#cdd6f4;border:1px solid #313244;border-radius:3px;padding:2px 4px;font-size:11px;font-family:monospace;text-align:center;';
     bpmIn.addEventListener('change', () => {
       this._bpm = parseInt(bpmIn.value) || 120;
-      if (this._playing) Tone.getTransport().bpm.value = this._bpm;
+      if (this._clock?.playing) Tone.getTransport().bpm.value = this._bpm;
       this._history?.commit();
       this._autoSave();
     });
@@ -959,7 +936,7 @@ export class Piano {
   /** Set transport BPM. */
   bpm(v) {
     this._bpm = v;
-    if (this._playing) Tone.getTransport().bpm.value = v;
+    if (this._clock?.playing) Tone.getTransport().bpm.value = v;
     this._history?.commit();
     this._autoSave();
     return this;
@@ -1084,27 +1061,7 @@ export class Piano {
   }
 
   _stop() {
-    if (this._sequence) {
-      try {
-        this._sequence.stop();
-        this._sequence.dispose();
-      } catch (_) {}
-      this._sequence = null;
-    }
-    try {
-      Tone.getTransport().stop();
-    } catch (_) {}
-    this._playing = false;
-    this._paused = false;
-    this._seqStep = 0;
-    this._stepBtns.forEach((b) => {
-      b.style.boxShadow = '';
-    });
-    if (this._playBtnEl) {
-      this._playBtnEl.textContent = '▶ Play';
-      this._playBtnEl._active = false;
-      this._playBtnEl.style.background = '#1e1e2e';
-    }
+    this._clock?.stop();
   }
 
   _destroy() {

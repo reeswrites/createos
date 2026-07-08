@@ -16,6 +16,25 @@
 
 import { WidgetEvents } from './widget-events.js';
 
+// restoreFrames — the frame-count reconcile shared by every frame widget's undo
+// restore. frame-snapshot.js extracted the PURE half (the per-frame pixel/cell
+// copy); this is the RISKY half that was left copy-pasted three ways: growing and
+// truncating the live frame list and clamping the current index. Getting the
+// truncation or index wrong leaks frames or points at a missing one — so it earns
+// exactly one home. The element-specific parts stay closures on the caller:
+//   frames    the live frame array (mutated in place)
+//   snap      { fi, frames: [...] } captured by the widget's _snap* method
+//   grow()    append one blank frame (offscreen <canvas> vs cell array)
+//   paint(frame, data, i)  restore one captured frame's content
+//   setIndex(fi)           set the current index (raw _fi vs controller.frame())
+// The caller keeps the post-restore render/refresh — that genuinely differs.
+export function restoreFrames({ frames, snap, grow, paint, setIndex }) {
+  while (frames.length < snap.frames.length) grow();
+  frames.length = snap.frames.length;
+  snap.frames.forEach((data, i) => paint(frames[i], data, i));
+  setIndex(snap.fi);
+}
+
 export class FrameDoc {
   constructor({
     frames = null,

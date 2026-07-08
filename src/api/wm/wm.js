@@ -11,6 +11,7 @@ import {
   registerWindowType,
   getWindowAdapter,
   geoOf,
+  applyGeo,
   titleOf,
   readAudio,
 } from './window-registry.js';
@@ -119,18 +120,16 @@ export function initWM(onContentResize) {
   const _WM_HISTORY_MAX = 50;
   let _wmHistoryDebounce = null;
 
-  // Common window geometry + class fields — used by both _captureState (undo) and _flushState (persist).
+  // Common window geometry + class fields — used by both _captureState (undo) and
+  // _flushState (persist). Delegates the geometry read to window-registry.geoOf (the
+  // canonical reader the portable adapters use), then adds the in-session-only fields:
+  // the id, the minimized-aware `visible`, and `maximized`.
   function _winBaseEntry(win) {
     return {
+      ...geoOf(win),
       id: win.id,
-      x: parseInt(win.style.left) || 0,
-      y: parseInt(win.style.top) || 0,
-      w: parseInt(win.style.width) || 320,
-      h: parseInt(win.style.height) || 240,
       visible: win.style.display !== 'none' && !win._wmMinimized,
       maximized: win.classList.contains('wm-maximized'),
-      nochrome: win.classList.contains('wm-no-chrome'),
-      transparent: win.classList.contains('wm-transparent'),
     };
   }
 
@@ -189,14 +188,8 @@ export function initWM(onContentResize) {
       const tkNum = s.id === 'win-toolkit' ? 1 : parseInt(s.id?.replace('win-toolkit-', '')) || 1;
       const win = window.__ar_createToolkit(tkNum);
       if (win) {
-        win.style.left = `${s.x}px`;
-        win.style.top = `${s.y}px`;
-        win.style.width = `${s.w}px`;
-        win.style.height = `${s.h}px`;
-        win.style.display = s.visible ? 'flex' : 'none';
+        applyGeo(win, s);
         if (s.maximized) _toggleMaximize(win);
-        if (s.nochrome) win.classList.add('wm-no-chrome');
-        if (s.transparent) win.classList.add('wm-transparent');
       }
       return win;
     }
@@ -1072,6 +1065,142 @@ export function initWM(onContentResize) {
     return fallback ? { fallback, name: fallback.name } : null;
   }
 
+  // ── Window type descriptors (spawn body build + chrome decoration) ──────────
+  // The single table for "what a window of type X contains and how it's decorated".
+  // Previously spawn() held a per-type body switch (viz/sensor already delegated,
+  // image/video/camera/canvas/shader inline) AND a second per-type chrome switch
+  // whose four overlapping `.includes([...])` type-lists had to be hand-synced. The
+  // body builders below and this capability table replace both. An unknown type has
+  // no entry → a bare, undecorated window (unchanged behaviour).
+  //   draggable   add .wm-draggable-body (a body drag moves the window)
+  //   audio       eligible for the titlebar audio controls (gated by _showAudio)
+  //   video       body hosts a <video> → also gets video controls + a viz panel
+  //   cameraViz   camera window → a locked audio viz panel
+  //   copyPath    image/video with a src → the copy-path button
+  //   overlay     visual surface → paint overlay + capture buttons
+  //   flipTarget  which element the flip buttons rotate (chrome stays upright)
+  const _flipCanvas = (b) => b.querySelector('canvas') || b;
+  const WINDOW_TYPES = {
+    html: { flipTarget: (b) => b, audio: true },
+    image: {
+      draggable: true,
+      copyPath: true,
+      overlay: true,
+      flipTarget: (b) => b.querySelector('img') || b,
+    },
+    video: {
+      draggable: true,
+      copyPath: true,
+      overlay: true,
+      audio: true,
+      video: true,
+      flipTarget: (b) => b.querySelector('video') || b,
+    },
+    viz: { draggable: true, flipTarget: _flipCanvas },
+    sensor: { draggable: true, flipTarget: _flipCanvas },
+    camera: { draggable: true, overlay: true, cameraViz: true, flipTarget: _flipCanvas },
+    canvas: { draggable: true, overlay: true, flipTarget: _flipCanvas },
+    shader: { draggable: true, overlay: true, flipTarget: _flipCanvas },
+  };
+
+  function _buildImageBody(body, opts) {
+    const img = document.createElement('img');
+    img.src = opts.src ?? '';
+    img.style.cssText = 'width:100%;height:100%;object-fit:contain;display:block;';
+    body.style.overflow = 'hidden';
+    body.appendChild(img);
+  }
+
+  // Returns a cleanup fn (pause + release the media element).
+  function _buildVideoBody(win, body, opts) {
+    const vid = document.createElement('video');
+    vid.src = opts.src ?? '';
+    vid.style.cssText = 'width:100%;display:block;';
+    vid.autoplay = true;
+    vid.muted = true;
+    vid.loop = opts.loop !== false;
+    vid.disablePictureInPicture = true;
+    vid.setAttribute('controlsList', 'nodownload nofullscreen noremoteplayback');
+    body.style.overflow = 'hidden';
+    body.style.background = '#000';
+    body.appendChild(vid);
+    vid.addEventListener(
+      'loadedmetadata',
+      () => {
+        const tb = win.querySelector('.wm-titlebar');
+        const chrome = tb ? tb.getBoundingClientRect().height + 1 : 29;
+        const desk = win.parentElement ?? document.getElementById('desktop');
+        const capW = opts.w ?? 320;
+        const capH = opts.h ?? 240;
+        const maxW = Math.min(capW, desk ? desk.offsetWidth * 0.9 : vid.videoWidth);
+        const maxH = Math.min(capH, desk ? desk.offsetHeight * 0.9 - chrome : vid.videoHeight);
+        const scale = Math.min(1, maxW / vid.videoWidth, maxH / vid.videoHeight);
+        win.style.width = `${Math.round(vid.videoWidth * scale)}px`;
+        win.style.height = `${Math.round(vid.videoHeight * scale + chrome)}px`;
+      },
+      { once: true },
+    );
+    return () => {
+      vid.pause();
+      vid.src = '';
+    };
+  }
+
+  // camera/canvas/shader all blit a source (or a z-sorted layer stack) into a
+  // window <canvas> on a RAF loop. Returns a cleanup fn, or null when there's
+  // nothing to blit.
+  function _buildBlitBody(type, body, opts) {
+    let src;
+    let _camLease = null;
+    if (type === 'camera') {
+      _camLease = acquireCamera(); // window-scoped toolbar-camera lease (ADR 023)
+      src = document.getElementById('camera');
+    } else if (type === 'canvas') {
+      src =
+        opts.canvas instanceof HTMLCanvasElement
+          ? opts.canvas
+          : window.__ar_layers?.get(opts.z ?? 0);
+    } else {
+      src = opts.shader?.canvas;
+    }
+    const getLayers = opts.getLayers; // () => sorted HTMLCanvasElement[]
+    if (!getLayers && !src) return null;
+    const dst = document.createElement('canvas');
+    dst.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block;';
+    body.style.overflow = 'hidden';
+    body.style.background = '#000';
+    body.appendChild(dst);
+    const ctx = dst.getContext('2d');
+    let rafId;
+    const copy = () => {
+      if (getLayers) {
+        const layers = getLayers().filter((c) => !c._ar_webgpu);
+        // Ping shader readable canvases so they blit within their own RAF
+        layers.forEach((c) => {
+          if (c._ar_shaderReadable) c._ar_watched = true;
+        });
+        if (layers.length && layers[0].width) {
+          dst.width = layers[0].width;
+          dst.height = layers[0].height;
+          ctx.clearRect(0, 0, dst.width, dst.height);
+          for (const c of layers) {
+            if (c.width && c.height) ctx.drawImage(c, 0, 0, dst.width, dst.height);
+          }
+        }
+      } else if (src.width && src.height) {
+        dst.width = src.width;
+        dst.height = src.height;
+        ctx.drawImage(src, 0, 0);
+      }
+      rafId = requestAnimationFrame(copy);
+    };
+    rafId = requestAnimationFrame(copy);
+    return () => {
+      cancelAnimationFrame(rafId);
+      _camLease?.release();
+    };
+  }
+
   // ── Public API (exposed as window.wm) ────────────────────────────────────
 
   const api = {
@@ -1578,116 +1707,28 @@ export function initWM(onContentResize) {
       const body = win.querySelector('.wm-body');
 
       let _cleanup = null;
+      const cap = WINDOW_TYPES[type]; // undefined for an unknown type → bare window
 
-      if (type === 'html') {
-        body.innerHTML = opts.html ?? '';
-      } else if (type === 'image') {
-        const img = document.createElement('img');
-        img.src = opts.src ?? '';
-        img.style.cssText = 'width:100%;height:100%;object-fit:contain;display:block;';
-        body.style.overflow = 'hidden';
-        body.appendChild(img);
-      } else if (type === 'video') {
-        const vid = document.createElement('video');
-        vid.src = opts.src ?? '';
-        vid.style.cssText = 'width:100%;display:block;';
-        vid.autoplay = true;
-        vid.muted = true;
-        vid.loop = opts.loop !== false;
-        vid.disablePictureInPicture = true;
-        vid.setAttribute('controlsList', 'nodownload nofullscreen noremoteplayback');
-        body.style.overflow = 'hidden';
-        body.style.background = '#000';
-        body.appendChild(vid);
-        vid.addEventListener(
-          'loadedmetadata',
-          () => {
-            const tb = win.querySelector('.wm-titlebar');
-            const chrome = tb ? tb.getBoundingClientRect().height + 1 : 29;
-            const desk = win.parentElement ?? document.getElementById('desktop');
-            const capW = opts.w ?? 320;
-            const capH = opts.h ?? 240;
-            const maxW = Math.min(capW, desk ? desk.offsetWidth * 0.9 : vid.videoWidth);
-            const maxH = Math.min(capH, desk ? desk.offsetHeight * 0.9 - chrome : vid.videoHeight);
-            const scale = Math.min(1, maxW / vid.videoWidth, maxH / vid.videoHeight);
-            win.style.width = `${Math.round(vid.videoWidth * scale)}px`;
-            win.style.height = `${Math.round(vid.videoHeight * scale + chrome)}px`;
-          },
-          { once: true },
-        );
-        _cleanup = () => {
-          vid.pause();
-          vid.src = '';
-        };
-      } else if (type === 'viz') {
-        buildVizWindow(win, body, opts, _vizCtx);
-      } else if (type === 'sensor') {
+      // ── Body construction (viz/sensor delegate to their own modules) ──────────
+      if (type === 'html') body.innerHTML = opts.html ?? '';
+      else if (type === 'image') _buildImageBody(body, opts);
+      else if (type === 'video') _cleanup = _buildVideoBody(win, body, opts);
+      else if (type === 'viz') buildVizWindow(win, body, opts, _vizCtx);
+      else if (type === 'sensor')
         buildSensorWindow(win, body, opts, { onDispose: (fn) => _onDispose(win, fn) });
-      } else if (type === 'camera' || type === 'canvas' || type === 'shader') {
-        let src;
-        let _camLease = null;
-        if (type === 'camera') {
-          // Acquire toolbar camera — window-scoped lease (ADR 023).
-          _camLease = acquireCamera();
-          src = document.getElementById('camera');
-        } else if (type === 'canvas') {
-          src =
-            opts.canvas instanceof HTMLCanvasElement
-              ? opts.canvas
-              : window.__ar_layers?.get(opts.z ?? 0);
-        } else {
-          src = opts.shader?.canvas;
-        }
-        const getLayers = opts.getLayers; // () => sorted HTMLCanvasElement[]
-        if (getLayers || src) {
-          const dst = document.createElement('canvas');
-          dst.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block;';
-          body.style.overflow = 'hidden';
-          body.style.background = '#000';
-          body.appendChild(dst);
-          const ctx = dst.getContext('2d');
-          let rafId;
-          const copy = () => {
-            if (getLayers) {
-              const layers = getLayers().filter((c) => !c._ar_webgpu);
-              // Ping shader readable canvases so they blit within their own RAF
-              layers.forEach((c) => {
-                if (c._ar_shaderReadable) c._ar_watched = true;
-              });
-              if (layers.length && layers[0].width) {
-                dst.width = layers[0].width;
-                dst.height = layers[0].height;
-                ctx.clearRect(0, 0, dst.width, dst.height);
-                for (const c of layers) {
-                  if (c.width && c.height) ctx.drawImage(c, 0, 0, dst.width, dst.height);
-                }
-              }
-            } else if (src.width && src.height) {
-              dst.width = src.width;
-              dst.height = src.height;
-              ctx.drawImage(src, 0, 0);
-            }
-            rafId = requestAnimationFrame(copy);
-          };
-          rafId = requestAnimationFrame(copy);
-          _cleanup = () => {
-            cancelAnimationFrame(rafId);
-            _camLease?.release();
-          };
-        }
-      }
+      else if (type === 'camera' || type === 'canvas' || type === 'shader')
+        _cleanup = _buildBlitBody(type, body, opts);
 
       if (_cleanup) _onDispose(win, _cleanup);
       win._wmSpawnOpts = { title, ...opts };
 
-      if (['image', 'video', 'camera', 'canvas', 'shader', 'viz', 'sensor'].includes(type)) {
-        win.classList.add('wm-draggable-body');
-      }
+      // ── Chrome decoration (all driven by the WINDOW_TYPES capability table) ────
+      if (cap?.draggable) win.classList.add('wm-draggable-body');
 
       const _defaultAudio = type === 'video' ? true : (window.__ar_usesAudio ?? true);
       const _showAudio = opts.audio !== undefined ? opts.audio !== false : _defaultAudio;
-      if ((type === 'video' || type === 'html') && _showAudio) {
-        const videoEl = type === 'video' ? body.querySelector('video') : null;
+      if (cap?.audio && _showAudio) {
+        const videoEl = cap.video ? body.querySelector('video') : null;
         _chrome.addAudioControls(win, videoEl);
         if (videoEl) {
           _chrome.addVideoControls(win, videoEl);
@@ -1695,24 +1736,15 @@ export function initWM(onContentResize) {
         }
       }
       // Camera windows get the audio viz panel too (source locked while embedded)
-      if (type === 'camera') addVizPanel(win, body, id, { locked: true }, _vizCtx);
+      if (cap?.cameraViz) addVizPanel(win, body, id, { locked: true }, _vizCtx);
 
-      if (['image', 'video'].includes(type) && opts.src) _chrome.addCopyPathBtn(win, opts.src);
-      if (
-        ['image', 'video', 'camera', 'canvas', 'shader', 'viz', 'html', 'sensor'].includes(type)
-      ) {
+      if (cap?.copyPath && opts.src) _chrome.addCopyPathBtn(win, opts.src);
+      if (cap) {
         // Flip only the visual element so UI chrome (dropdowns, controls) stays upright
-        const _flipVisual =
-          type === 'image'
-            ? body.querySelector('img') || body
-            : type === 'video'
-              ? body.querySelector('video') || body
-              : ['camera', 'canvas', 'shader', 'viz', 'sensor'].includes(type)
-                ? body.querySelector('canvas') || body
-                : body; // html — body is the output visual, flip it whole
+        const _flipVisual = cap.flipTarget(body);
         _chrome.addFlipBtns(win, _flipVisual);
-        // Paint overlay + capture buttons — available on visual windows only (not viz/sensor/html)
-        if (['image', 'video', 'camera', 'canvas', 'shader'].includes(type)) {
+        // Paint overlay + capture buttons — visual surfaces only (not viz/sensor/html)
+        if (cap.overlay) {
           _chrome.addPaintOverlay(win, body, _flipVisual);
           _chrome.addCaptureButtons(win, body, _flipVisual);
         }
@@ -2011,14 +2043,8 @@ export function initWM(onContentResize) {
         // Window already exists (e.g. editor created from manifest) — restore geometry only
         const existing = s.id ? document.getElementById(s.id) : null;
         if (existing) {
-          existing.style.display = s.visible ? 'flex' : 'none';
-          existing.style.left = `${s.x}px`;
-          existing.style.top = `${s.y}px`;
-          existing.style.width = `${s.w}px`;
-          existing.style.height = `${s.h}px`;
+          applyGeo(existing, s);
           if (s.maximized) _toggleMaximize(existing);
-          if (s.nochrome) existing.classList.add('wm-no-chrome');
-          if (s.transparent) existing.classList.add('wm-transparent');
           continue;
         }
         // Recreate widget / toolkit / html / media windows via the shared respawn

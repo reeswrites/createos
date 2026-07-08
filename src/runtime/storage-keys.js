@@ -18,7 +18,6 @@ export const editorExecKey = (id) => `vl-ide-exec-${id}`;
 export const editorTitleKey = (id) => `vl-ide-title-${id}`;
 export const editorAutoExecKey = (id) => `vl-autoexec-${id}`;
 export const editorTraceKey = (id) => `vl-trace-${id}`;
-export const editorBlocksOpenKey = (id) => `vl-blocks-open-${id}`;
 
 // ── Subsystem singletons ────────────────────────────────────────────────────────
 export const WM_STATE = 'vl-wm-state';

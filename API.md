@@ -763,8 +763,7 @@ pipe(cam)
 
 Package a custom stage factory as a reusable named method. After registration:
 - `pipe(src).yourStageName(opts)` works in any pipeline
-- Appears in the text-toolkit sidebar (draggable snippet)
-- Generates a Blockly block from `descriptor.fields` (usable in blocks mode)
+- Appears in the text-toolkit sidebar (draggable snippet, its default opts built from `descriptor.fields`)
 
 ```js
 pipe.register('glowAscii', (src, opts = {}) => {
@@ -780,9 +779,8 @@ pipe.register('glowAscii', (src, opts = {}) => {
     },
   };
 }, {
-  label:  'Glow ASCII',            // toolkit + block display name
+  label:  'Glow ASCII',            // toolkit display name
   hint:   'ASCII art with glow',   // tooltip in sidebar
-  colour: 80,                      // Blockly block hue (0–360)
   fields: [
     { name: 'cols',  label: 'cols',  type: 'number', default: 120 },
     { name: 'color', label: 'color', type: 'color',  default: '#00ff41' },
@@ -796,7 +794,7 @@ pipe(cam).glowAscii({ cols: 120, color: '#00ff41' }).show('Glow', { w: 700, h: 5
 pipe(cam).ascii({ cols: 60 }).glowAscii({ cols: 60 }).fx('blur(2px)').show('out');
 ```
 
-**field `type` values:** `'number'` (numeric, Blockly number field), `'color'` (colour picker), `'text'` (text input), `'boolean'` (checkbox).
+**field `type` values:** `'number'`, `'color'`, `'text'`, `'boolean'` — used to synthesise the default snippet opts (and reserved as metadata for a future per-call editing widget).
 
 ### Sink methods (start the loop)
 

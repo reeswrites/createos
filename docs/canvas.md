@@ -464,7 +464,7 @@ pipe(vid)
 
 ### Custom stages — `pipe.register(name, factory, descriptor)`
 
-Package reusable processing logic as a named stage. Registered stages become chainable methods on every pipeline, appear in the text-toolkit sidebar as draggable snippets, and generate a Blockly block for blocks mode.
+Package reusable processing logic as a named stage. Registered stages become chainable methods on every pipeline and appear in the text-toolkit sidebar as draggable snippets.
 
 ```js
 // Register once (e.g., in a "setup" snippet you run before your sketch)
@@ -484,7 +484,6 @@ pipe.register('glowAscii', (src, opts = {}) => {
 }, {
   label:  'Glow ASCII',
   hint:   'ASCII art with bloom glow',
-  colour: 80,                       // Blockly block hue
   fields: [
     { name: 'cols',  label: 'cols',  type: 'number', default: 120 },
     { name: 'color', label: 'color', type: 'color',  default: '#00ff41' },
@@ -500,10 +499,9 @@ pipe(cam).glowAscii({ cols: 120, color: '#00ff41' }).show('Glow Cam', { w: 700, 
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `label` | string | Display name in toolkit and block (default: `name`) |
+| `label` | string | Display name in toolkit (default: `name`) |
 | `hint` | string | Tooltip shown in toolkit sidebar |
-| `colour` | number | Blockly block hue (0–360, default: 80) |
-| `fields` | array | Auto-generates block inputs. Each: `{ name, label?, type, default }` |
+| `fields` | array | Builds the default snippet opts. Each: `{ name, label?, type, default }` |
 | `code` | string | Custom toolkit snippet (auto-generated from `fields` if omitted) |
 
 **field types:** `'number'` → numeric scrubber, `'color'` → colour picker, `'text'` → text input, `'boolean'` → checkbox.

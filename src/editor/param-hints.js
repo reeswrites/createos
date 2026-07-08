@@ -83,6 +83,32 @@ export function calleePath(node) {
   return null;
 }
 
+// Resolve a chained method call to { head, method } by walking the receiver down
+// to the base call's identifier. `route(cam).scale(...)` → { head:'route', method:'scale' };
+// `route(mic).amplitude.motion().scale(...)` → { head:'route', method:'scale' } (descends
+// through intervening getters and calls). Returns null for a bare call, a computed
+// member, or a chain whose base is a plain variable (`r.scale(...)` — head unknown).
+// The chain-head anchor for Tier 1 Inline Controls (ADR 061); shared with Tier 2.
+export function chainHead(callNode) {
+  if (callNode?.type !== 'CallExpression') return null;
+  const callee = callNode.callee;
+  if (callee?.type !== 'MemberExpression' || callee.computed) return null;
+  const method = callee.property?.name;
+  if (!method) return null;
+  let cur = callee.object;
+  for (let i = 0; cur && i < 1000; i++) {
+    if (cur.type === 'CallExpression') {
+      if (cur.callee?.type === 'Identifier') return { head: cur.callee.name, method };
+      cur = cur.callee; // MemberExpression callee — descend via its object next
+    } else if (cur.type === 'MemberExpression' && !cur.computed) {
+      cur = cur.object;
+    } else {
+      return null; // Identifier receiver (variable), computed member, or other — unknown head
+    }
+  }
+  return null;
+}
+
 function findCallAtCursor(ast, cursor) {
   let best = null;
 

@@ -5,6 +5,39 @@
 import { applyProject } from '../../api/platform/project.js';
 import { nativeCap } from '../native.js';
 
+// Outcome-first taxonomy (ADR 064): the gallery groups demos by what a beginner WANTS
+// to make — beginner-facing verbs, not API category — so the entry point is "result
+// before notation" (a runnable example matching a goal), per the Result-Before-Notation
+// thesis. Each demo carries a primary `goal` key in index.json. Order = display order.
+export const GOAL_ORDER = ['face', 'sound', 'music', 'move', 'play', 'camera', 'paint'];
+export const GOAL_LABELS = {
+  face: 'React to your face & hands',
+  sound: 'React to sound',
+  music: 'Make music & sound',
+  move: 'Make it move',
+  play: 'Play with it',
+  camera: 'Camera effects',
+  paint: 'Paint & pixels',
+};
+
+// Group demos into [{ goal, label, demos }] in GOAL_ORDER, dropping empty buckets. A demo
+// with an unknown/missing goal falls into a trailing "More" section (never dropped).
+export function groupDemos(demos) {
+  const byGoal = new Map(GOAL_ORDER.map((g) => [g, []]));
+  const extra = [];
+  for (const d of demos) {
+    if (byGoal.has(d.goal)) byGoal.get(d.goal).push(d);
+    else extra.push(d);
+  }
+  const sections = GOAL_ORDER.filter((g) => byGoal.get(g).length).map((g) => ({
+    goal: g,
+    label: GOAL_LABELS[g],
+    demos: byGoal.get(g),
+  }));
+  if (extra.length) sections.push({ goal: 'more', label: 'More', demos: extra });
+  return sections;
+}
+
 export function initDemoGallery(ctx) {
   const { appAPI } = ctx;
   const galleryBtn = document.getElementById('galleryBtn');
@@ -19,20 +52,29 @@ export function initDemoGallery(ctx) {
     return _demos;
   }
 
-  function _renderInto(grid, list) {
-    grid.innerHTML = '';
-    for (const demo of list) {
-      const card = document.createElement('div');
-      card.className = 'gallery-card';
-      const tags = (demo.tags ?? []).map((t) => `<span class="gallery-tag">${t}</span>`).join('');
-      card.innerHTML = `
+  function _cardHTML(demo) {
+    const tags = (demo.tags ?? []).map((t) => `<span class="gallery-tag">${t}</span>`).join('');
+    return `
+      <div class="gallery-card">
         <h3 class="gallery-card-title">${demo.title}</h3>
         <p class="gallery-card-desc">${demo.desc}</p>
         <div class="gallery-card-tags">${tags}</div>
         <button class="gallery-load-btn" data-file="${demo.file}">
           <i class="fa-solid fa-play" style="font-size:9px;margin-right:4px;"></i>Load Demo
-        </button>`;
-      grid.appendChild(card);
+        </button>
+      </div>`;
+  }
+
+  // Render outcome sections: a header per goal, then that goal's cards in a grid.
+  function _renderInto(container, list) {
+    container.innerHTML = '';
+    for (const section of groupDemos(list)) {
+      const sec = document.createElement('div');
+      sec.className = 'gallery-section';
+      sec.innerHTML =
+        `<h2 class="gallery-section-title">${section.label}</h2>` +
+        `<div class="gallery-grid">${section.demos.map(_cardHTML).join('')}</div>`;
+      container.appendChild(sec);
     }
   }
 
@@ -62,8 +104,8 @@ export function initDemoGallery(ctx) {
 
     const body = document.getElementById(WIN_ID)?.querySelector('.wm-body');
     if (!body) return;
-    body.innerHTML = `<div id="galleryGrid" class="gallery-grid"><p style="color:#888;font-family:Arial;padding:12px;">Loading…</p></div>`;
-    const grid = body.querySelector('#galleryGrid');
+    body.innerHTML = `<div id="gallerySections" class="gallery-sections"><p style="color:#888;font-family:Arial;padding:12px;">Loading…</p></div>`;
+    const grid = body.querySelector('#gallerySections');
 
     grid.addEventListener('click', async (e) => {
       const btn = e.target.closest('.gallery-load-btn');

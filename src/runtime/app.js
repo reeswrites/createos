@@ -18,16 +18,10 @@ import {
 } from '../api/platform/desktop-files.js';
 import { initDOMCaptures, captureWindow as _captureWindow } from '../editor/editor-capture.js';
 import { registerWindowType } from '../api/wm/window-registry.js';
-import {
-  library,
-  initLibrary,
-  populateLibraryToolkit,
-  populateLibraryBlocks,
-} from '../api/platform/library.js';
+import { library, initLibrary, populateLibraryToolkit } from '../api/platform/library.js';
 import { initWM } from '../api/wm/wm.js';
 import { initTooltips } from '../api/wm/tooltips.js';
 import { installWidgetHistoryKeys } from '../api/widgets/widget-history.js';
-import { applyExternalBlocks, addBlockToCategoryMeta } from '../blocks/blocks.js';
 import { initVoices } from '../api/audio/voice.js';
 import { EditorInstance } from '../editor/editor-instance.js';
 import { applyProject } from '../api/platform/project.js';
@@ -177,22 +171,16 @@ window.onload = () => {
   if (window.Stage) _registerBuiltin('Stage', window.Stage);
 
   // The API Toolbox window type lives in toolkit-window.js. initToolkitWindow builds
-  // the shared tooltip + drag-out snippet panel + lazy Blockly palette and installs
+  // the shared tooltip + drag-out snippet panel and installs
   // window.__ar_addToolkitEntry (the live entry hook pipe.register / registerAPI use).
   const _toolkit = initToolkitWindow();
 
-  // Boot user library — loads localStorage entries into memory, injects into toolkit + palette
+  // Boot user library — loads localStorage entries into memory, injects into toolkit
   initLibrary();
   _registerBuiltin('library', library);
   // Boot the Voice registry — seeds builtins + loads saved voices (ADR 046).
   initVoices();
-  // wire block applier before populating so stored blocks register immediately
-  window.__ar_applyLibraryBlock = (definition, generator) => {
-    applyExternalBlocks(definition.type, [{ definition, generator }]);
-    addBlockToCategoryMeta('My Library', definition.type);
-  };
   populateLibraryToolkit();
-  populateLibraryBlocks();
 
   // ── Editor instances ───────────────────────────────────────────────────────
   window.__ar_instances = new Map();

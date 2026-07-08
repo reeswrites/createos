@@ -4,8 +4,7 @@ import { initToolkitWindow, toolkitWindowAdapter } from '../../../../src/api/wm/
 // toolkit-window.js is the API Toolbox window type extracted from app.js's
 // window.onload. Before the extraction, createToolkit / _buildToolkitContent /
 // __ar_addToolkitEntry were unreachable without booting the whole app. These tests
-// exercise the text-snippet half through a stub wm.spawn (the Blockly palette is
-// lazy — only built on a blocks-mode click — so it stays untouched here).
+// exercise the text-snippet panel through a stub wm.spawn.
 
 function stubWm() {
   window.wm = {

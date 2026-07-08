@@ -7,7 +7,6 @@ import {
   _endRun,
   getAPI,
   listAPIs,
-  _setBlocksApplier,
   _setToolkitApplier,
 } from '../../../src/runtime/api-registry.js';
 
@@ -86,22 +85,6 @@ describe('registerAPI', () => {
     expect(window[name]).toBe('override');
     expect(getAPI(name)).toBe('override');
     delete window[name];
-  });
-
-  test('calls blocks applier when ext.blocks provided', () => {
-    const calls = [];
-    _setBlocksApplier((n, defs) => calls.push({ n, defs }));
-
-    const name = uid();
-    const blocksDef = [{ definition: { type: 'my_block' }, generator: () => '' }];
-    registerAPI(name, {}, { blocks: blocksDef });
-
-    expect(calls.length).toBeGreaterThanOrEqual(1);
-    const last = calls[calls.length - 1];
-    expect(last.n).toBe(name);
-    expect(last.defs).toBe(blocksDef);
-    delete window[name];
-    _setBlocksApplier(null);
   });
 
   test('calls toolkit applier when ext.toolkit provided', () => {
@@ -204,22 +187,6 @@ describe('introspection', () => {
 // ── Deferred hooks ────────────────────────────────────────────────────────────
 
 describe('deferred hooks', () => {
-  test('pending blocks flushed when applier set', () => {
-    // Reset applier to null first
-    _setBlocksApplier(null);
-
-    const name = uid();
-    const blocksDef = [{ definition: { type: 'deferred_block' }, generator: () => '' }];
-    registerAPI(name, {}, { blocks: blocksDef });
-
-    const calls = [];
-    _setBlocksApplier((n, defs) => calls.push({ n, defs }));
-    // The pending entry should have been flushed
-    expect(calls.some((c) => c.n === name)).toBe(true);
-    delete window[name];
-    _setBlocksApplier(null);
-  });
-
   test('pending toolkit flushed when applier set', () => {
     _setToolkitApplier(null);
 

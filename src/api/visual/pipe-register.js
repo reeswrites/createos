@@ -46,10 +46,13 @@ export function installPipeRegister({ pipe, Pipeline, CustomStage }) {
     const hint = descriptor.hint ?? `pipe().${name}() — custom pipeline stage`;
     const fields = descriptor.fields ?? [];
 
-    // 1. Add stage method to all Pipeline instances (persists across resets)
-    Pipeline.prototype[name] = function (opts = {}) {
-      this._stages.push(new CustomStage(this._last(), (src) => factory(src, opts)));
-      return this;
+    // 1. Add stage method to all Pipeline instances (persists across resets).
+    //    Route through _pushStage (not a bare _stages.push) so a registered stage is
+    //    first-class: it gets an _id + _stageName + _stageRegistry entry + stage-added
+    //    event, so route()'s toggle/remove and the pipe:stage:set command can target it.
+    Pipeline.prototype[name] = function (opts = {}, id) {
+      const stage = new CustomStage(this._last(), (src) => factory(src, opts));
+      return this._pushStage(stage, name, id);
     };
 
     // 2. Build toolkit snippet

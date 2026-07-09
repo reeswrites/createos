@@ -857,6 +857,7 @@ onReset(cleanupDrumpads);
 registerDesktopFileType('beat', {
   glyph: 'fa-solid fa-drum',
   cssClass: 'dt-beat-icon',
+  glyphStyle: 'background: #1a0d2e; border: 1px solid #4a2a6a; font-size: 26px; color: #cba6f7;',
   open: (data, pos) => new Drumpad({ ...data, ...pos }),
 });
 

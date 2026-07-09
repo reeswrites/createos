@@ -7,6 +7,7 @@ import { downloadBlob } from './frame-snapshot.js';
 import { registerWidgetRestorer } from '../wm/widget-restorer-registry.js';
 import { insertSnippet } from '../../editor/active-editor.js';
 import { FrameDoc, restoreFrames } from './frame-doc.js';
+import { clampToGrid, rasterLine, rasterRectOutline } from './raster-tools.js';
 import { hexToRgb } from '../visual/color.js';
 import {
   mountWidgetShell,
@@ -710,15 +711,13 @@ export class AsciiEditor {
 
   _cellCoord(e) {
     const rect = e.target.getBoundingClientRect();
-    const c = Math.max(
-      0,
-      Math.min(this._cols - 1, Math.floor((e.clientX - rect.left) / this._cellW)),
-    );
-    const r = Math.max(
-      0,
-      Math.min(this._rows - 1, Math.floor((e.clientY - rect.top) / this._cellH)),
-    );
-    return { c, r };
+    const { x, y } = clampToGrid(e.clientX, e.clientY, rect, {
+      divX: this._cellW,
+      divY: this._cellH,
+      maxX: this._cols,
+      maxY: this._rows,
+    });
+    return { c: x, r: y };
   }
 
   _expandBbox(c, r) {
@@ -888,44 +887,11 @@ export class AsciiEditor {
 
   _shapeLineRect(start, end) {
     const cells = [];
-    const c0 = start.c,
-      r0 = start.r,
-      c1 = end.c,
-      r1 = end.r;
+    const plot = (c, r) => cells.push([c, r]);
     if (this._tool === 'line') {
-      let dc = Math.abs(c1 - c0),
-        dr = Math.abs(r1 - r0);
-      let sc = c0 < c1 ? 1 : -1,
-        sr = r0 < r1 ? 1 : -1;
-      let err = dc - dr,
-        c = c0,
-        r = r0;
-      for (;;) {
-        cells.push([c, r]);
-        if (c === c1 && r === r1) break;
-        const e2 = 2 * err;
-        if (e2 > -dr) {
-          err -= dr;
-          c += sc;
-        }
-        if (e2 < dc) {
-          err += dc;
-          r += sr;
-        }
-      }
+      rasterLine(start.c, start.r, end.c, end.r, plot);
     } else {
-      const lc = Math.min(c0, c1),
-        rc = Math.max(c0, c1);
-      const tr = Math.min(r0, r1),
-        br = Math.max(r0, r1);
-      for (let c = lc; c <= rc; c++) {
-        cells.push([c, tr]);
-        if (br !== tr) cells.push([c, br]);
-      }
-      for (let r = tr + 1; r < br; r++) {
-        cells.push([lc, r]);
-        if (rc !== lc) cells.push([rc, r]);
-      }
+      rasterRectOutline(start.c, start.r, end.c, end.r, plot);
     }
     return cells;
   }
@@ -1166,6 +1132,7 @@ onReset(cleanupAsciiEditors);
 registerDesktopFileType('ascii', {
   glyph: 'fa-solid fa-font',
   cssClass: 'dt-ascii-icon',
+  glyphStyle: 'background: #0d1a10; border: 1px solid #2a4a2a; font-size: 22px; color: #a6e3a1;',
   open: (data, pos) =>
     new AsciiEditor({
       cols: data.cols ?? 64,

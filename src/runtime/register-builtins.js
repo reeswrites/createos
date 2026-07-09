@@ -39,6 +39,8 @@ import { DesktopAPI } from '../api/platform/desktop-files.js';
 import { pipe, Source } from '../api/visual/render-pipeline.js';
 import { Mask } from '../api/visual/mask-registry.js';
 import { route } from '../api/signal/route.js';
+import { physics } from '../api/signal/physics.js';
+import '../api/signal/physics-sims.js'; // side effect: registers the v1 sim catalog (ADR 059)
 import { timeline } from '../api/signal/timeline.js';
 import { editImage } from '../api/media/image-edit.js';
 import { ThreeScene, THREE } from '../api/visual/three-scene.js';
@@ -124,6 +126,7 @@ export function registerBuiltins() {
   });
   _registerBuiltin('Source', Source);
   _registerBuiltin('route', route);
+  _registerBuiltin('physics', physics, { params: ['name', 'opts?'] });
   _registerBuiltin('timeline', timeline);
   _registerBuiltin('PIXI', PIXI);
   // Vector constructor stubs — used as type hints in Shader JS function params.

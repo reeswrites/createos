@@ -47,6 +47,7 @@ import {
   inlayHintsEnabledField,
 } from './inline-widgets.js';
 import { searchMarksField, initSearch } from './cm-search.js';
+import { TraceController, traceLineField } from './trace-controller.js';
 import { paramHintsExtension } from './param-hints.js';
 import { windowMemberCompletionSource } from './completions.js';
 import { shaderSignalPickerExtension } from './shader-signal-picker.js';
@@ -130,33 +131,8 @@ const errorLineField = StateField.define({
   provide: (f) => EditorView.decorations.from(f),
 });
 
-// ── Execution Trail decorations ───────────────────────────────────────────────
-// Mirrors errorLineField pattern. Lines arrive as Set<number> via setTraceLinesEffect.
-const setTraceLinesEffect = StateEffect.define();
-
-const traceLineField = StateField.define({
-  create: () => Decoration.none,
-  update(decos, tr) {
-    decos = decos.map(tr.changes);
-    for (const e of tr.effects) {
-      if (!e.is(setTraceLinesEffect)) continue;
-      if (e.value === null) {
-        decos = Decoration.none;
-        continue;
-      }
-      const builder = new RangeSetBuilder();
-      const lines = [...e.value].sort((a, b) => a - b);
-      for (const ln of lines) {
-        if (ln < 1 || ln > tr.state.doc.lines) continue;
-        const line = tr.state.doc.line(ln);
-        builder.add(line.from, line.to, Decoration.mark({ class: 'ar-trace-line' }));
-      }
-      decos = builder.finish();
-    }
-    return decos;
-  },
-  provide: (f) => EditorView.decorations.from(f),
-});
+// Execution Trail decorations + the per-editor glow controller live in
+// trace-controller.js (ADR 019); traceLineField below feeds the cm extension list.
 
 // Number of lines the execute() preamble adds before user code (1-based offset).
 // Structure: `(async function(){\n` + 9 preamble lines + `\nawait ...\n` = 10.
@@ -306,10 +282,13 @@ export class EditorInstance {
     this._autoExec = localStorage.getItem(editorAutoExecKey(id)) === '1';
     this._autoExecTimer = null;
 
-    this._traceEnabled = localStorage.getItem(editorTraceKey(id)) !== '0';
-    this._traceDirty = new Set();
-    this._traceActive = new Map(); // line → removal-timer id
-    this._traceRAF = null;
+    // Execution-trail glow — own state machine behind a small interface (ADR 019).
+    // getCm is a closure so the controller (built now) can dispatch into cm (built later).
+    this._trace = new TraceController({
+      native: this._native,
+      getCm: () => this.cm,
+      enabled: localStorage.getItem(editorTraceKey(id)) !== '0',
+    });
 
     this.editorWinId = `win-editor-${id}`;
 
@@ -360,13 +339,13 @@ export class EditorInstance {
     consolePopBtn.addEventListener('click', () => this._popoutConsole());
 
     const traceToggleBtn = document.createElement('button');
-    traceToggleBtn.className = 'ar-console-btn' + (this._traceEnabled ? ' ar-btn-active' : '');
+    traceToggleBtn.className = 'ar-console-btn' + (this._trace.enabled ? ' ar-btn-active' : '');
     traceToggleBtn.title = 'Toggle execution trail';
     traceToggleBtn.innerHTML = '<i class="fa-solid fa-route"></i>';
     traceToggleBtn.addEventListener('click', () => {
-      this._traceEnabled = !this._traceEnabled;
-      localStorage.setItem(editorTraceKey(this.id), this._traceEnabled ? '1' : '0');
-      traceToggleBtn.classList.toggle('ar-btn-active', this._traceEnabled);
+      this._trace.enabled = !this._trace.enabled;
+      localStorage.setItem(editorTraceKey(this.id), this._trace.enabled ? '1' : '0');
+      traceToggleBtn.classList.toggle('ar-btn-active', this._trace.enabled);
     });
     this._traceToggleBtn = traceToggleBtn;
 
@@ -648,49 +627,7 @@ export class EditorInstance {
     for (const [name, make] of PER_EDITOR_LOCALS) {
       window[`${ns}_${name}`] = make(this);
     }
-    window[`${ns}_trace`] = (line) => {
-      if (!this._traceEnabled) return;
-      this._traceDirty.add(line);
-      this._scheduleTraceFlush();
-    };
-  }
-
-  _scheduleTraceFlush() {
-    if (this._traceRAF !== null) return;
-    this._traceRAF = requestAnimationFrame(() => this._flushTrace());
-  }
-
-  _flushTrace() {
-    this._traceRAF = null;
-    if (!this._traceDirty.size) return;
-    const lines = new Set(this._traceActive.keys());
-    for (const line of this._traceDirty) {
-      // Cancel existing removal timer so hot lines stay lit
-      const existing = this._traceActive.get(line);
-      if (existing != null) this._native.clearTimeout(existing);
-      const tid = this._native.setTimeout(() => {
-        this._traceActive.delete(line);
-        if (this.cm) {
-          const active = new Set(this._traceActive.keys());
-          this.cm.dispatch({ effects: setTraceLinesEffect.of(active) });
-        }
-      }, 800);
-      this._traceActive.set(line, tid);
-      lines.add(line);
-    }
-    this._traceDirty.clear();
-    if (this.cm) this.cm.dispatch({ effects: setTraceLinesEffect.of(new Set(lines)) });
-  }
-
-  _clearTrace() {
-    if (this._traceRAF !== null) {
-      cancelAnimationFrame(this._traceRAF);
-      this._traceRAF = null;
-    }
-    for (const tid of this._traceActive.values()) this._native.clearTimeout(tid);
-    this._traceActive.clear();
-    this._traceDirty.clear();
-    if (this.cm) this.cm.dispatch({ effects: setTraceLinesEffect.of(null) });
+    window[`${ns}_trace`] = (line) => this._trace.record(line);
   }
 
   // ── Console ────────────────────────────────────────────────────────────────
@@ -831,7 +768,7 @@ export class EditorInstance {
   }
 
   _setStopped() {
-    this._clearTrace(); // every stop path converges here (manual stop, error, idle auto-stop) — kill stale execution-trail glow
+    this._trace.clear(); // every stop path converges here (manual stop, error, idle auto-stop) — kill stale execution-trail glow
     if (this.idleWatcher) {
       this._native.clearInterval(this.idleWatcher);
       this.idleWatcher = null;
@@ -884,9 +821,12 @@ export class EditorInstance {
     }, 300);
   }
 
-  stopRunning() {
-    emit('session:stop', {});
-    clearRunScoped();
+  // The "kill every tracked driver" sequence shared by stopRunning() and reset():
+  // clear tracked timers, drop their maps, remove run-scoped listeners, run every
+  // subsystem's onReset cleanup, and drop any frozen-pause state. One method so the two
+  // stop paths can't drift (a resource added to one but forgotten in the other). `soft`
+  // is forwarded to runResetHandlers (soft → Canvas windows survive; ADR 040).
+  _teardownDrivers(soft) {
     for (const id of this._intervals.keys()) this._native.clearInterval(id);
     for (const id of this._timeouts.keys()) this._native.clearTimeout(id);
     this._intervals.clear();
@@ -895,8 +835,14 @@ export class EditorInstance {
       target?.removeEventListener(type, handler, options),
     );
     this._listeners = [];
-    runResetHandlers(this.id, false); // hard reset/stop — tear everything down (Canvas windows too)
+    runResetHandlers(this.id, soft);
     this._pause.clear();
+  }
+
+  stopRunning() {
+    emit('session:stop', {});
+    clearRunScoped();
+    this._teardownDrivers(false); // hard stop — tear everything down (Canvas windows too)
     this._setStopped(); // _setStopped() clears the execution trail
   }
 
@@ -922,19 +868,11 @@ export class EditorInstance {
     if (this.btnState === 'running' || this.btnState === 'paused') emit('session:stop', {});
     _endRun(); // restore any registerAPI() overrides made during this run
     this.cm.dispatch({ effects: setErrorLineEffect.of(null) });
-    this._clearTrace();
+    this._trace.clear();
     setPaused(false);
     setUsesAudio(undefined);
-    this._pause.clear();
-    this._listeners.forEach(({ target, type, handler, options }) =>
-      target?.removeEventListener(type, handler, options),
-    );
-    this._listeners = [];
-    for (const id of this._intervals.keys()) this._native.clearInterval(id);
-    for (const id of this._timeouts.keys()) this._native.clearTimeout(id);
-    this._intervals.clear();
-    this._timeouts.clear();
-    runResetHandlers(this.id, soft); // every subsystem's cleanup, registered via onReset (ADR 008) — scoped to this editor; soft → Canvas windows survive
+    // Shared driver teardown (onReset cleanups scoped to this editor, ADR 008).
+    this._teardownDrivers(soft);
     if (!soft) {
       this._keepAlive = new Set();
       this._hadOutput = false;
@@ -959,7 +897,7 @@ export class EditorInstance {
     startRun({
       raw,
       id: this.id,
-      traceEnabled: this._traceEnabled,
+      traceEnabled: this._trace.enabled,
       soft,
       preamble: editorPreamble(this.id),
       deps: {

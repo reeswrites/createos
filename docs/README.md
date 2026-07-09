@@ -14,6 +14,7 @@ Press **?** in the IDE for the in-app audio quick reference.
 | [media.md](media.md) | Images, video layers |
 | [vision.md](vision.md) | Object detection, gesture, face expression |
 | [video.md](video.md) | Sample canvas/camera regions as live brightness/color/motion signals |
+| [physics.md](physics.md) | Physics simulations as signal sources — pendulum/ball/kuramoto/lorenz/logistic → route/audio/shader |
 | [sensors.md](sensors.md) | Mouse, keyboard, gamepad, device motion, geolocation, network, battery signals |
 | [serial.md](serial.md) | WebSerial — read/write Arduino/ESP32/Pico via USB; GPIO pin events |
 | [control.md](control.md) | Timers, keyboard, color, utilities |

@@ -3,7 +3,13 @@
 // Sibling to SpriteEditor; reuses WidgetHistory, wm.addHistoryControls, desktop autosave.
 
 import { WidgetEvents } from './widget-events.js';
-import { floodFill, resolveColorRGBA, expandBbox } from './raster-tools.js';
+import {
+  floodFill,
+  resolveColorRGBA,
+  expandBbox,
+  clampToGrid,
+  readPixelHex,
+} from './raster-tools.js';
 import { snapshotFrameCanvases, paintFrameCanvas, downloadCanvasPng } from './frame-snapshot.js';
 import { registerWidgetRestorer } from '../wm/widget-restorer-registry.js';
 import { insertSnippet } from '../../editor/active-editor.js';
@@ -952,10 +958,12 @@ export class Paint {
 
   _xyCoord(e) {
     const rect = e.target.getBoundingClientRect();
-    return {
-      x: Math.max(0, Math.min(this._w - 1, Math.floor(e.clientX - rect.left))),
-      y: Math.max(0, Math.min(this._h - 1, Math.floor(e.clientY - rect.top))),
-    };
+    return clampToGrid(e.clientX, e.clientY, rect, {
+      divX: 1,
+      divY: 1,
+      maxX: this._w,
+      maxY: this._h,
+    });
   }
 
   // Expand the stroke bounding-box to include point (x, y)
@@ -1119,10 +1127,7 @@ export class Paint {
   _eyedrop(x, y) {
     const fc = this._frames[this._fi];
     if (!fc) return;
-    const [r, g, b, a] = fc.getContext('2d').getImageData(x, y, 1, 1).data;
-    const c =
-      a === 0 ? '#000000' : '#' + [r, g, b].map((n) => n.toString(16).padStart(2, '0')).join('');
-    this._setColor(c);
+    this._setColor(readPixelHex(fc.getContext('2d'), x, y, '#000000'));
   }
 
   // ── Flood fill (BFS on frame ImageData, ported from sprite-editor.js) ─────────
@@ -1376,6 +1381,7 @@ onReset(cleanupPaints);
 registerDesktopFileType('paint', {
   glyph: 'fa-solid fa-paintbrush',
   cssClass: 'dt-paint-icon',
+  glyphStyle: 'background: #1a0d1a; border: 1px solid #4a2a4a; font-size: 22px; color: #cba6f7;',
   open: (data, pos) => {
     const frameUrls = data.frames ?? [];
     const canvases = frameUrls.map(() => {

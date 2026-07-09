@@ -60,3 +60,68 @@ export function expandBbox(bbox, a, b) {
   if (b > bbox.maxY) bbox.maxY = b;
   return bbox;
 }
+
+// Map a client pointer position to an integer grid cell, clamped to [0, max-1] on each
+// axis. Paint (divX=divY=1), Sprite (divX=divY=scale), and Ascii (divX=cellW, divY=cellH,
+// mapped to c/r) hand-rolled this identical clamp-floor; only the divisors differ. rect =
+// the element's getBoundingClientRect() (passed in so this stays a pure unit).
+export function clampToGrid(clientX, clientY, rect, { divX, divY, maxX, maxY }) {
+  return {
+    x: Math.max(0, Math.min(maxX - 1, Math.floor((clientX - rect.left) / divX))),
+    y: Math.max(0, Math.min(maxY - 1, Math.floor((clientY - rect.top) / divY))),
+  };
+}
+
+// Bresenham integer line from (x0,y0) to (x1,y1), calling plot(x,y) at each point.
+// Sprite plots pixels, Ascii accumulates cells — they carried byte-identical copies of
+// this loop (with x/y vs c/r names). Callers own what "plot" does.
+export function rasterLine(x0, y0, x1, y1, plot) {
+  const dx = Math.abs(x1 - x0),
+    dy = Math.abs(y1 - y0);
+  const sx = x0 < x1 ? 1 : -1,
+    sy = y0 < y1 ? 1 : -1;
+  let err = dx - dy,
+    x = x0,
+    y = y0;
+  for (;;) {
+    plot(x, y);
+    if (x === x1 && y === y1) break;
+    const e2 = 2 * err;
+    if (e2 > -dy) {
+      err -= dy;
+      x += sx;
+    }
+    if (e2 < dx) {
+      err += dx;
+      y += sy;
+    }
+  }
+}
+
+// Rectangle perimeter between two corners, calling plot(x,y) on each edge cell. Skips
+// the duplicate edge on a degenerate (single-row / single-column) rect. Shared by Sprite
+// (pixels) and Ascii (cells) — both idempotent under plot, so double-plotting a corner
+// would be harmless, but the guard keeps the two exact.
+export function rasterRectOutline(x0, y0, x1, y1, plot) {
+  const lx = Math.min(x0, x1),
+    rx = Math.max(x0, x1);
+  const ty = Math.min(y0, y1),
+    by = Math.max(y0, y1);
+  for (let x = lx; x <= rx; x++) {
+    plot(x, ty);
+    if (by !== ty) plot(x, by);
+  }
+  for (let y = ty + 1; y < by; y++) {
+    plot(lx, y);
+    if (rx !== lx) plot(rx, y);
+  }
+}
+
+// Read the pixel at (x, y) as a #rrggbb hex string. Fully-transparent pixels return the
+// `transparent` sentinel (Paint uses '#000000', Sprite uses 'transparent'). The
+// eyedropper both editors hand-rolled off getImageData.
+export function readPixelHex(ctx, x, y, transparent = 'transparent') {
+  const [r, g, b, a] = ctx.getImageData(x, y, 1, 1).data;
+  if (a === 0) return transparent;
+  return '#' + [r, g, b].map((n) => n.toString(16).padStart(2, '0')).join('');
+}

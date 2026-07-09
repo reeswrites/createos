@@ -495,52 +495,33 @@ class StripHandle {
   _set() {
     return _settingsFor(this._name);
   }
-  volume(db) {
+  // The one live-or-persist fork: a live strip owns the node write (its setter also
+  // persists + ducks); with no strip, write the setting that survives teardown and
+  // persist here. `duck` recomputes solo/mute ducking on the settings-only path.
+  _apply(setter, key, value, duck = false) {
     const l = this._live();
-    if (l) l.setVolume(db);
+    if (l) l[setter](value);
     else {
-      this._set().volume = db;
+      this._set()[key] = value;
+      if (duck) _recomputeDucking();
       _persistAndNotify();
     }
     return this;
+  }
+  volume(db) {
+    return this._apply('setVolume', 'volume', db);
   }
   pan(v) {
-    const l = this._live();
-    if (l) l.setPan(v);
-    else {
-      this._set().pan = v;
-      _persistAndNotify();
-    }
-    return this;
+    return this._apply('setPan', 'pan', v);
   }
   mute(b = true) {
-    const l = this._live();
-    if (l) l.setMute(b);
-    else {
-      this._set().mute = !!b;
-      _recomputeDucking();
-      _persistAndNotify();
-    }
-    return this;
+    return this._apply('setMute', 'mute', !!b, true);
   }
   solo(b = true) {
-    const l = this._live();
-    if (l) l.setSolo(b);
-    else {
-      this._set().solo = !!b;
-      _recomputeDucking();
-      _persistAndNotify();
-    }
-    return this;
+    return this._apply('setSolo', 'solo', !!b, true);
   }
   eq(bands) {
-    const l = this._live();
-    if (l) l.setEQ(bands);
-    else {
-      this._set().eq = bands;
-      _persistAndNotify();
-    }
-    return this;
+    return this._apply('setEQ', 'eq', bands);
   }
   get name() {
     return this._name;

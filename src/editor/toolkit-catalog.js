@@ -1041,6 +1041,47 @@ setcps(0.5);`,
     ],
   },
   {
+    name: 'Physics',
+    commands: [
+      {
+        label: 'pendulum → shader',
+        code: "// Double pendulum angle drives a shader uniform (smooth, never-repeating)\nconst p = physics('pendulum', { id: 'a', damp: 0 });\np.show('Pendulum');\nconst sh = new GLShader(`\n  float r = uCustom.x;\n  gl_FragColor = vec4(r, uv.y, 1.0 - r, 1.0);\n`).start();\nroute(p.theta2).norm(-Math.PI, Math.PI).smooth(0.85).to(sh, 'uCustom.x');",
+        hint: 'physics(name, opts) instantiates a sim. Channels (p.theta2) are plain () => value readers you route(). p.show() opens a debug window.',
+        tags: ['physics', 'pendulum', 'chaos', 'shader', 'route', 'signal', 'simulation'],
+      },
+      {
+        label: 'bouncing ball → drum',
+        code: "// Discrete bounce events trigger a drum hit; harder bounces = louder\nconst b = physics('ball', { e: 0.85 });\nb.show('Ball');\non('physics:ball:bounce').do((e) => console.log('bounce', e.speed.toFixed(2)));\nroute('physics:ball:bounce').to('kick');",
+        hint: 'Sims dual-emit `physics:{name}:{event}` (all instances) and `physics:{id}:{event}` (one). Route or on() them like any bus event.',
+        tags: ['physics', 'ball', 'bounce', 'event', 'trigger', 'drum', 'discrete'],
+      },
+      {
+        label: 'Kuramoto → filter arc',
+        code: "// Order parameter R (0..1) slowly opens a filter as oscillators sync\nconst k = physics('kuramoto', { n: 16, k: 1.4 });\nk.show('Kuramoto');\nconst filt = new Tone.Filter(200, 'lowpass').toDestination();\nroute(k.R).scale(0, 1, 200, 8000).smooth(0.95).to(filt.frequency);",
+        hint: "R is already 0..1 (no norm needed). Raise coupling k live with k.set('k', 2) to push it through the sync threshold.",
+        tags: ['physics', 'kuramoto', 'order', 'sync', 'filter', 'arc', 'coupling'],
+      },
+      {
+        label: 'stereo divergence (two pendulums)',
+        code: "// Two pendulums a hair apart diverge — a free correlated stereo pair\nconst L = physics('pendulum', { id: 'L' });\nconst R = physics('pendulum', { id: 'R', split: 0.01 });\nroute(L.theta2).to((v) => console.log('L', v.toFixed(2)));\nroute(R.theta2).to((v) => console.log('R', v.toFixed(2)));",
+        hint: 'Give each instance an `id` so it has a stable identity (survives soft reset) and its own event namespace. `split` seeds a divergent twin.',
+        tags: ['physics', 'pendulum', 'stereo', 'divergence', 'chaos', 'id'],
+      },
+      {
+        label: 'live knob = bidirectional',
+        code: "// Route a signal INTO a sim param (fn-sink) — bidirectional, no new API\nconst p = physics('pendulum', { id: 'a' });\np.show('Pendulum');\n// mic loudness bends gravity live:\nroute(Source.mic).amplitude.scale(0, 1, 5, 25).to((v) => p.set('g', v));",
+        hint: 'p.set(name, val) changes a param live without resetting the trajectory. Routing to it = modulation. (Feeding a sim its OWN channel back is unstable — avoid.)',
+        tags: ['physics', 'param', 'set', 'bidirectional', 'mic', 'modulation'],
+      },
+      {
+        label: 'logistic map (iterated chaos)',
+        code: "// A chaotic map iterated at 4 Hz — sparse discrete signal, sweep r to find edges\nconst m = physics('logistic', { r: 3.7, rate: 6 });\nm.show('Logistic');\nroute('physics:logistic:step').to((e) => console.log(e.x.toFixed(3)));",
+        hint: 'The logistic map has no continuous time — it iterates (rate Hz), not steps. r in 3.57..4 is chaotic; r below ~3 settles.',
+        tags: ['physics', 'logistic', 'map', 'chaos', 'iterated', 'bifurcation'],
+      },
+    ],
+  },
+  {
     name: 'Pipeline',
     commands: [
       {

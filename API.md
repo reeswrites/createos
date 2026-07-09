@@ -608,6 +608,8 @@ route(Source.mic).amplitude
 | `Source.camera` | frame | Camera feed (delegates to `pipe()` internally) |
 | `() => value` | continuous | Fn called each RAF tick |
 | `video.signal(...)` | continuous | VideoSignal object (duck-typed) |
+| `physics('pendulum').theta2` | continuous | Physics-sim channel (plain reader — see below) |
+| `'physics:pendulum:flip'` | discrete | Physics-sim event (dual-emitted) |
 | Canvas / video element | frame | DOM element |
 
 ### Bridges (mandatory retyping for audio/frame → scalar)
@@ -666,6 +668,28 @@ route(src1).amplitude
   .mix(route(src2).motion(), (a, b) => a * 0.7 + b * 0.3)
   .to(osc.frequency)
 ```
+
+## Physics sims — `physics(name, opts)`
+
+> **Full reference:** [`docs/physics.md`](docs/physics.md) — every sim's channels,
+> events, knobs, and the lifecycle model.
+
+Numerical simulations as signal sources (ADR 059). A sim publishes continuous
+**channels** (plain `() => value` readers you `route()`) and discrete **events**
+(dual-emitted on `physics:{name}:{event}` + `physics:{id}:{event}`).
+
+```js
+const p = physics('pendulum', { id: 'a', damp: 0 });
+p.show('Pendulum');                                  // debug window
+route(p.theta2).norm(-Math.PI, Math.PI).to(sh, 'uCustom.x');   // channel → shader
+route('physics:pendulum:flip').to('kick');           // event → drum
+p.set('g', 12);                                      // live knob (bidirectional-ready)
+```
+
+v1 sims: `pendulum` · `ball` · `kuramoto` · `harmonic` · `lorenz` · `logistic`. A sim is
+an **input** (only `.show()` or a downstream sink holds the run alive) and **survives soft
+reset by identity** so a chaotic trajectory doesn't reset each keystroke. Add your own with
+`registerPhysicsSource(name, spec)`.
 
 ### Route-scoped events
 

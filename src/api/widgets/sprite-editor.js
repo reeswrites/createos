@@ -2,7 +2,15 @@
 // Entry: new SpriteEditor(opts), Sprite.edit(opts), sp.edit(opts), toolbar button
 
 import { Sprite } from './sprite.js';
-import { floodFill, resolveColorRGBA, expandBbox } from './raster-tools.js';
+import {
+  floodFill,
+  resolveColorRGBA,
+  expandBbox,
+  clampToGrid,
+  readPixelHex,
+  rasterLine,
+  rasterRectOutline,
+} from './raster-tools.js';
 import { snapshotFrameCanvases, paintFrameCanvas, downloadCanvasPng } from './frame-snapshot.js';
 import { restoreFrames } from './frame-doc.js';
 import { registerWidgetRestorer } from '../wm/widget-restorer-registry.js';
@@ -518,10 +526,12 @@ export class SpriteEditor {
     const rect = e.target.getBoundingClientRect();
     const sc = this._scale;
     const sp = this.sprite;
-    return {
-      x: Math.max(0, Math.min(sp._w - 1, Math.floor((e.clientX - rect.left) / sc))),
-      y: Math.max(0, Math.min(sp._h - 1, Math.floor((e.clientY - rect.top) / sc))),
-    };
+    return clampToGrid(e.clientX, e.clientY, rect, {
+      divX: sc,
+      divY: sc,
+      maxX: sp._w,
+      maxY: sp._h,
+    });
   }
 
   _expandBbox(x, y) {
@@ -630,12 +640,7 @@ export class SpriteEditor {
   _eyedrop(px, py) {
     const ctx = this.sprite.ctx();
     if (!ctx) return;
-    const [r, g, b, a] = ctx.getImageData(px, py, 1, 1).data;
-    const c =
-      a === 0
-        ? 'transparent'
-        : '#' + [r, g, b].map((n) => n.toString(16).padStart(2, '0')).join('');
-    this._setColor(c);
+    this._setColor(readPixelHex(ctx, px, py, 'transparent'));
   }
 
   // ── Flood fill (BFS on frame pixel data) ─────────────────────────────────────
@@ -782,44 +787,16 @@ export class SpriteEditor {
         if (x >= 0 && x < sp._w && y >= 0 && y < sp._h) sp.pixel(x, y, color);
       }
     } else if (this._tool === 'line') {
-      // Bresenham
-      let dx = Math.abs(x1 - x0),
-        dy = Math.abs(y1 - y0);
-      let sx = x0 < x1 ? 1 : -1,
-        sy = y0 < y1 ? 1 : -1;
-      let err = dx - dy,
-        x = x0,
-        y = y0;
-      for (;;) {
-        sp.pixel(x, y, color);
-        if (x === x1 && y === y1) break;
-        const e2 = 2 * err;
-        if (e2 > -dy) {
-          err -= dy;
-          x += sx;
-        }
-        if (e2 < dx) {
-          err += dx;
-          y += sy;
-        }
-      }
-    } else {
+      rasterLine(x0, y0, x1, y1, (x, y) => sp.pixel(x, y, color));
+    } else if (this._tool === 'rectfill') {
       const lx = Math.min(x0, x1),
         rx = Math.max(x0, x1);
       const ty = Math.min(y0, y1),
         by = Math.max(y0, y1);
-      if (this._tool === 'rectfill') {
-        for (let y = ty; y <= by; y++) for (let x = lx; x <= rx; x++) sp.pixel(x, y, color);
-      } else {
-        for (let x = lx; x <= rx; x++) {
-          sp.pixel(x, ty, color);
-          sp.pixel(x, by, color);
-        }
-        for (let y = ty + 1; y < by; y++) {
-          sp.pixel(lx, y, color);
-          sp.pixel(rx, y, color);
-        }
-      }
+      for (let y = ty; y <= by; y++) for (let x = lx; x <= rx; x++) sp.pixel(x, y, color);
+    } else {
+      // rect outline
+      rasterRectOutline(x0, y0, x1, y1, (x, y) => sp.pixel(x, y, color));
     }
   }
 
@@ -1075,6 +1052,7 @@ onReset(cleanupSpriteEditors);
 registerDesktopFileType('sprite', {
   glyph: 'fa-solid fa-border-all',
   cssClass: 'dt-sprite-icon',
+  glyphStyle: 'background: #0d1a2e; border: 1px solid #2a4a6a; font-size: 22px; color: #89b4fa;',
   open: (data, pos) => {
     const sp = new Sprite({
       width: data.width,

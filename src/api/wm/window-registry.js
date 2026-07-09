@@ -59,3 +59,31 @@ export function applyGeo(win, w) {
   if (w.nochrome) win.classList.add('wm-no-chrome');
   if (w.transparent) win.classList.add('wm-transparent');
 }
+
+// ── Shared FIELD-EXTRACTION primitives ───────────────────────────────────────
+// Both window serializers (in-session `_serializeSpawnedType` and the portable
+// Window Type Adapters) read the SAME per-type fields off the live window; only
+// the CONTRACT they project into differs (in-session keeps id + hasHandle; the
+// portable path drops id + uses fileKey + 'visualizer'). These helpers own the
+// read once; each caller projects the result into its own contract shape. Do NOT
+// fold the projection in here — the two contracts stay deliberately separate.
+
+// Viz window fields: reads the live source/style <select> values (falling back
+// to spawn opts, then the defaults) plus the current color set. Callers decide
+// which keys to emit (portable drops colors).
+export function readVizFields(win, opts) {
+  return {
+    source: win._vizSourceEl?.value ?? opts?.source ?? 'master',
+    style: win._vizStyleEl?.value ?? opts?.style ?? 'wave',
+    colors: win._vizColors ? { ...win._vizColors } : undefined,
+  };
+}
+
+// Media (image/video) source decision: a `blob:` src means the real handle lives
+// in IndexedDB (in-session projects `hasHandle:true`, portable projects a
+// `fileKey`); a non-blob src travels inline. Returns the decision as data —
+// `src` is the inline value to persist (undefined for blob-backed windows).
+export function readMediaSrc(opts) {
+  const isBlob = opts?.src?.startsWith('blob:') ?? false;
+  return { isBlob, src: isBlob ? undefined : opts?.src };
+}

@@ -75,14 +75,7 @@ export async function applyProject(data, wm, instances, appAPI) {
 
   // Execution states — after all windows exist
   for (const w of editorEntries) {
-    const inst = instances.get(w.editorId);
-    if (!inst) continue;
-    if (w.executionState === 'running' || w.executionState === 'paused') {
-      inst.execute();
-      if (w.executionState === 'paused') {
-        setTimeout(() => inst.pauseRunning(), 200);
-      }
-    }
+    instances.get(w.editorId)?.restoreExecutionState(w.executionState);
   }
 
   // Toolbar state: mic/camera no longer serialized; streams are demand-driven (ADR 023).

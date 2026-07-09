@@ -1,10 +1,10 @@
-import { onReset } from '../../runtime/reset-registry.js';
+import { trackedGroup } from '../../runtime/tracked-group.js';
 import { liveOutput } from '../../runtime/keep-alive.js';
-const _mediaLayers = [];
+const _mediaLayers = trackedGroup({ teardown: (m) => m._destroy() });
 
+// Manual "destroy-all" helper (tests / app.js); reset teardown is the group's own.
 export function cleanupMedia() {
-  for (const m of _mediaLayers) m._destroy();
-  _mediaLayers.length = 0;
+  _mediaLayers.teardownAll();
 }
 
 function makeOverlayCanvas(z, opacity) {
@@ -37,7 +37,7 @@ class ImageLayer {
     this._fit = fit;
     this._canvas = makeOverlayCanvas(z, opacity);
     this._draw();
-    _mediaLayers.push(this);
+    _mediaLayers.add(this);
   }
 
   _draw() {
@@ -107,7 +107,7 @@ class VideoLayer {
     this._video.style.display = 'none';
     document.body.appendChild(this._video);
 
-    _mediaLayers.push(this);
+    _mediaLayers.add(this);
   }
 
   _renderLoop() {
@@ -223,7 +223,7 @@ class VideoClip {
       }
     };
     this.el.addEventListener('timeupdate', this._onTime);
-    _mediaLayers.push(this);
+    _mediaLayers.add(this);
   }
 
   play() {
@@ -303,6 +303,3 @@ export const Media = {
     return new VideoClip(source, start, end);
   },
 };
-
-// Register teardown with the reset registry (ADR 008).
-onReset(cleanupMedia);

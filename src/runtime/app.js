@@ -262,19 +262,14 @@ window.onload = () => {
         await applyProject(_embedProject, window.wm, window.__ar_instances, appAPI);
         nativeCap('setProjectProvenance')?.('imported'); // embedded/shared = untrusted (ADR 050)
       }
-      window.__ar_instances.forEach((inst) => inst.execute());
+      // Embed auto-run is execute-only (== 'running'); restore via the shared seam.
+      window.__ar_instances.forEach((inst) => inst.restoreExecutionState('running'));
     })();
   } else {
     // Auto-execute editors that were running/paused before refresh
     for (const id of manifest) {
       const state = localStorage.getItem(editorExecKey(id));
-      if (state === 'running' || state === 'paused') {
-        const inst = window.__ar_instances.get(id);
-        if (inst) {
-          inst.execute();
-          if (state === 'paused') setTimeout(() => inst.pauseRunning(), 200);
-        }
-      }
+      window.__ar_instances.get(id)?.restoreExecutionState(state);
     }
   }
 

@@ -3,6 +3,8 @@ import { activeEditorId } from '../../runtime/run-context.js';
 import { notify, registerCommand } from '../../events/index.js';
 import { recordStream } from './recorder.js';
 import { initCameraLease } from './media-lease.js';
+import { refcounted } from './refcounted.js';
+import { playOffDom } from './off-dom-video.js';
 // ── Multi-camera API ─────────────────────────────────────────────────────────
 
 // Open handles (one per Camera.open() call). Each is tagged with the editor that
@@ -21,28 +23,23 @@ class CameraSource {
   constructor(key, stream) {
     this.key = key;
     this.stream = stream;
-    this.refs = 0;
     this.deviceId = stream.getVideoTracks()[0]?.getSettings?.().deviceId ?? null;
-    this.element = document.createElement('video');
-    this.element.autoplay = true;
-    this.element.playsInline = true;
-    this.element.muted = true;
-    this.element.srcObject = stream;
-    // Off-DOM <video> fed by a MediaStream does NOT start on autoplay alone —
-    // Chrome leaves it paused (currentTime stuck at 0), so drawImage samples a
-    // blank frame. Kick playback explicitly. Muted + playsInline → no gesture needed.
-    this.element.play().catch(() => {});
+    this.element = playOffDom(stream);
+    // Shared-stream refcount: the underlying getUserMedia stream is already live
+    // (open done in _getSharedSource), so only the 1→0 edge does work — stop the
+    // tracks and drop the shared entry once the last CameraStream releases.
+    this._rc = refcounted({
+      close: () => {
+        this.stream?.getTracks().forEach((t) => t.stop());
+        this.element.srcObject = null;
+        _sharedSources.delete(this.key);
+        if (this.deviceId) notify('camera:close', { deviceId: this.deviceId });
+      },
+    });
   }
+  /** Take a lease on the shared stream. Returns a handle with idempotent release(). */
   acquire() {
-    this.refs++;
-  }
-  release() {
-    this.refs = Math.max(0, this.refs - 1);
-    if (this.refs > 0) return;
-    this.stream?.getTracks().forEach((t) => t.stop());
-    this.element.srcObject = null;
-    _sharedSources.delete(this.key);
-    if (this.deviceId) notify('camera:close', { deviceId: this.deviceId });
+    return this._rc.acquire();
   }
 }
 
@@ -89,7 +86,7 @@ class CameraStream {
     this._flipped = false;
     this._released = false;
     this._ownerEditorId = ownerEditorId;
-    source.acquire();
+    this._lease = source.acquire();
     _openCameras.push(this);
     // Owner-scoped teardown via the shared run-scoped handler (ADR 041). owner is
     // passed in (open() awaits, so it was captured before the await). A camera is
@@ -156,7 +153,7 @@ class CameraStream {
     this._released = true;
     const i = _openCameras.indexOf(this);
     if (i >= 0) _openCameras.splice(i, 1);
-    this._source.release(); // stops tracks only when last handle releases
+    this._lease.release(); // stops tracks only when last handle releases
     this._scoped?.dispose(); // removes from run-scoped set (onStop re-enters, guarded)
   }
 }

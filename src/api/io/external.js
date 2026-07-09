@@ -1,4 +1,4 @@
-import { onReset } from '../../runtime/reset-registry.js';
+import { trackedGroup } from '../../runtime/tracked-group.js';
 // external.js — open data APIs as live signal sources (#38)
 // external.weather(lat, lon) → WeatherSignal (temperature/windSpeed/precipitation)
 // external.fetch(url, opts)  → raw JSON fetch helper (CORS permitting)
@@ -104,11 +104,11 @@ class DataSignal {
 
 // ── Tracking for cleanup ──────────────────────────────────────────────────────
 
-const _signals = [];
+const _signals = trackedGroup({ teardown: (s) => s._destroy() });
 
+// Manual "destroy-all" helper (tests / app.js); reset teardown is the group's own.
 export function cleanupExternal() {
-  for (const s of _signals) s._destroy();
-  _signals.length = 0;
+  _signals.teardownAll();
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -117,7 +117,7 @@ export const external = {
   // Weather signal from open-meteo (no API key required)
   async weather(lat, lon) {
     const sig = new WeatherSignal(lat, lon);
-    _signals.push(sig);
+    _signals.add(sig);
     await sig._fetch();
     return sig;
   },
@@ -126,7 +126,7 @@ export const external = {
   // selector(json) → value; e.g. json => json.price
   async signal(url, selector, intervalMs = 30_000) {
     const sig = new DataSignal(url, selector);
-    _signals.push(sig);
+    _signals.add(sig);
     await sig._fetch();
     if (intervalMs > 0) {
       sig.stream(() => {}, intervalMs);
@@ -141,6 +141,3 @@ export const external = {
     return res.json();
   },
 };
-
-// Register teardown with the reset registry (ADR 008).
-onReset(cleanupExternal);

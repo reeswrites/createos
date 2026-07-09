@@ -8,6 +8,7 @@ import {
   desktopFileCssClass,
   desktopFileGlyphStyles,
 } from './desktop-file-registry.js';
+import { mediaKind } from '../media/media-kind.js';
 // desktop-files.js — file icons on the IDE desktop (project-scoped)
 //
 // Two icon types:
@@ -52,7 +53,12 @@ async function _syncFoldersToDB() {
     store.clear();
     for (const icon of _icons.values()) {
       if (icon.type === 'folder' && icon.folderData?.handle)
-        store.add({ handle: icon.folderData.handle, name: icon.name, x: icon.x, y: icon.y });
+        store.add({
+          handle: icon.folderData.handle,
+          name: icon.name,
+          x: icon.x,
+          y: icon.y,
+        });
     }
     tx.oncomplete = () => db.close();
   } catch (_) {}
@@ -243,8 +249,10 @@ ${_widgetGlyphRules}
 function _classify(name, mime = '') {
   if (mime.startsWith('image/') || /\.(png|jpe?g|gif|webp|svg|avif|bmp|ico)$/i.test(name))
     return 'image';
-  if (mime.startsWith('video/') || /\.(mp4|webm|mov|avi|mkv|ogv)$/i.test(name)) return 'video';
-  if (mime.startsWith('audio/') || /\.(mp3|wav|ogg|flac|aac|m4a|opus)$/i.test(name)) return 'audio';
+  if (mime.startsWith('video/')) return 'video';
+  if (mime.startsWith('audio/')) return 'audio';
+  const kind = mediaKind(name);
+  if (kind) return kind;
   if (/\.(js|ts|mjs|wgsl|glsl|json|html?|css|md|txt|yaml|toml)$/i.test(name)) return 'code';
   return 'file';
 }
@@ -423,7 +431,11 @@ function _buildEl(icon) {
     const peers = isMulti
       ? [..._selIds].map((id) => _icons.get(id)).filter((ic) => ic && ic !== icon)
       : [];
-    const peerOffsets = peers.map((ic) => ({ ic, ox: e.clientX - ic.x, oy: e.clientY - ic.y }));
+    const peerOffsets = peers.map((ic) => ({
+      ic,
+      ox: e.clientX - ic.x,
+      oy: e.clientY - ic.y,
+    }));
     const mv = (e) => {
       if (!moved) {
         moved = true;
@@ -521,7 +533,11 @@ function _selMulti(ids) {
 // ── Activate (double-click) ───────────────────────────────────────────────────
 
 function _activate(icon) {
-  notify('desktop:icon-clicked', { id: icon.id, name: icon.name, type: icon.type });
+  notify('desktop:icon-clicked', {
+    id: icon.id,
+    name: icon.name,
+    type: icon.type,
+  });
   (_iconClickHandlers.get(icon.id) ?? []).forEach((fn) => {
     try {
       fn({ id: icon.id, name: icon.name, type: icon.type, url: icon.url });
@@ -707,7 +723,10 @@ function _ctx(icon, cx, cy) {
       item('Use as shader texture', () => {
         if (!window.Shader) return;
         if (icon.type === 'image') {
-          const img = Object.assign(new Image(), { crossOrigin: 'anonymous', src: icon.url });
+          const img = Object.assign(new Image(), {
+            crossOrigin: 'anonymous',
+            src: icon.url,
+          });
           img.addEventListener(
             'load',
             () =>
@@ -1198,7 +1217,13 @@ export function serializeDesktop({ forProject = false } = {}) {
   for (const icon of _icons.values()) {
     if (icon.type === 'folder') continue;
     if (icon.type === 'editor') {
-      out.push({ type: 'editor', editorId: icon.editorId, name: icon.name, x: icon.x, y: icon.y });
+      out.push({
+        type: 'editor',
+        editorId: icon.editorId,
+        name: icon.name,
+        x: icon.x,
+        y: icon.y,
+      });
       continue;
     }
     const rec = _iconRecord(icon, { forProject });
@@ -1360,7 +1385,13 @@ export const DesktopAPI = {
     _putCaptureBlob(icon.id, blob);
     _saveDesktopState();
     if (download) _download(url, name);
-    return { id: icon.id, name: icon.name, type: icon.type, url: icon.url, blobKey: icon.id };
+    return {
+      id: icon.id,
+      name: icon.name,
+      type: icon.type,
+      url: icon.url,
+      blobKey: icon.id,
+    };
   },
   // Resolve a stored capture blob by key (IDB) → Blob | null. Used by Sample
   // Voices to load their audio buffer (ADR 046 / 016).

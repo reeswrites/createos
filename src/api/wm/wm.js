@@ -14,6 +14,8 @@ import {
   applyGeo,
   titleOf,
   readAudio,
+  readVizFields,
+  readMediaSrc,
 } from './window-registry.js';
 import {
   storeWinHandle as _storeWinHandle,
@@ -153,16 +155,17 @@ export function initWM(onContentResize) {
       return true;
     }
     entry.type = opts.type;
-    const isBlobSrc = opts.src?.startsWith('blob:');
+    const { isBlob, src } = readMediaSrc(opts);
     if (opts.html !== undefined) entry.html = opts.html;
-    if (!isBlobSrc && opts.src !== undefined) entry.src = opts.src;
+    if (src !== undefined) entry.src = src;
     if (opts.loop !== undefined) entry.loop = opts.loop;
-    if (isBlobSrc) entry.hasHandle = true; // handle stored in IndexedDB
+    if (isBlob) entry.hasHandle = true; // handle stored in IndexedDB
     // Persist viz source/style so restored windows reuse them
     if (opts.type === 'viz') {
-      entry.source = win._vizSourceEl?.value ?? opts.source ?? 'master';
-      entry.style = win._vizStyleEl?.value ?? opts.style ?? 'wave';
-      if (win._vizColors) entry.colors = { ...win._vizColors };
+      const { source, style, colors } = readVizFields(win, opts);
+      entry.source = source;
+      entry.style = style;
+      if (colors) entry.colors = colors;
     }
     if (win._widgetType) {
       entry.widgetType = win._widgetType;
@@ -2099,18 +2102,18 @@ export function initWM(onContentResize) {
   const _mediaAdapter = {
     serialize(win, ctx) {
       const opts = win._wmSpawnOpts;
-      const isBlobSrc = opts.src?.startsWith('blob:');
+      const { isBlob, src } = readMediaSrc(opts);
       const entry = {
         type: ctx.type,
         title: ctx.titleOf(win, opts.title),
         ...ctx.geoOf(win),
         loop: opts.loop,
       };
-      if (isBlobSrc) {
+      if (isBlob) {
         const key = api.fileKey(win.id);
         if (key) entry.fileKey = key;
-      } else if (opts.src) {
-        entry.src = opts.src;
+      } else if (src) {
+        entry.src = src;
       }
       if (ctx.type === 'video') entry.audio = ctx.readAudio(win);
       return entry;
@@ -2153,12 +2156,13 @@ export function initWM(onContentResize) {
   const _vizAdapter = {
     serialize(win, ctx) {
       const opts = win._wmSpawnOpts;
+      const { source, style } = readVizFields(win, opts);
       return {
         type: 'visualizer',
         title: ctx.titleOf(win, 'Visualizer'),
         ...ctx.geoOf(win),
-        source: win._vizSourceEl?.value ?? opts.source ?? 'master',
-        style: win._vizStyleEl?.value ?? opts.style ?? 'wave',
+        source,
+        style,
       };
     },
     restore(w, ctx) {

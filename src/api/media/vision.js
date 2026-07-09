@@ -10,6 +10,7 @@ import { notify, subscribe } from '../../events/index.js';
 import { acquireCameraRunScoped } from './media-lease.js';
 import { isPaused } from '../../runtime/run-context.js';
 import { GAZE_CALIB } from '../../runtime/storage-keys.js';
+import { edgeGroup } from './edge-group.js';
 
 const WASM_CDN = 'https://unpkg.com/@mediapipe/tasks-vision@0.10.35/wasm';
 const MODEL_BASE = 'https://storage.googleapis.com/mediapipe-models';
@@ -327,12 +328,12 @@ function _makeMaskCanvas({ w = 512, h = 512 }, paint) {
   return canvas;
 }
 
-const _gestureHandlers = [];
-const _expressionHandlers = [];
-const _gazeDirHandlers = []; // { dir, fn, prev }
-const _gazeRegionHandlers = []; // { target, fn, prev }  (target = el | {x,y,w,h})
-const _blinkHandlers = []; // { fn, prev }
-const _winkHandlers = []; // { eye, fn, prev }
+const _gestureHandlers = edgeGroup(); // add(fn, { gesture })
+const _expressionHandlers = edgeGroup(); // add(fn, { expr })
+const _gazeDirHandlers = edgeGroup(); // add(fn, { dir })
+const _gazeRegionHandlers = edgeGroup(); // add(fn, { target, label }) — enter/leave
+const _blinkHandlers = edgeGroup(); // add(fn)
+const _winkHandlers = edgeGroup(); // add(fn, { eye })
 let _prevDir = null; // for gaze:look edge
 
 let _initPromise = null;
@@ -567,24 +568,23 @@ function _loop() {
   // Edge-triggered gesture handlers
   const g = _cache.hands[0]?.gesture;
   const currGesture = !g || g === 'None' ? null : g;
-  for (const h of _gestureHandlers) {
-    const active = currGesture === h.gesture;
-    if (active && !h.prev) {
+  _gestureHandlers.dispatch(
+    (h) => currGesture === h.gesture,
+    (h) => {
       notify('gesture:detected', {
         type: currGesture,
         hand: _cache.hands[0],
         confidence: _cache.hands[0]?.confidence ?? 0,
       });
       h.fn();
-    }
-    h.prev = active;
-  }
+    },
+  );
 
   // Edge-triggered expression handlers
   const currExpr = _cache.face?.expression ?? null;
-  for (const h of _expressionHandlers) {
-    const active = currExpr === h.expr;
-    if (active && !h.prev) {
+  _expressionHandlers.dispatch(
+    (h) => currExpr === h.expr,
+    (h) => {
       const face = _cache.face;
       if (currExpr === 'smile') {
         notify('gesture:smile', {
@@ -600,9 +600,8 @@ function _loop() {
         cy: face?.cy ?? 0,
       });
       h.fn();
-    }
-    h.prev = active;
-  }
+    },
+  );
 }
 
 // Resolve which stored calibration applies, once the camera deviceId is known.
@@ -629,33 +628,31 @@ function _notifyGaze(g) {
     notify('gaze:look', { dir: g.dir });
     _prevDir = g.dir;
   }
-  for (const h of _gazeDirHandlers) {
-    const active = g.dir === h.dir;
-    if (active && !h.prev) h.fn();
-    h.prev = active;
-  }
+  _gazeDirHandlers.dispatch(
+    (h) => g.dir === h.dir,
+    (h) => h.fn(),
+  );
 
   // Blink (both eyes) — edge on rising.
   const bothClosed = g.leftClosed && g.rightClosed;
-  for (const h of _blinkHandlers) {
-    if (bothClosed && !h.prev) {
+  _blinkHandlers.dispatch(
+    () => bothClosed,
+    (h) => {
       notify('gaze:blink', {});
       h.fn();
-    }
-    h.prev = bothClosed;
-  }
+    },
+  );
 
   // Wink (one eye closed, the other open) — edge on rising, per eye.
   const winkL = g.leftClosed && !g.rightClosed;
   const winkR = g.rightClosed && !g.leftClosed;
-  for (const h of _winkHandlers) {
-    const active = h.eye === 'left' ? winkL : winkR;
-    if (active && !h.prev) {
+  _winkHandlers.dispatch(
+    (h) => (h.eye === 'left' ? winkL : winkR),
+    (h) => {
       notify('gaze:wink', { eye: h.eye });
       h.fn();
-    }
-    h.prev = active;
-  }
+    },
+  );
 
   // Region gaze (needs calibration — vx/vy). No-op + warn once if uncalibrated.
   if (_gazeRegionHandlers.length) {
@@ -667,17 +664,17 @@ function _notifyGaze(g) {
         _gazeWarned = true;
       }
     } else {
-      for (const h of _gazeRegionHandlers) {
-        const inside = _inRect(g.vx, g.vy, h.target);
-        if (inside && !h.prev) {
+      _gazeRegionHandlers.dispatch(
+        (h) => _inRect(g.vx, g.vy, h.target),
+        (h) => {
           notify('gaze:enter', { target: h.label });
           h.fn(true);
-        } else if (!inside && h.prev) {
+        },
+        (h) => {
           notify('gaze:leave', { target: h.label });
           h.fn(false);
-        }
-        h.prev = inside;
-      }
+        },
+      );
     }
   }
 }
@@ -734,12 +731,12 @@ export function stopVision() {
   _cache.pose = null;
   _cache.gaze = null;
   _lastDetectionTime = 0;
-  _gestureHandlers.length = 0;
-  _expressionHandlers.length = 0;
-  _gazeDirHandlers.length = 0;
-  _gazeRegionHandlers.length = 0;
-  _blinkHandlers.length = 0;
-  _winkHandlers.length = 0;
+  _gestureHandlers.clear();
+  _expressionHandlers.clear();
+  _gazeDirHandlers.clear();
+  _gazeRegionHandlers.clear();
+  _blinkHandlers.clear();
+  _winkHandlers.clear();
   _prevDir = null;
   for (const cancel of _maskLoops.splice(0)) cancel(); // stop handMask RAFs (ADR 054)
   // Calibration model + persisted map survive reset (not run artifacts).
@@ -1189,33 +1186,33 @@ export const vision = {
   onGaze(target, fn) {
     _ensureStarted();
     if (typeof target === 'string') {
-      _gazeDirHandlers.push({ dir: target, fn, prev: false });
+      _gazeDirHandlers.add(fn, { dir: target });
     } else {
       const label = target?.id || target?.className || 'rect';
-      _gazeRegionHandlers.push({ target, label, fn, prev: false });
+      _gazeRegionHandlers.add(fn, { target, label });
       if (!_calib) _ensureGazeChip();
     }
     return this;
   },
   onBlink(fn) {
     _ensureStarted();
-    _blinkHandlers.push({ fn, prev: false });
+    _blinkHandlers.add(fn);
     return this;
   },
   onWink(eye, fn) {
     _ensureStarted();
-    _winkHandlers.push({ eye, fn, prev: false });
+    _winkHandlers.add(fn, { eye });
     return this;
   },
 
   onGesture(gesture, fn) {
     _ensureStarted();
-    _gestureHandlers.push({ gesture, fn, prev: false });
+    _gestureHandlers.add(fn, { gesture });
     return this;
   },
   onExpression(expr, fn) {
     _ensureStarted();
-    _expressionHandlers.push({ expr, fn, prev: false });
+    _expressionHandlers.add(fn, { expr });
     return this;
   },
 

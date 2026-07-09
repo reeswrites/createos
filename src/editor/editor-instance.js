@@ -66,6 +66,10 @@ import { PauseController } from '../runtime/pause-controller.js';
 import { setPaused, setUsesAudio } from '../runtime/run-context.js';
 import { startRun } from '../runtime/run.js';
 
+// After execute(), a persisted 'paused' editor needs a beat for the run to spin
+// up before pauseRunning() takes effect. Shared by every resume-from-persist path.
+const RESUME_PAUSE_DELAY_MS = 200;
+
 // ── Syntax linter (esprima-based) ────────────────────────────────────────────
 
 // Parse user code the way the runtime runs it: injected inside an async IIFE,
@@ -710,6 +714,18 @@ export class EditorInstance {
   }
 
   // ── Execution state machine ────────────────────────────────────────────────
+
+  // Resume from a persisted execution state (localStorage autosave / .vljson /
+  // embed). 'running' re-runs; 'paused' re-runs then pauses after a short beat
+  // so the run has spun up. No-op for falsy/'stopped'/'idle'. Must be called
+  // after all windows exist (execute() may need output windows).
+  restoreExecutionState(state) {
+    if (state !== 'running' && state !== 'paused') return;
+    this.execute();
+    if (state === 'paused') {
+      this._native.setTimeout(() => this.pauseRunning(), RESUME_PAUSE_DELAY_MS);
+    }
+  }
 
   _saveExecState(state) {
     try {

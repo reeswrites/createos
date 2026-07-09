@@ -2,7 +2,21 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { TOOLKIT_CATEGORIES } from '../../../src/editor/toolkit-catalog.js';
-import * as esprima from 'esprima';
+import * as acorn from 'acorn';
+
+// Snippets are real learner code — they use modern JS (optional chaining `?.`,
+// top-level `await`) that the app runs unmodified (user code is injected as a raw
+// <script>; live-patch.js's esprima transform simply no-ops on syntax it can't
+// parse). The gate must therefore parse the SAME modern syntax, so it uses acorn
+// (ESTree, current ecmaVersion) rather than the app's older esprima. `parseSnippet`
+// is the single parse seam both tests share.
+function parseSnippet(code) {
+  return acorn.parse(code, {
+    ecmaVersion: 'latest',
+    allowAwaitOutsideFunction: true,
+    allowReturnOutsideFunction: true,
+  });
+}
 
 // ── Completion-snippet coherence gate (ADR Phase 4) ───────────────────────────
 //
@@ -72,6 +86,7 @@ const JS_BUILTINS = new Set([
   'cancelAnimationFrame',
   'Event',
   'EventTarget',
+  'Audio', // DOM HTMLAudioElement constructor — `new Audio(url)` in the desktop.onFile demo
   // Commonly used in snippet examples as local variable names for results
   'Serial',
 ]);
@@ -114,19 +129,52 @@ const ALLOWED_SNIPPET_LOCALS = new Set([
   // ADR 040: the conventional example drawing surface (snippets use `canvas.*`
   // against an implicit `const canvas = new Canvas()` the learner adds).
   'canvas',
+  // Conventional handle-name aliases used by companion/reference snippets whose
+  // `const <name> = …` binding lives in a sibling snippet, not the one shown:
+  'vid', // `const vid = Media.video(...)` — the "video controls" method reference
+  'layer', // Media.image / c.fx(z) layer handle — the "image fit" reference
+  'rec', // `const rec = cam.record(...)` — the "stop recording" companion snippet
 ]);
 
+// Collect every name a snippet binds locally: `const`/`let`/`var` (including
+// destructuring), function declarations, AND function parameters (including
+// destructured/rest/defaulted callback params like `({ lat, lon }) => …` or
+// `blob => …`). Parameters are unambiguously local bindings — never window
+// globals — so capturing them here (rather than allow-listing each param name)
+// keeps the identifier gate from false-flagging destructured callback params.
 function extractLocalNames(ast) {
   const locals = new Set();
+  function addPattern(node) {
+    if (!node || typeof node !== 'object') return;
+    switch (node.type) {
+      case 'Identifier':
+        locals.add(node.name);
+        break;
+      case 'ObjectPattern':
+        node.properties.forEach((p) => addPattern(p.value ?? p.argument));
+        break;
+      case 'ArrayPattern':
+        node.elements.forEach((el) => el && addPattern(el));
+        break;
+      case 'AssignmentPattern':
+        addPattern(node.left);
+        break;
+      case 'RestElement':
+        addPattern(node.argument);
+        break;
+    }
+  }
   function walk(node) {
     if (!node || typeof node !== 'object') return;
-    if (node.type === 'VariableDeclarator' && node.id?.type === 'Identifier') {
-      locals.add(node.id.name);
-    }
+    if (node.type === 'VariableDeclarator') addPattern(node.id);
     if (node.type === 'FunctionDeclaration' && node.id?.type === 'Identifier') {
       locals.add(node.id.name);
     }
-    if (['Params', 'params'].includes(node.type)) return; // skip params
+    if (
+      ['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(node.type)
+    ) {
+      (node.params ?? []).forEach(addPattern);
+    }
     for (const key of Object.keys(node)) {
       const child = node[key];
       if (child && typeof child === 'object' && child.type) walk(child);
@@ -165,12 +213,21 @@ function extractAPICallers(ast) {
 // ── Collect all snippets ───────────────────────────────────────────────────────
 
 const snippets = TOOLKIT_CATEGORIES.flatMap((cat) =>
-  (cat.items ?? []).map((item) => ({ cat: cat.name, label: item.label, code: item.code })),
+  (cat.commands ?? []).map((item) => ({ cat: cat.name, label: item.label, code: item.code })),
 );
 
 describe('completion snippet coherence — API identifier gate', () => {
+  // Guard against a vacuous pass: if the catalog shape drifts (e.g. the `commands`
+  // key gets renamed) this collection silently empties and every per-snippet
+  // assertion below passes over zero rows. Assert we actually loaded the catalog.
+  // This is the exact failure that once hid inside this gate — it iterated a
+  // non-existent `cat.items` key and exercised 0 of the ~435 real snippets.
+  it('actually collected the toolkit snippets (no vacuous pass)', () => {
+    expect(snippets.length).toBeGreaterThan(400);
+  });
+
   it('every category has at least one item with a code snippet', () => {
-    const missing = TOOLKIT_CATEGORIES.filter((c) => !(c.items ?? []).some((i) => i.code)).map(
+    const missing = TOOLKIT_CATEGORIES.filter((c) => !(c.commands ?? []).some((i) => i.code)).map(
       (c) => c.name,
     );
     // Some categories intentionally have no code (e.g. header-only) — only warn
@@ -185,7 +242,7 @@ describe('completion snippet coherence — API identifier gate', () => {
     for (const { cat, label, code } of snippets) {
       if (!code) continue;
       try {
-        esprima.parseScript(code, { tolerant: true });
+        parseSnippet(code);
       } catch (err) {
         parseErrors.push(`[${cat}] "${label}": ${err.message}`);
       }
@@ -203,7 +260,7 @@ describe('completion snippet coherence — API identifier gate', () => {
       if (!code) continue;
       let ast;
       try {
-        ast = esprima.parseScript(code, { tolerant: true });
+        ast = parseSnippet(code);
       } catch {
         continue; // parse failures caught above
       }

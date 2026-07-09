@@ -4,6 +4,7 @@
 // window.onload. No shared onload ctx needed — all wiring is DOM + globals.
 import { openTutorial } from '../../api/platform/tutorial.js';
 import { subscribe } from '../../events/index.js';
+import { mediaKind } from '../../api/media/media-kind.js';
 
 export function initMiscChrome() {
   // ── "Speech-to-Text" button — opens the model-manager panel (ADR 039) ────────
@@ -50,8 +51,6 @@ export function initMiscChrome() {
   // ── Files button ──────────────────────────────────────────────────────────────
   const filesBtn = document.getElementById('filesBtn');
   const imageExts = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico']);
-  const videoExts = new Set(['mp4', 'webm', 'mov', 'avi', 'mkv']);
-  const audioExts = new Set(['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a']);
   let _fileBrowseCount = 0;
   filesBtn?.addEventListener('click', async () => {
     const offset = (_fileBrowseCount++ % 8) * 24;
@@ -64,12 +63,17 @@ export function initMiscChrome() {
           const ext = name.split('.').pop().toLowerCase();
           if (imageExts.has(ext))
             window.wm.spawn(name, { type: 'image', src: url, w: 480, h: 360 });
-          else if (videoExts.has(ext))
+          else if (mediaKind(name) === 'video')
             window.wm.spawn(name, { type: 'video', src: url, w: 640, h: 480 });
-          else if (audioExts.has(ext)) {
+          else if (mediaKind(name) === 'audio') {
             const a = new Audio(url);
             a.controls = true;
-            const winId = window.wm.spawn(name, { type: 'html', html: '', w: 320, h: 60 });
+            const winId = window.wm.spawn(name, {
+              type: 'html',
+              html: '',
+              w: 320,
+              h: 60,
+            });
             const body = document.getElementById(winId)?.querySelector('.wm-body');
             if (body) {
               body.style.cssText += 'align-items:center;padding:4px 8px;';

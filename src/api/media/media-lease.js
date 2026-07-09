@@ -14,13 +14,19 @@
 //   acquireMicRunScoped();
 
 import { runScoped } from '../../runtime/run-scoped.js';
+import { refcounted } from './refcounted.js';
 
 let _cameraStart = null,
   _cameraStop = null;
 let _micStart = null,
   _micStop = null;
-let _cameraCount = 0,
-  _micCount = 0;
+
+// Toolbar camera/mic are global singletons — one refcount each, firing the
+// registered start/stop on the 0→1 / 1→0 edges (indirected so registration can
+// land after these instances are built). Owner-scoping stays in the runScoped
+// helpers below; the primitive is scope-agnostic.
+const _cameraRc = refcounted({ open: () => _cameraStart?.(), close: () => _cameraStop?.() });
+const _micRc = refcounted({ open: () => _micStart?.(), close: () => _micStop?.() });
 
 // ── Registration (called by camera.js / mic.js at init time) ─────────────────
 
@@ -35,35 +41,14 @@ export function initMicLease(start, stop) {
 
 // ── Lease primitives ─────────────────────────────────────────────────────────
 
-function _makeHandle(onRelease) {
-  let released = false;
-  return {
-    release() {
-      if (released) return;
-      released = true;
-      onRelease();
-    },
-  };
-}
-
 /** Acquire the toolbar camera stream. Returns a handle with release(). */
 export function acquireCamera() {
-  _cameraCount++;
-  if (_cameraCount === 1) _cameraStart?.();
-  return _makeHandle(() => {
-    _cameraCount = Math.max(0, _cameraCount - 1);
-    if (_cameraCount === 0) _cameraStop?.();
-  });
+  return _cameraRc.acquire();
 }
 
 /** Acquire the toolbar mic analyser. Returns a handle with release(). */
 export function acquireMic() {
-  _micCount++;
-  if (_micCount === 1) _micStart?.();
-  return _makeHandle(() => {
-    _micCount = Math.max(0, _micCount - 1);
-    if (_micCount === 0) _micStop?.();
-  });
+  return _micRc.acquire();
 }
 
 // ── Run-scoped helpers (auto-released on reset) ───────────────────────────────
@@ -92,10 +77,10 @@ export function acquireMicRunScoped() {
 // ── Diagnostics ──────────────────────────────────────────────────────────────
 
 export function getCameraCount() {
-  return _cameraCount;
+  return _cameraRc.count;
 }
 export function getMicCount() {
-  return _micCount;
+  return _micRc.count;
 }
 
 // Reset teardown is owned by run-scoped.js (owner-filtered onReset) — see ADR 008.

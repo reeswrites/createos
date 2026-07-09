@@ -2,7 +2,7 @@
 //
 // Lifecycle:
 //   _registerBuiltin(name, impl) — called at app startup for each built-in API
-//   registerAPI(name, impl, blocks?)  — called by users / plugins to override/extend
+//   registerAPI(name, impl, ext?)  — called by users / plugins to override/extend
 //   _beginRun()    — called at execute() start; snapshots current registry
 //   _endRun()      — called at reset(); restores snapshot (rolls back run-scoped overrides)
 //
@@ -15,21 +15,11 @@ const _descriptors = new Map(); // name → descriptor (params / detect / …) �
 let _runBaseline = null; // impl snapshot taken at _beginRun(); restored at _endRun()
 let _descBaseline = null; // descriptor snapshot, rolled back the same way
 
-// ── Blocks / toolkit extensibility hooks ─────────────────────────────────────
-// Set by blocks.js and completions.js respectively after they initialise.
+// ── Toolkit extensibility hook ───────────────────────────────────────────────
+// Set by completions.js after it initialises.
 
-let _blocksApplier = null;
 let _toolkitApplier = null;
-const _pendingBlocks = [];
 const _pendingToolkit = [];
-
-function _applyBlocks(name, blocksDefs) {
-  if (_blocksApplier) {
-    _blocksApplier(name, blocksDefs);
-  } else {
-    _pendingBlocks.push({ name, blocksDefs });
-  }
-}
 
 function _applyToolkit(category, entries) {
   if (_toolkitApplier) {
@@ -67,21 +57,17 @@ export function reassertBuiltins() {
  * @param {string} name          The global name (e.g. 'audio', 'draw').
  * @param {*}      impl          The implementation to assign to window[name].
  * @param {object} [ext]         Optional extension descriptor:
- *   ext.blocks  — array of { definition, generator } Blockly block descriptors
  *   ext.toolkit — array of { label, code, hint } snippet entries
  *   ext.category — category name for toolkit entries (default: name)
  *   ext.params  — param-hint signatures: { method: [names] } and/or [names] for a
  *                 callable/constructor. Derived into the editor's param hints.
- *   ext.detect  — { effect, triggers? } usage-detection spec (reserved; see ADR 012).
+ *   ext.detect  — { effect, triggers? } usage-detection spec (see ADR 058).
  */
 export function registerAPI(name, impl, ext = null) {
   _registry.set(name, impl);
   window[name] = impl;
   if (ext) _descriptors.set(name, ext);
 
-  if (ext?.blocks?.length) {
-    _applyBlocks(name, ext.blocks);
-  }
   if (ext?.toolkit?.length) {
     _applyToolkit(ext.category ?? name, ext.toolkit);
   }
@@ -176,15 +162,7 @@ export function deriveAudioDetectPattern() {
   return parts.length ? new RegExp(parts.join('|')) : null;
 }
 
-// ── Deferred hooks — called by blocks.js / completions.js after they init ────
-
-export function _setBlocksApplier(fn) {
-  _blocksApplier = fn;
-  if (fn) {
-    for (const { name, blocksDefs } of _pendingBlocks) fn(name, blocksDefs);
-    _pendingBlocks.length = 0;
-  }
-}
+// ── Deferred hook — called by completions.js after it inits ──────────────────
 
 export function _setToolkitApplier(fn) {
   _toolkitApplier = fn;

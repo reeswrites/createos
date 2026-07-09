@@ -1,7 +1,8 @@
 import esprima from 'esprima';
 import { EditorView, Decoration, WidgetType, ViewPlugin } from '@codemirror/view';
 import { StateField, StateEffect, RangeSetBuilder } from '@codemirror/state';
-import { resolveParamHint, calleePath } from './param-hints.js';
+import { resolveParamHint, calleePath, chainHead } from './param-hints.js';
+import { getInlineControl, inferOptFields, formatOptValue } from './inline-controls.js';
 import { isValidColor, hexToHsl, hslToHex, resolveToHex } from '../api/visual/color.js';
 
 // ── Color popup (singleton) ───────────────────────────────────────────────────
@@ -124,6 +125,72 @@ function getColorPopup() {
 
   _popup = { show, hide, isOpen, currentAnchor };
   return _popup;
+}
+
+// ── Inline-control popup (singleton) ──────────────────────────────────────────
+// Generic anchored popup hosting arbitrary panel DOM — the Tier 1 Inline Control
+// panels (ADR 061). Separate from the colour popup (which owns its HSL sliders).
+
+let _ctrlPopup = null;
+
+function getControlPopup() {
+  if (_ctrlPopup) return _ctrlPopup;
+
+  const el = document.createElement('div');
+  el.className = 'ar-ictrl-popup';
+  el.style.display = 'none';
+  document.body.appendChild(el);
+
+  let anchorEl = null;
+  let onCloseCb = null;
+
+  el.addEventListener('mousedown', (e) => e.stopImmediatePropagation());
+  document.addEventListener('mousedown', (e) => {
+    if (el.style.display === 'none') return;
+    if (!el.contains(e.target) && e.target !== anchorEl && !anchorEl?.contains(e.target)) hide();
+  });
+
+  function reposition() {
+    if (!anchorEl || el.style.display === 'none') return;
+    const r = anchorEl.getBoundingClientRect();
+    const w = el.offsetWidth || 220;
+    const h = el.offsetHeight || 120;
+    let left = r.left;
+    let top = r.bottom + 4;
+    if (left + w > window.innerWidth) left = window.innerWidth - w - 4;
+    if (top + h > window.innerHeight) top = r.top - h - 4;
+    el.style.left = `${Math.max(4, left)}px`;
+    el.style.top = `${Math.max(4, top)}px`;
+  }
+
+  function show(anchor, content, onClose) {
+    anchorEl = anchor;
+    onCloseCb = onClose ?? null;
+    el.innerHTML = '';
+    el.appendChild(content);
+    el.style.display = 'block';
+    reposition();
+  }
+
+  function hide() {
+    if (el.style.display === 'none') return;
+    el.style.display = 'none';
+    el.innerHTML = '';
+    anchorEl = null;
+    const cb = onCloseCb;
+    onCloseCb = null;
+    cb?.();
+  }
+
+  function isOpen() {
+    return el.style.display !== 'none';
+  }
+  function currentAnchor() {
+    return anchorEl;
+  }
+
+  _ctrlPopup = { show, hide, isOpen, currentAnchor };
+  return _ctrlPopup;
 }
 
 // ── State machinery ───────────────────────────────────────────────────────────
@@ -288,6 +355,180 @@ export class ScrubWidget extends WidgetType {
   }
 }
 
+// Tier 1 Inline Control glyph (ADR 061): a small affordance after a route()/pipe()
+// chain method that opens a bespoke, semantic control panel in a popup. `args` are
+// the leading numeric-literal arg positions {value, from, to} captured at build time.
+export class InlineControlWidget extends WidgetType {
+  constructor(key, control, args, setDragging) {
+    super();
+    this.key = key; // encodes head.method + arg positions/values → drives eq()
+    this.control = control;
+    this.args = args;
+    this._setDragging = setDragging;
+  }
+
+  eq(other) {
+    return this.key === other.key;
+  }
+
+  toDOM(view) {
+    const glyph = document.createElement('span');
+    glyph.className = 'ar-inline-ctrl';
+    glyph.textContent = this.control.glyph;
+    glyph.title = this.control.title;
+    glyph.addEventListener('mousedown', (e) => e.stopImmediatePropagation());
+    glyph.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const popup = getControlPopup();
+      if (popup.isOpen() && popup.currentAnchor() === glyph) {
+        popup.hide();
+        return;
+      }
+      // Mutable per-arg state for range tracking across successive edits, sorted by
+      // source position (args arrive in order).
+      const state = this.args.map((a) => ({
+        from: a.from,
+        len: a.to - a.from,
+        value: a.value,
+      }));
+      const panel = this.control.buildPanel(
+        state.map((s) => s.value),
+        (newValues) => this._applyEdit(view, state, newValues),
+      );
+      // Suppress the doc-change rebuild while the popup is open so this glyph (the
+      // popup anchor) is not destroyed mid-edit; releasing reschedules a rebuild.
+      this._setDragging(true);
+      popup.show(glyph, panel, () => this._setDragging(false));
+    });
+    return glyph;
+  }
+
+  _applyEdit(view, state, newValues) {
+    const changes = [];
+    for (let i = 0; i < state.length; i++) {
+      const s = state[i];
+      const val = newValues[i];
+      // Round to 3 decimals to avoid float noise; integers render without a decimal,
+      // fractions are allowed (a `0..1` range field must not lock to ints — ADR 061).
+      const str = String(Math.round(val * 1000) / 1000);
+      s._newStr = str;
+      if (str !== String(s.value)) changes.push({ from: s.from, to: s.from + s.len, insert: str });
+    }
+    if (changes.length) view.dispatch({ changes });
+    // Re-derive froms/lens after the atomic edit — positions shift by cumulative
+    // length delta of earlier args (state is in ascending source order).
+    let shift = 0;
+    for (const s of state) {
+      s.from += shift;
+      const newLen = s._newStr.length;
+      shift += newLen - s.len;
+      s.len = newLen;
+      s.value = Number(s._newStr);
+    }
+  }
+}
+
+// Pipe opts-object control (ADR 062): a glyph after a pipe chain method whose sole arg
+// is an object literal, opening a popup with one field per literal-valued property —
+// fields inferred (number input / colour swatch / text / checkbox), not registered.
+export class ObjectControlWidget extends WidgetType {
+  constructor(key, fields, setDragging) {
+    super();
+    this.key = key;
+    this.fields = fields; // [{ name, kind, value, from, to }]
+    this._setDragging = setDragging;
+  }
+
+  eq(other) {
+    return this.key === other.key;
+  }
+
+  toDOM(view) {
+    const glyph = document.createElement('span');
+    glyph.className = 'ar-inline-ctrl';
+    glyph.textContent = '⚙';
+    glyph.title = 'edit options';
+    glyph.addEventListener('mousedown', (e) => e.stopImmediatePropagation());
+    glyph.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const popup = getControlPopup();
+      if (popup.isOpen() && popup.currentAnchor() === glyph) {
+        popup.hide();
+        return;
+      }
+      // Per-field range state, ascending by source position (fields arrive in order).
+      const state = this.fields.map((f) => ({ from: f.from, len: f.to - f.from }));
+      const panel = document.createElement('div');
+      panel.className = 'ar-ictrl-panel';
+      this.fields.forEach((f, i) => panel.append(this._row(view, state, i, f)));
+      this._setDragging(true);
+      popup.show(glyph, panel, () => this._setDragging(false));
+    });
+    return glyph;
+  }
+
+  // One property row; the field kind picks the widget. Each edit writes only its own
+  // property (single change) and shifts later fields by the length delta.
+  _row(view, state, i, field) {
+    const row = document.createElement('div');
+    row.className = 'ar-ictrl-row';
+    const lab = document.createElement('span');
+    lab.className = 'ar-ictrl-label';
+    lab.textContent = field.name;
+    row.append(lab);
+
+    const write = (kind, value) => this._writeField(view, state, i, formatOptValue(kind, value));
+
+    if (field.kind === 'number') {
+      const inp = document.createElement('input');
+      inp.type = 'number';
+      inp.step = 'any';
+      inp.className = 'ar-ictrl-num';
+      inp.value = String(field.value);
+      inp.addEventListener('input', () => {
+        if (Number.isFinite(Number(inp.value))) write('number', Number(inp.value));
+      });
+      row.append(inp);
+    } else if (field.kind === 'boolean') {
+      const inp = document.createElement('input');
+      inp.type = 'checkbox';
+      inp.checked = !!field.value;
+      inp.addEventListener('change', () => write('boolean', inp.checked));
+      row.append(inp);
+    } else if (field.kind === 'color') {
+      const sw = document.createElement('span');
+      sw.className = 'ar-color-swatch';
+      sw.style.background = resolveToHex(field.value);
+      sw.addEventListener('mousedown', (e) => e.stopImmediatePropagation());
+      sw.addEventListener('click', () => {
+        getColorPopup().show(sw, resolveToHex(field.value), (hex) => {
+          sw.style.background = hex;
+          write('color', hex);
+        });
+      });
+      row.append(sw);
+    } else {
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.className = 'ar-ictrl-num ar-ictrl-text';
+      inp.value = String(field.value);
+      inp.addEventListener('input', () => write('text', inp.value));
+      row.append(inp);
+    }
+    return row;
+  }
+
+  _writeField(view, state, i, newStr) {
+    const s = state[i];
+    view.dispatch({ changes: { from: s.from, to: s.from + s.len, insert: newStr } });
+    const delta = newStr.length - s.len;
+    s.len = newStr.length;
+    for (let j = i + 1; j < state.length; j++) state[j].from += delta; // shift later fields
+  }
+}
+
 class InlayHintWidget extends WidgetType {
   constructor(label) {
     super();
@@ -394,7 +635,7 @@ function buildInlayDecorations(code) {
   return builder.finish();
 }
 
-function buildWidgetDecorations(code, setDragging) {
+export function buildWidgetDecorations(code, setDragging = () => {}) {
   let ast;
   try {
     ast = esprima.parseScript(code, { range: true, tolerant: true });
@@ -403,11 +644,78 @@ function buildWidgetDecorations(code, setDragging) {
   }
 
   const items = [];
+  // Arg start-positions owned by a Tier 1 Inline Control — suppressed as individual
+  // scrubbers below (the control edits them as a coupled group). ADR 061.
+  const controlledArgStarts = new Set();
+
+  // Pass 1 — Inline Controls: whole-call, chain-head anchored. Attaches a glyph after
+  // a `route()`/`pipe()` chain method that has a registered control, but only when the
+  // leading args it owns are ALL numeric literals (all-or-nothing; else Tier 0 covers).
+  (function walkControls(node) {
+    if (!node || typeof node !== 'object') return;
+    if (node.type === 'CallExpression') {
+      const head = chainHead(node);
+      const control = head ? getInlineControl(head.head, head.method) : null;
+      if (control && node.arguments.length >= control.arity) {
+        const owned = node.arguments.slice(0, control.arity);
+        if (owned.every((a) => a.type === 'Literal' && typeof a.value === 'number')) {
+          const argState = owned.map((a) => ({ value: a.value, from: a.range[0], to: a.range[1] }));
+          const key =
+            `${head.head}.${head.method}:` + argState.map((a) => `${a.from},${a.value}`).join(';');
+          const at = node.callee.range[1]; // right after `.method`, before `(`
+          items.push({
+            from: at,
+            to: at,
+            deco: Decoration.widget({
+              widget: new InlineControlWidget(key, control, argState, setDragging),
+              side: -1,
+            }),
+          });
+          for (const a of argState) controlledArgStarts.add(a.from);
+        }
+      }
+    }
+    for (const v of Object.values(node)) {
+      if (Array.isArray(v)) v.forEach(walkControls);
+      else if (v && typeof v === 'object' && v.type) walkControls(v);
+    }
+  })(ast);
+
+  // Pass 1b — Pipe opts-object controls (ADR 062): a chain method whose sole arg is an
+  // object literal gets a ⚙ glyph with a field per literal-valued property (inferred, not
+  // registered). Disjoint from Pass 1 (that needs numeric positional args) and Pass 2
+  // (scrubbers/swatches never reach object properties), so no suppression needed.
+  (function walkObjectControls(node) {
+    if (!node || typeof node !== 'object') return;
+    if (node.type === 'CallExpression' && node.arguments.length === 1) {
+      const arg = node.arguments[0];
+      if (arg.type === 'ObjectExpression' && chainHead(node)) {
+        const fields = inferOptFields(arg);
+        if (fields.length) {
+          const key = 'opts:' + fields.map((f) => `${f.from},${f.kind},${f.value}`).join(';');
+          const at = node.callee.range[1];
+          items.push({
+            from: at,
+            to: at,
+            deco: Decoration.widget({
+              widget: new ObjectControlWidget(key, fields, setDragging),
+              side: -1,
+            }),
+          });
+        }
+      }
+    }
+    for (const v of Object.values(node)) {
+      if (Array.isArray(v)) v.forEach(walkObjectControls);
+      else if (v && typeof v === 'object' && v.type) walkObjectControls(v);
+    }
+  })(ast);
 
   function visitCall(call) {
     if (call.callee?.type !== 'MemberExpression') return;
     for (const arg of call.arguments) {
       if (arg.type !== 'Literal') continue;
+      if (controlledArgStarts.has(arg.range[0])) continue; // owned by an Inline Control
       if (typeof arg.value === 'string' && isValidColor(arg.value)) {
         items.push({
           from: arg.range[0],

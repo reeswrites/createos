@@ -66,7 +66,6 @@ This application is not the best of anything. We provide creative tools for peop
   - **Color swatches** — click any color string to open an HSL picker; edits write back to the source
   - **Number scrubbers** — drag any numeric literal to change its value live
   - **Syntax linting** — squiggles + hover tooltips on parse errors; runtime error highlights
-- **Blocks panel** (toggle on/off) — visual [Blockly](https://developers.google.com/blockly) workspace for Audio, Shader, GLShader, PIXI, Vision, Canvas, and Media blocks; coexists with the text editor
 - **API drawer** (toggle on/off) — drag-to-text code snippets for every API
 - Infinite loop protection ([Esprima](https://esprima.org/))
 - Friendly runtime error messages

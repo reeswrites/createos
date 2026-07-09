@@ -14,7 +14,6 @@ import {
   registerAPI,
   reassertBuiltins,
   _setToolkitApplier,
-  _setBlocksApplier,
   deriveAudioDetectPattern,
 } from './api-registry.js';
 import { setAudioDetectPattern } from '../editor/api-detector.js';
@@ -43,7 +42,6 @@ import { route } from '../api/signal/route.js';
 import { physics } from '../api/signal/physics.js';
 import '../api/signal/physics-sims.js'; // side effect: registers the v1 sim catalog (ADR 059)
 import { timeline } from '../api/signal/timeline.js';
-import { applyExternalBlocks } from '../blocks/blocks.js';
 import { editImage } from '../api/media/image-edit.js';
 import { ThreeScene, THREE } from '../api/visual/three-scene.js';
 import { signalGraph } from '../api/signal/signal-graph.js';
@@ -261,8 +259,7 @@ export function registerBuiltins() {
   _registerBuiltin('external', external);
   _registerBuiltin('statusBar', statusBar);
 
-  // Wire up extensibility appliers so registerAPI(name, impl, { blocks, toolkit }) works.
-  _setBlocksApplier(applyExternalBlocks);
+  // Wire up the toolkit applier so registerAPI(name, impl, { toolkit }) works.
   _setToolkitApplier(addToolkitEntries);
 
   // ADR 058: derive the audio-usage detection regex from the descriptors declared

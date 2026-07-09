@@ -1335,7 +1335,7 @@ export function pipe(source) {
   return p;
 }
 
-// pipe.register (user-extensible named stages + their Blockly codegen) lives in
+// pipe.register (user-extensible named stages + their toolkit snippet) lives in
 // pipe-register.js — a separate authoring-surface concern. Install it once here.
 installPipeRegister({ pipe, Pipeline, CustomStage });
 

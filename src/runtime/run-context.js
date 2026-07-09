@@ -1,6 +1,6 @@
 // run-context.js — the single owner of the per-run lifecycle fields the codebase
-// reads to know "what is running right now": the active editor, the active blocks
-// editor, the paused flag, and the audio-state flags. Replaces ~6 raw window.__ar_*
+// reads to know "what is running right now": the active editor, the paused flag,
+// and the audio-state flags. Replaces ~6 raw window.__ar_*
 // globals that a dozen files used to read and several wrote with no accessor.
 //
 // Deliberately NARROW — lifecycle state only. App-wiring factory handles
@@ -19,13 +19,6 @@ export function activeEditorId() {
 }
 export function setActiveEditorId(id) {
   window.__ar_active_editor_id = id;
-}
-
-export function activeBlocksEditor() {
-  return window.__ar_active_blocks_editor ?? null;
-}
-export function setActiveBlocksEditor(inst) {
-  window.__ar_active_blocks_editor = inst;
 }
 
 export function isPaused() {

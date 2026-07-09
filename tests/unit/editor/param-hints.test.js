@@ -6,8 +6,16 @@ import {
   resolveParamHint,
   paramHintsField,
   paramHintsExtension,
+  chainHead,
 } from '../../../src/editor/param-hints.js';
 import { registerAPI, _beginRun, _endRun } from '../../../src/runtime/api-registry.js';
+import esprima from 'esprima';
+
+// Parse `code` and return the outermost CallExpression node (the tail chain call).
+function outerCall(code) {
+  const ast = esprima.parseScript(code, { range: true });
+  return ast.body[0].expression;
+}
 
 function makeView(doc, cursorPos) {
   const state = EditorState.create({
@@ -150,5 +158,40 @@ describe('paramHintsField', () => {
     expect(tip).not.toBeNull();
     const { dom } = tip.create(view);
     expect(dom.textContent).toContain('file.filter');
+  });
+});
+
+describe('chainHead (ADR 061 chain-head anchor)', () => {
+  test('route(cam).scale(...) → route/scale', () => {
+    expect(chainHead(outerCall('route(cam).scale(0,1,0,100)'))).toEqual({
+      head: 'route',
+      method: 'scale',
+    });
+  });
+
+  test('descends through getters + intervening calls', () => {
+    expect(chainHead(outerCall('route(mic).amplitude.motion().scale(0,1,0,2)'))).toEqual({
+      head: 'route',
+      method: 'scale',
+    });
+  });
+
+  test('pipe(cam).pixelate(...) → pipe/pixelate', () => {
+    expect(chainHead(outerCall('pipe(cam).pixelate({blockSize:8})'))).toEqual({
+      head: 'pipe',
+      method: 'pixelate',
+    });
+  });
+
+  test('variable receiver (r.scale) → null (unknown head)', () => {
+    expect(chainHead(outerCall('r.scale(0,1,0,100)'))).toBeNull();
+  });
+
+  test('bare call (scale(...)) → null', () => {
+    expect(chainHead(outerCall('scale(0,1,0,100)'))).toBeNull();
+  });
+
+  test('computed member → null', () => {
+    expect(chainHead(outerCall('route(cam)["scale"](0,1)'))).toBeNull();
   });
 });

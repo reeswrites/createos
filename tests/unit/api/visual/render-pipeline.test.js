@@ -651,7 +651,6 @@ describe('pipe.register()', () => {
       expect.objectContaining({
         label: 'Test Stage',
         hint: 'A test stage',
-        blockType: 'pipe_custom_testStage',
       }),
     );
     delete global.window.__ar_addToolkitEntry;

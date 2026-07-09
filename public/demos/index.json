@@ -11,7 +11,8 @@
       "interactive",
       "game",
       "music"
-    ]
+    ],
+    "goal": "music"
   },
   {
     "id": "auto-blur-faces",
@@ -24,7 +25,8 @@
       "mask",
       "camera",
       "privacy"
-    ]
+    ],
+    "goal": "face"
   },
   {
     "id": "finger-frame-ascii",
@@ -37,7 +39,8 @@
       "ascii",
       "mask",
       "camera"
-    ]
+    ],
+    "goal": "face"
   },
   {
     "id": "watch-your-mouth",
@@ -51,7 +54,8 @@
       "vision",
       "camera",
       "canvas"
-    ]
+    ],
+    "goal": "sound"
   },
   {
     "id": "plasma-shader",
@@ -62,7 +66,8 @@
       "shader",
       "glsl",
       "visual"
-    ]
+    ],
+    "goal": "move"
   },
   {
     "id": "bouncing-circles",
@@ -73,7 +78,8 @@
       "draw",
       "animation",
       "2d"
-    ]
+    ],
+    "goal": "move"
   },
   {
     "id": "spiral-trail",
@@ -84,7 +90,8 @@
       "canvas",
       "animation",
       "visual"
-    ]
+    ],
+    "goal": "move"
   },
   {
     "id": "reactive-ripples",
@@ -96,7 +103,8 @@
       "audio",
       "draw",
       "reactive"
-    ]
+    ],
+    "goal": "sound"
   },
   {
     "id": "gaze-garden",
@@ -108,7 +116,8 @@
       "gaze",
       "camera",
       "draw"
-    ]
+    ],
+    "goal": "face"
   },
   {
     "id": "billiards-pool",
@@ -120,7 +129,8 @@
       "physics",
       "audio",
       "interactive"
-    ]
+    ],
+    "goal": "play"
   },
   {
     "id": "hand-pong",
@@ -133,7 +143,8 @@
       "camera",
       "canvas",
       "physics"
-    ]
+    ],
+    "goal": "face"
   },
   {
     "id": "finger-guns",
@@ -146,7 +157,8 @@
       "camera",
       "audio",
       "interactive"
-    ]
+    ],
+    "goal": "face"
   },
   {
     "id": "karaoke-words",
@@ -159,7 +171,8 @@
       "audio",
       "camera",
       "text"
-    ]
+    ],
+    "goal": "sound"
   },
   {
     "id": "traffic-music",
@@ -172,6 +185,7 @@
       "vision",
       "interactive",
       "canvas"
-    ]
+    ],
+    "goal": "music"
   }
 ]

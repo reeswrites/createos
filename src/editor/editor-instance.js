@@ -18,7 +18,6 @@ import {
   editorTitleKey,
   editorAutoExecKey,
   editorTraceKey,
-  editorBlocksOpenKey,
 } from '../runtime/storage-keys.js';
 import {
   bracketMatching,
@@ -64,18 +63,8 @@ import { runResetHandlers } from '../runtime/reset-registry.js';
 import { emit, clearRunScoped } from '../events/index.js';
 import { eventCompletionSource } from './event-completion.js';
 import { PauseController } from '../runtime/pause-controller.js';
-import { setActiveBlocksEditor, setPaused, setUsesAudio } from '../runtime/run-context.js';
+import { setPaused, setUsesAudio } from '../runtime/run-context.js';
 import { startRun } from '../runtime/run.js';
-import {
-  initBlockly,
-  getWorkspaceCode,
-  resizeBlockly,
-  workspaceIsEmpty,
-  loadWorkspaceJSON,
-  saveWorkspaceJSON,
-  registerSidebarDeleteZone,
-} from '../blocks/blocks.js';
-import { jsToBlocks } from '../blocks/js-to-blocks.js';
 
 // ── Syntax linter (esprima-based) ────────────────────────────────────────────
 
@@ -257,9 +246,6 @@ const ICONS = {
   reset: '<i class="fa-solid fa-rotate-left"></i>',
 };
 
-// Which editor instance receives palette clicks (set when editor opens blocks mode)
-export let activeBlocksEditor = null;
-
 export class EditorInstance {
   constructor(id, { nativeTimers, wm, toolkitWinId, defaultCode = '' }) {
     this.id = id;
@@ -293,9 +279,6 @@ export class EditorInstance {
       },
     });
 
-    this.blocklyWorkspace = null;
-    this.blocksMode = false;
-
     this._autoExec = localStorage.getItem(editorAutoExecKey(id)) === '1';
     this._autoExecTimer = null;
 
@@ -312,14 +295,6 @@ export class EditorInstance {
     this._buildDOM();
     this._setupGlobals();
     this._buildWindows();
-
-    // Restore blocks mode pref — wait for FA font so icon widths are correct
-    const _faReady = document.fonts.load('900 13px "Font Awesome 6 Free"').catch(() => {});
-    if (localStorage.getItem(editorBlocksOpenKey(id)) === '1') {
-      _faReady.then(() => requestAnimationFrame(() => this._openBlocks()));
-    } else {
-      _faReady.then(() => requestAnimationFrame(() => this._positionThumb(false)));
-    }
   }
 
   // ── DOM construction ───────────────────────────────────────────────────────
@@ -387,14 +362,6 @@ export class EditorInstance {
     this.consolePanel.appendChild(consoleLabelRow);
     this.consolePanel.appendChild(this.consoleEl);
 
-    // Blocks area
-    this.blocksArea = document.createElement('div');
-    this.blocksArea.className = 'ar-blocks-area';
-    this.blocksArea.style.display = 'none';
-    this.blocksDiv = document.createElement('div');
-    this.blocksDiv.style.flex = '1';
-    this.blocksArea.appendChild(this.blocksDiv);
-
     // Editor wrap + CodeMirror
     this.editorWrap = document.createElement('div');
     this.editorWrap.className = 'ar-editor-wrap';
@@ -410,7 +377,6 @@ export class EditorInstance {
     this.editorColumn.className = 'ar-editor-column';
     this.editorColumn.appendChild(toolbar);
     this.editorColumn.appendChild(this.editorWrap);
-    this.editorColumn.appendChild(this.blocksArea);
     this.editorColumn.appendChild(this.consolePanel);
 
     // CodeMirror init
@@ -525,59 +491,11 @@ export class EditorInstance {
         selection: { anchor: offset + insertText.length },
       });
     });
-
-    // Drag-drop from toolkit into blocks area
-    this.blocksArea.addEventListener('dragover', (e) => {
-      if (e.dataTransfer.types.includes('application/x-ar-block-type')) {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'copy';
-      }
-    });
-    this.blocksArea.addEventListener('drop', (e) => {
-      const type = e.dataTransfer.getData('application/x-ar-block-type');
-      if (!type || !this.blocklyWorkspace) return;
-      e.preventDefault();
-      e.stopPropagation();
-      this._addBlockToWorkspace(type, e.clientX, e.clientY);
-    });
-
-    new ResizeObserver(() => {
-      if (this.blocklyWorkspace && this.blocksArea.style.display !== 'none')
-        resizeBlockly(this.blocklyWorkspace);
-    }).observe(this.blocksArea);
   }
 
   _buildToolbar() {
     const bar = document.createElement('div');
     bar.className = 'ar-editor-toolbar';
-
-    // Mode toggle
-    const modeToggle = document.createElement('div');
-    modeToggle.className = 'ar-mode-toggle';
-    this._modeThumb = document.createElement('div');
-    this._modeThumb.className = 'ar-mode-thumb';
-    this._textBtn = document.createElement('div');
-    this._textBtn.className = 'ar-toggle-opt ar-toggle-active';
-    this._textBtn.innerHTML = '<i class="fa-solid fa-code"></i>';
-    this._blocksBtn = document.createElement('div');
-    this._blocksBtn.className = 'ar-toggle-opt';
-    this._blocksBtn.innerHTML = '<i class="fa-solid fa-puzzle-piece"></i>';
-    modeToggle.appendChild(this._modeThumb);
-    modeToggle.appendChild(this._textBtn);
-    modeToggle.appendChild(this._blocksBtn);
-
-    this._textBtn.addEventListener('click', () => {
-      if (this.blocksMode) {
-        this._closeBlocks();
-        localStorage.setItem(editorBlocksOpenKey(this.id), '0');
-      }
-    });
-    this._blocksBtn.addEventListener('click', () => {
-      if (!this.blocksMode) {
-        this._openBlocks();
-        localStorage.setItem(editorBlocksOpenKey(this.id), '1');
-      }
-    });
 
     // Execute button
     this.executeBtn = document.createElement('button');
@@ -636,7 +554,6 @@ export class EditorInstance {
       localStorage.setItem(editorAutoExecKey(this.id), this._autoExec ? '1' : '0');
     });
 
-    bar.appendChild(modeToggle);
     bar.appendChild(this.consoleToggleBtn);
     bar.appendChild(inlayBtn);
     this.executeBtn.style.marginLeft = 'auto';
@@ -644,16 +561,6 @@ export class EditorInstance {
     bar.appendChild(this.stopBtn);
     bar.appendChild(this._autoExecBtn);
     return bar;
-  }
-
-  _positionThumb(toBlocks) {
-    const opt = toBlocks ? this._blocksBtn : this._textBtn;
-    const container = this._modeThumb.parentElement;
-    if (!container) return;
-    const cr = container.getBoundingClientRect();
-    const or = opt.getBoundingClientRect();
-    this._modeThumb.style.left = or.left - cr.left + 'px';
-    this._modeThumb.style.width = or.width + 'px';
   }
 
   // ── Window manager integration ─────────────────────────────────────────────
@@ -675,29 +582,9 @@ export class EditorInstance {
       duplicateEditor(this.id);
     });
 
-    // Replace full audio controls with mute-only button for Blockly sounds
+    // Editor windows carry no audio controls — sketch audio routes through the
+    // mixer/master, not a per-editor strip.
     editorWin.querySelector('.wm-audio-ctrl')?.remove();
-    const muteCtrl = document.createElement('span');
-    muteCtrl.className = 'wm-audio-ctrl';
-    muteCtrl.style.display = 'none';
-    const muteBtn = document.createElement('button');
-    muteBtn.className = 'wm-mute';
-    muteBtn.title = 'Mute blocks sounds';
-    muteBtn.innerHTML = '<i class="fa-solid fa-volume-high"></i>';
-    let _blocksMuted = false;
-    muteBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      _blocksMuted = !_blocksMuted;
-      muteBtn.innerHTML = _blocksMuted
-        ? '<i class="fa-solid fa-volume-xmark"></i>'
-        : '<i class="fa-solid fa-volume-high"></i>';
-      muteBtn.classList.toggle('muted', _blocksMuted);
-      if (this.blocklyWorkspace) this.blocklyWorkspace.getAudioManager().setMuted(_blocksMuted);
-    });
-    muteCtrl.appendChild(muteBtn);
-    this._blocksMuteCtrl = muteCtrl;
-    const firstBtn = editorWin.querySelector('.wm-titlebar .wm-btn');
-    editorWin.querySelector('.wm-titlebar').insertBefore(muteCtrl, firstBtn);
     // Auto-create a live-linked desktop icon for this editor
     addEditorIcon(this.id, this.editorWinId, this.title);
 
@@ -708,12 +595,7 @@ export class EditorInstance {
         this.reset();
         this._setIdle();
       }
-      const hasContent =
-        this._everHadContent ||
-        this.cm.state.doc.toString().trim().length > 0 ||
-        (this.blocksMode &&
-          this.blocklyWorkspace &&
-          this.blocklyWorkspace.getAllBlocks(false).length > 0);
+      const hasContent = this._everHadContent || this.cm.state.doc.toString().trim().length > 0;
       if (!hasContent && this.id !== 1) {
         // Never had content and not the primary editor → clean up completely
         this.destroy();
@@ -735,8 +617,6 @@ export class EditorInstance {
     new ResizeObserver(() => {
       this.cm.requestMeasure();
       this.inlineWidgets.refresh();
-      if (this.blocklyWorkspace && this.blocksArea.style.display !== 'none')
-        resizeBlockly(this.blocklyWorkspace);
     }).observe(editorWin);
   }
 
@@ -808,68 +688,6 @@ export class EditorInstance {
     this.inlineWidgets.refresh();
   }
 
-  // ── Blocks ─────────────────────────────────────────────────────────────────
-
-  _addBlockToWorkspace(type, clientX, clientY) {
-    if (!this.blocklyWorkspace) return;
-    const ws = this.blocklyWorkspace;
-    const block = ws.newBlock(type);
-    block.initSvg();
-    block.render();
-    const injectDiv = ws.getInjectionDiv();
-    if (clientX != null) {
-      const rect = injectDiv.getBoundingClientRect();
-      block.moveTo({
-        x: (clientX - rect.left - ws.scrollX) / ws.scale,
-        y: (clientY - rect.top - ws.scrollY) / ws.scale,
-      });
-    } else {
-      block.moveTo({
-        x: (-ws.scrollX + injectDiv.offsetWidth / 2) / ws.scale,
-        y: (-ws.scrollY + injectDiv.offsetHeight / 2) / ws.scale,
-      });
-    }
-  }
-
-  _openBlocks() {
-    this.blocksMode = true;
-    activeBlocksEditor = this;
-    setActiveBlocksEditor(this);
-    this.editorWrap.style.display = 'none';
-    this.blocksArea.style.display = 'flex';
-    this._textBtn.classList.remove('ar-toggle-active');
-    this._blocksBtn.classList.add('ar-toggle-active');
-    this._positionThumb(true);
-
-    if (!this.blocklyWorkspace) {
-      this.blocklyWorkspace = initBlockly(this.blocksDiv);
-      const toolkitWin = document.getElementById(this._toolkitWinId);
-      if (toolkitWin) registerSidebarDeleteZone(this.blocklyWorkspace, toolkitWin);
-      this.blocklyWorkspace
-        .getAudioManager()
-        .setMuted(
-          this._blocksMuteCtrl?.querySelector('button')?.classList.contains('muted') ?? false,
-        );
-    }
-
-    if (this._blocksMuteCtrl) this._blocksMuteCtrl.style.display = '';
-
-    if (workspaceIsEmpty(this.blocklyWorkspace)) {
-      try {
-        const json = jsToBlocks(this.cm.state.doc.toString());
-        if (json) loadWorkspaceJSON(this.blocklyWorkspace, json);
-      } catch (e) {
-        console.error('[blocks] js→blocks conversion failed:', e);
-      }
-    }
-    resizeBlockly(this.blocklyWorkspace);
-  }
-
-  loadBlocksJSON(json) {
-    if (!this.blocksMode) this._openBlocks();
-    if (this.blocklyWorkspace && json) loadWorkspaceJSON(this.blocklyWorkspace, json);
-  }
-
   // ── Project round-trip (the editor-owned half) ────────────────────────────────
   // The code + authoring mode this editor owns. The window-owned half of an editor
   // record (title / geometry / audio / editorId) is composed by the caller from the
@@ -878,45 +696,17 @@ export class EditorInstance {
   serialize() {
     return {
       code: this.cm.state.doc.toString(),
-      mode: this.blocksMode ? 'blocks' : 'text',
-      blocksJson:
-        this.blocksMode && this.blocklyWorkspace ? saveWorkspaceJSON(this.blocklyWorkspace) : null,
+      mode: 'text',
       executionState: this.btnState,
     };
   }
 
-  // Apply a serialized editor record's code + blocks (the inverse of serialize()).
+  // Apply a serialized editor record's code (the inverse of serialize()).
   // Execution-state restore stays with the caller — it needs all windows to exist.
   applyRecord(rec) {
     this.cm.dispatch({
       changes: { from: 0, to: this.cm.state.doc.length, insert: rec.code ?? '' },
     });
-    if (rec.mode === 'blocks' && rec.blocksJson) this.loadBlocksJSON(rec.blocksJson);
-  }
-
-  _closeBlocks() {
-    if (this.blocklyWorkspace) {
-      const code = workspaceIsEmpty(this.blocklyWorkspace)
-        ? ''
-        : getWorkspaceCode(this.blocklyWorkspace);
-      this.cm.dispatch({
-        changes: { from: 0, to: this.cm.state.doc.length, insert: code },
-        selection: { anchor: 0 },
-      });
-    }
-    if (this._blocksMuteCtrl) this._blocksMuteCtrl.style.display = 'none';
-    this.blocksMode = false;
-    if (activeBlocksEditor === this) {
-      activeBlocksEditor = null;
-      setActiveBlocksEditor(null);
-    }
-    this.blocksArea.style.display = 'none';
-    this.editorWrap.style.display = '';
-    this._textBtn.classList.add('ar-toggle-active');
-    this._blocksBtn.classList.remove('ar-toggle-active');
-    this._positionThumb(false);
-    this.cm.requestMeasure();
-    this.inlineWidgets.refresh();
   }
 
   // ── Execution state machine ────────────────────────────────────────────────
@@ -1100,11 +890,7 @@ export class EditorInstance {
   }
 
   execute({ soft = false } = {}) {
-    const blocksActive =
-      this.blocksMode && this.blocklyWorkspace && !workspaceIsEmpty(this.blocklyWorkspace);
-    const raw = blocksActive
-      ? getWorkspaceCode(this.blocklyWorkspace)
-      : this.cm.state.doc.toString();
+    const raw = this.cm.state.doc.toString();
 
     // Gather this instance's inputs + callbacks; the run sequence lives in run.js so
     // it can be exercised with a fake injector (no CodeMirror/DOM). See run.js.
@@ -1158,9 +944,6 @@ export class EditorInstance {
     } catch (_) {}
     try {
       localStorage.removeItem(editorAutoExecKey(this.id));
-    } catch (_) {}
-    try {
-      localStorage.removeItem(editorBlocksOpenKey(this.id));
     } catch (_) {}
 
     const editorWin = document.getElementById(this.editorWinId);

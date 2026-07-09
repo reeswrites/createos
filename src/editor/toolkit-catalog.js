@@ -1003,6 +1003,12 @@ setcps(0.5);`,
         tags: ['route', 'mic', 'shader', 'uniform', 'amplitude', 'smooth'],
       },
       {
+        label: 'watch a live chain',
+        code: "// Live chain inspector: role-tagged nodes + per-stage values, updating in real time\nroute(Source.mic).amplitude.scale(0, 1, 0, 100).smooth(0.8).watch('Mic chain');",
+        hint: 'route(...).watch() opens a live, read-only window showing each stage of the chain (source/transform/sink), its role, and its current value. Adds a no-op driver if there is no sink yet.',
+        tags: ['route', 'watch', 'inspect', 'signal', 'chain', 'debug', 'tier2'],
+      },
+      {
         label: 'camera visual effects chain',
         code: "// Camera with composable visual effects\nroute(Source.camera)\n  .tint('#ff4400')\n  .grain(0.1)\n  .show('Treated Camera', { w: 700, h: 500 });",
         hint: 'route(Source.camera) creates a visual signal chain. Chain .tint() .negative() .solarize() .grain() .strobe() etc.',

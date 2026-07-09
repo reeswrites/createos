@@ -23,6 +23,7 @@ import { pipe, sourceKind, sourceField } from '../visual/render-pipeline.js';
 import { audio } from '../audio/audio.js';
 import { VideoSignalAPI } from './video-signal.js';
 import { _isCanvas, _isVideo } from '../visual/drawable-source.js';
+import { openRouteInspector } from './route-inspector.js';
 import { isVideoSignal, isAudioSignal } from './signal-shape.js';
 
 // ── Native timing (captured before user-code patching) ────────────────────────
@@ -593,11 +594,41 @@ class Route {
   // ── Chain evaluation ──────────────────────────────────────────────────────
 
   _eval(v) {
+    const inspect = this._inspecting; // ADR 063: record per-stage values while inspected
+    if (inspect) {
+      this._srcV = v;
+      this._srcAt = performance.now();
+    }
     for (const t of this._chain) {
       v = t.step(v);
+      if (inspect) {
+        t._v = v;
+        t._at = performance.now();
+      }
       if (v === SKIP) return SKIP;
     }
+    if (inspect) {
+      this._outV = v;
+      this._outAt = performance.now();
+    }
     return v;
+  }
+
+  // ── Live chain inspector (ADR 063) ────────────────────────────────────────
+  // .watch() opens a WM window rendering this route's chain with live per-stage values
+  // and active-stage lighting (read-only). If the route has no sink yet, watch adds a
+  // no-op driver so values flow — and then owns the route (closing the window tears it
+  // down); otherwise closing only stops inspecting and leaves the route running.
+  // NOT named `inspect`: that collides with the Node/pretty-format custom-inspect
+  // protocol — a serializer probes `obj.inspect()`, which (returning `this`) recurses.
+  watch(title) {
+    if (this._destroyed) return this;
+    this._inspecting = true;
+    const ownsRoute = this._sinks.length === 0 && !this._started;
+    if (ownsRoute) this._sinks.push({ write: () => {}, immediate: false, label: 'inspect' });
+    this._startScalar(); // idempotent — drives _eval so values flow
+    openRouteInspector(this, { title: title ?? this._src?.label ?? 'Route', ownsRoute });
+    return this;
   }
 
   // ── Scalar driver election and start ──────────────────────────────────────

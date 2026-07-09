@@ -12,6 +12,7 @@
 // Camera).
 
 import { trackedGroup } from '../../runtime/tracked-group.js';
+import { playOffDom } from './off-dom-video.js';
 
 // Set-backed group (trackedGroup dedupes internally) — streams stop on reset.
 const _active = trackedGroup({ teardown: _stopTracks });
@@ -44,12 +45,7 @@ export async function openScreenSource(opts = {}) {
     video: opts.video ?? true,
     audio: opts.audio ?? false,
   });
-  const video = document.createElement('video');
-  video.srcObject = stream;
-  video.muted = true;
-  video.autoplay = true;
-  video.playsInline = true;
-  await video.play().catch(() => {});
+  const video = playOffDom(stream);
   _active.add(video);
   // User-initiated stop (browser "Stop sharing") → tear down our handle too.
   stream.getVideoTracks()[0]?.addEventListener('ended', () => _stop(video));

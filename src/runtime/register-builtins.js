@@ -20,7 +20,7 @@ import { setAudioDetectPattern } from '../editor/api-detector.js';
 import { Camera } from '../api/media/camera.js';
 import { audio } from '../api/audio/audio.js';
 import { initStrudel, strudelGlobals } from '../api/audio/strudel.js';
-import { Shader, ShaderFX } from '../api/shader/shader.js';
+import { Shader, ShaderFX, SHADER_PRESETS } from '../api/shader/shader.js';
 import { GLShader, GLSL_PRESETS } from '../api/shader/glsl-shader.js';
 import { Canvas } from '../api/visual/canvas.js';
 import { PIXI } from '../api/visual/pixi.js';
@@ -119,6 +119,7 @@ export function registerBuiltins() {
   _registerBuiltin('ShaderFX', ShaderFX, { params: ['fragmentBody', 'opts?'] });
   _registerBuiltin('GLShader', GLShader, { params: ['fragmentBody', 'opts?'] });
   _registerBuiltin('GLSL_PRESETS', GLSL_PRESETS);
+  _registerBuiltin('SHADER_PRESETS', SHADER_PRESETS); // WGSL preset set — twin of GLSL_PRESETS, used by `new Shader(SHADER_PRESETS.plasma)` snippets
   _registerBuiltin('Canvas', Canvas, { params: ['opts?'] });
   _registerBuiltin('pipe', pipe);
   _registerBuiltin('Mask', Mask, {

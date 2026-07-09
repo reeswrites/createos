@@ -73,7 +73,7 @@ export const TOOLKIT_CATEGORIES = [
       },
       {
         label: 'load font',
-        code: "await canvas.loadFont('Orbitron', 'https://fonts.gstatic.com/s/orbitron/v31/yMJMMIlzdpvBhQQL_SC3X9yhF25-T1nyGy6BoWgz.woff2');\ndraw.text('SPACE', 100, 200, 64, '#0ff', { font: 'Orbitron', weight: 'bold' });",
+        code: "await canvas.loadFont('Orbitron', 'https://fonts.gstatic.com/s/orbitron/v31/yMJMMIlzdpvBhQQL_SC3X9yhF25-T1nyGy6BoWgz.woff2');\ncanvas.text('SPACE', 100, 200, 64, '#0ff', { font: 'Orbitron', weight: 'bold' });",
         hint: 'Load custom font by name + URL (FontFace API), then use with canvas.text({ font })',
         tags: ['font', 'text', 'custom'],
       },
@@ -89,12 +89,12 @@ export const TOOLKIT_CATEGORIES = [
       },
       {
         label: 'image',
-        code: "const img = await Media.image('https://example.com/photo.jpg');\ndraw.image(img, x, y, w, h);",
+        code: "const img = await Media.image('https://example.com/photo.jpg');\ncanvas.image(img, x, y, w, h);",
         hint: 'Draw an image — load with Media.image(), then canvas.image(img, x, y, w?, h?)',
       },
       {
         label: 'backdrop (image/video underlay)',
-        code: "canvas.backdrop('https://example.com/photo.jpg');\n// now draw on top:\ndraw.circle(400, 300, 50, 'red');",
+        code: "canvas.backdrop('https://example.com/photo.jpg');\n// now draw on top:\ncanvas.circle(400, 300, 50, 'red');",
         hint: "canvas.backdrop(source) — renders an image, video, camera, or canvas on the layer below so all draw calls appear on top. Accepts a URL string, 'camera', HTMLImageElement, HTMLVideoElement, CameraStream, or any canvas/shader. Returns { stop(), layer }. stop() cancels a live video loop. Cleaned up automatically on reset.",
         tags: [
           'draw',
@@ -111,28 +111,28 @@ export const TOOLKIT_CATEGORIES = [
       },
       {
         label: 'backdrop — camera underlay',
-        code: "const cam = await Camera.open();\ndraw.backdrop(cam);\n\nsetInterval(() => {\n  // draw on top of live camera each frame\n  canvas.circle(\n    canvas.width/2 + Math.cos(Date.now()/500)*100,\n    canvas.height/2, 40, 'rgba(255,0,0,0.7)'\n  );\n}, 16);",
+        code: "const cam = await Camera.open();\ncanvas.backdrop(cam);\n\nsetInterval(() => {\n  // draw on top of live camera each frame\n  canvas.circle(\n    canvas.width/2 + Math.cos(Date.now()/500)*100,\n    canvas.height/2, 40, 'rgba(255,0,0,0.7)'\n  );\n}, 16);",
         hint: 'canvas.backdrop(cam) — live camera feed as a background layer. Use Camera.open() to get a CameraStream, then draw shapes/text on top.',
         tags: ['draw', 'backdrop', 'camera', 'live', 'ar', 'augmented', 'overlay'],
       },
       {
         label: 'alpha',
-        code: "canvas.alpha(0.5);\ndraw.circle(x, y, r, 'red');\ndraw.alpha(1);",
+        code: "canvas.alpha(0.5);\ncanvas.circle(x, y, r, 'red');\ncanvas.alpha(1);",
         hint: 'Set global alpha (0–1) — affects all subsequent draw calls until changed',
       },
       {
         label: 'blend mode',
-        code: "canvas.blend('screen');\ndraw.circle(x, y, r, 'blue');\ndraw.blend('source-over');",
+        code: "canvas.blend('screen');\ncanvas.circle(x, y, r, 'blue');\ncanvas.blend('source-over');",
         hint: 'Set composite blend mode — screen, multiply, add, overlay, etc.',
       },
       {
         label: 'save / restore',
-        code: "canvas.push();\ndraw.alpha(0.3);\ndraw.translate(100, 100);\ndraw.circle(0, 0, 50, 'white');\ndraw.pop();",
+        code: "canvas.push();\ncanvas.alpha(0.3);\ncanvas.translate(100, 100);\ncanvas.circle(0, 0, 50, 'white');\ncanvas.pop();",
         hint: 'push()/pop() save and restore all ctx state (alpha, blend, transform)',
       },
       {
         label: 'transform',
-        code: "canvas.push();\ndraw.translate(canvas.width/2, canvas.height/2);\ndraw.rotate(Math.PI / 4);\ndraw.rect(-50, -50, 100, 100, 'cyan');\ndraw.pop();",
+        code: "canvas.push();\ncanvas.translate(canvas.width/2, canvas.height/2);\ncanvas.rotate(Math.PI / 4);\ncanvas.rect(-50, -50, 100, 100, 'cyan');\ncanvas.pop();",
         hint: 'translate/rotate/scale — use push/pop to scope transforms',
       },
       {
@@ -162,7 +162,7 @@ export const TOOLKIT_CATEGORIES = [
       },
       {
         label: 'load image',
-        code: "const img = await Media.image('https://example.com/photo.jpg');\ndraw.image(img, 0, 0);",
+        code: "const img = await Media.image('https://example.com/photo.jpg');\ncanvas.image(img, 0, 0);",
         hint: 'Load image URL — returns HTMLImageElement. Draw with canvas.image(img, x, y) or canvas.image(img, x, y, w, h).',
       },
       {
@@ -982,7 +982,7 @@ setcps(0.5);`,
       },
       {
         label: 'edit image',
-        code: "const img = editImage(await Media.image('https://example.com/photo.jpg'));\nimg.crop(100, 0, 800, 600).rotate(15);\ndraw.image(img.toCanvas(), 0, 0);",
+        code: "const img = editImage(await Media.image('https://example.com/photo.jpg'));\nimg.crop(100, 0, 800, 600).rotate(15);\ncanvas.image(img.toCanvas(), 0, 0);",
         hint: "Non-destructive image pipeline — editImage(src).crop(x,y,w,h).rotate(deg).filter(cssStr).flipH().flipV().blend(other,'screen').toCanvas()",
       },
     ],
@@ -2239,7 +2239,7 @@ setcps(0.5);`,
       },
       {
         label: 'wm.addText — live text overlay',
-        code: "const cam = wm.spawn('Cam', { type: 'camera', w: 640, h: 480 });\nconst t = wm.addText(cam, 'Hello', 40, 40, {\n  fontSize: 36, color: '#fff', bold: true,\n});\n// live-update each tick:\ntick(() => t.setText('fps: ' + Math.round(1000 / (Date.now() - (_t = _t || Date.now(), _t = Date.now()))));\n// t.setStyle({ color:'#f00', rotation: 15, kerning: 2 })\n// t.moveTo(100, 80)\n// t.remove()",
+        code: "const cam = wm.spawn('Cam', { type: 'camera', w: 640, h: 480 });\nconst t = wm.addText(cam, 'Hello', 40, 40, {\n  fontSize: 36, color: '#fff', bold: true,\n});\n// live-update each tick:\nlet n = 0;\ntick(() => t.setText('frame: ' + n++));\n// t.setStyle({ color:'#f00', rotation: 15, kerning: 2 })\n// t.moveTo(100, 80)\n// t.remove()",
         hint: "wm.addText(winId, text, x, y, opts?) — place a text object on any visual window. Returns a handle: setText / setStyle / moveTo / remove / on('move'|'edit'|'select'|'deselect'). Run-scoped (cleared on reset). opts: { fontSize, fontFamily, color, bold, italic, align, rotation, kerning, curve:{type:'arc',radius} }.",
         tags: ['wm', 'text', 'overlay', 'live', 'camera', 'label', 'font', 'arc'],
       },
@@ -2274,7 +2274,7 @@ setcps(0.5);`,
       },
       {
         label: 'save file (native)',
-        code: "const canvas = canvas.el;\ncanvas.toBlob(async blob => {\n  const buf = await blob.arrayBuffer();\n  await shell.saveFile(buf, { defaultPath: 'export.png', filters: [{ name: 'PNG', extensions: ['png'] }] });\n});",
+        code: "const el = canvas.el;\nel.toBlob(async blob => {\n  const buf = await blob.arrayBuffer();\n  await shell.saveFile(buf, { defaultPath: 'export.png', filters: [{ name: 'PNG', extensions: ['png'] }] });\n});",
         hint: 'shell.saveFile(data, opts) — native save dialog in Electron/Tauri. Falls back to browser download in static-site mode.',
         tags: ['shell', 'save', 'file', 'export', 'download'],
       },

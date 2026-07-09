@@ -4,10 +4,13 @@
 // entry) on click. No wm-closure state — the stateful glue (folder handle maps, the
 // directory pickers, spawn, the refresh-callback set) stays in wm's browse() api.
 
+import { mediaKind } from '../media/media-kind.js';
+
 function fileIcon(ext) {
   if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico'].includes(ext)) return '🖼';
-  if (['mp4', 'webm', 'mov', 'avi', 'mkv'].includes(ext)) return '🎬';
-  if (['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a'].includes(ext)) return '🎵';
+  const kind = mediaKind(ext);
+  if (kind === 'video') return '🎬';
+  if (kind === 'audio') return '🎵';
   if (['js', 'ts', 'jsx', 'tsx', 'mjs'].includes(ext)) return '📜';
   if (['wgsl', 'glsl'].includes(ext)) return '✨';
   if (['json'].includes(ext)) return '{ }';

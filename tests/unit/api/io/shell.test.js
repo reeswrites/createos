@@ -1,15 +1,19 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { shell } from '../../../../src/api/io/shell.js';
+import {
+  registerNativeCapability,
+  unregisterNativeCapability,
+} from '../../../../src/runtime/native.js';
 
 afterEach(() => {
   vi.restoreAllMocks();
-  delete window.__ELECTRON__;
-  delete window.__TAURI__;
+  unregisterNativeCapability('pickFile');
+  unregisterNativeCapability('saveFile');
   document.title = '';
 });
 
 describe('shell environment detection', () => {
-  it('isBrowser is true in jsdom (no Electron/Tauri)', () => {
+  it('isBrowser is true in jsdom (no native bridge)', () => {
     expect(shell.isBrowser).toBe(true);
   });
 
@@ -21,8 +25,17 @@ describe('shell environment detection', () => {
     expect(shell.isElectron).toBe(false);
   });
 
-  it('isTauri is false in jsdom', () => {
+  it('isTauri is always false (Tauri never built, ADR 048)', () => {
     expect(shell.isTauri).toBe(false);
+  });
+
+  it('isDesktop/isElectron flip true once a native cap is registered', () => {
+    registerNativeCapability('pickFile', vi.fn());
+    expect(shell.isDesktop).toBe(true);
+    expect(shell.isElectron).toBe(true);
+    expect(shell.isBrowser).toBe(false);
+    unregisterNativeCapability('pickFile');
+    expect(shell.isDesktop).toBe(false);
   });
 });
 
@@ -30,17 +43,6 @@ describe('shell.status / clearStatus', () => {
   it('returns shell for chaining in browser', () => {
     expect(shell.status('test')).toBe(shell);
     expect(shell.clearStatus()).toBe(shell);
-  });
-
-  it('calls Electron statusBar.set when __ELECTRON__ present', () => {
-    const set = vi.fn();
-    window.__ELECTRON__ = { statusBar: { set, clear: vi.fn() } };
-    // Re-test: since module is loaded once, simulate direct call
-    // The shell module captured _isElectron at load time — test the internal path
-    if (window.__ELECTRON__?.statusBar) {
-      window.__ELECTRON__.statusBar.set('test');
-    }
-    expect(set).toHaveBeenCalledWith('test');
   });
 });
 
@@ -86,6 +88,15 @@ describe('shell.saveFile', () => {
     expect(a.click).toHaveBeenCalled();
     expect(a.download).toBe('out.png');
   });
+
+  it('routes through nativeCap("saveFile") when a native bridge exists', async () => {
+    const save = vi.fn().mockResolvedValue({ path: '/tmp/out.png', name: 'out.png' });
+    registerNativeCapability('saveFile', save);
+    const data = new ArrayBuffer(4);
+    const result = await shell.saveFile(data, { defaultPath: 'out.png' });
+    expect(save).toHaveBeenCalledWith({ defaultPath: 'out.png', data });
+    expect(result).toEqual({ path: '/tmp/out.png', name: 'out.png' });
+  });
 });
 
 describe('shell.invoke', () => {
@@ -99,5 +110,13 @@ describe('shell.openFile', () => {
   it('returns null in browser (no native picker)', async () => {
     const result = await shell.openFile({});
     expect(result).toBeNull();
+  });
+
+  it('routes through nativeCap("pickFile") when a native bridge exists', async () => {
+    const pick = vi.fn().mockResolvedValue({ path: '/tmp/in.png', name: 'in.png' });
+    registerNativeCapability('pickFile', pick);
+    const result = await shell.openFile({ filters: [] });
+    expect(pick).toHaveBeenCalledWith({ filters: [] });
+    expect(result).toEqual({ path: '/tmp/in.png', name: 'in.png' });
   });
 });

@@ -7,21 +7,28 @@
 // <video> (resolveDrawable / _isVideo), so `pipe(Source.screen)` and `canvas.backdrop(v)`
 // both work with no new resolver branch beyond the Source sentinel.
 //
-// Streams are run artifacts — tracks stop on reset (onReset) so capture doesn't leak past
-// a run. Not refcounted (screen capture is rarely shared, unlike Camera).
+// Streams are run artifacts — tracked in a trackedGroup so their tracks stop on reset and
+// capture doesn't leak past a run. Not refcounted (screen capture is rarely shared, unlike
+// Camera).
 
-import { onReset } from '../../runtime/reset-registry.js';
+import { trackedGroup } from '../../runtime/tracked-group.js';
 
-const _active = new Set();
+// Set-backed group (trackedGroup dedupes internally) — streams stop on reset.
+const _active = trackedGroup({ teardown: _stopTracks });
 
-function _stop(video) {
+function _stopTracks(video) {
   try {
     video.srcObject?.getTracks?.().forEach((t) => t.stop());
   } catch (_) {
     /* already gone */
   }
   video.srcObject = null;
-  _active.delete(video);
+}
+
+// User-initiated stop ("Stop sharing") — tear down our handle AND drop from group.
+function _stop(video) {
+  _stopTracks(video);
+  _active.remove(video);
 }
 
 /**
@@ -48,7 +55,3 @@ export async function openScreenSource(opts = {}) {
   stream.getVideoTracks()[0]?.addEventListener('ended', () => _stop(video));
   return video;
 }
-
-onReset(() => {
-  for (const v of [..._active]) _stop(v);
-});

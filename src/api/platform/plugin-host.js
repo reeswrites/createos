@@ -1,14 +1,14 @@
-import { onReset } from '../../runtime/reset-registry.js';
+import { trackedGroup } from '../../runtime/tracked-group.js';
 // plugin-host.js — sandboxed iframe plugins as first-class wm windows
 // #19: PluginHost.load(url) / PluginHost.create(html)
 // Signal bus: plugin.send(type, val), plugin.on(type, fn), plugin.bridge(name, fn)
 // Canvas output: plugin.canvas → HTMLCanvasElement usable as GLShader/pipe source
 
-const _plugins = [];
+const _plugins = trackedGroup({ teardown: (p) => p._destroy() });
 
+// Manual "destroy-all" helper (tests / app.js); reset teardown is the group's own.
 export function cleanupPlugins() {
-  for (const p of _plugins) p._destroy();
-  _plugins.length = 0;
+  _plugins.teardownAll();
 }
 
 // ── Plugin ────────────────────────────────────────────────────────────────────
@@ -25,7 +25,7 @@ class Plugin {
     // Mirror canvas for cross-origin frame capture
     this._mirrorCanvas = null;
     this._mirrorCtx = null;
-    _plugins.push(this);
+    _plugins.add(this);
   }
 
   // Spawn in a wm window
@@ -286,6 +286,3 @@ export const PluginHost = {
     return new Plugin(html);
   },
 };
-
-// Register teardown with the reset registry (ADR 008).
-onReset(cleanupPlugins);

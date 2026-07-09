@@ -1,9 +1,12 @@
-import { onReset } from '../../runtime/reset-registry.js';
+import { trackedGroup } from '../../runtime/tracked-group.js';
 
-const _recorders = [];
+// teardown = rec.stop() — finalizes any partial blob via the recorder's own
+// mr.onstop (which back-calls _remove); see Recording below.
+const _recorders = trackedGroup({ teardown: (rec) => rec.stop() });
 
+// Manual "destroy-all" helper (tests / app.js); reset teardown is the group's own.
 export function cleanupRecorders() {
-  for (const rec of [..._recorders]) rec.stop();
+  _recorders.teardownAll();
 }
 
 function pickMime() {
@@ -16,8 +19,7 @@ function pickMime() {
 }
 
 function _remove(rec) {
-  const i = _recorders.indexOf(rec);
-  if (i >= 0) _recorders.splice(i, 1);
+  _recorders.remove(rec);
 }
 
 export class Recording {
@@ -45,7 +47,7 @@ export class Recording {
       }
     };
     mr.start(100);
-    _recorders.push(this);
+    _recorders.add(this);
   }
 
   stop() {
@@ -88,5 +90,3 @@ export function compositeCanvasStream(canvases, fps = 30) {
     },
   };
 }
-
-onReset(cleanupRecorders);

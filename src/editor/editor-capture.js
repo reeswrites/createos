@@ -1,11 +1,10 @@
-import { onReset } from '../runtime/reset-registry.js';
+import { trackedGroup } from '../runtime/tracked-group.js';
 // DOMCapture — renders any DOM element to a live HTMLCanvasElement via SVG foreignObject.
 // The canvas can be passed directly as `video:` to the Shader class.
 
 let _nativeSetInterval = null;
 let _nativeClearInterval = null;
-const _captures = new Map(); // key → DOMCapture instance
-let _captureCounter = 0;
+const _captures = trackedGroup({ teardown: (c) => c.stop() });
 
 class DOMCapture {
   constructor(el, fps = 12) {
@@ -111,17 +110,13 @@ export function captureWindow(target, fps = 12) {
     el instanceof HTMLImageElement
   )
     return el;
-  const key = `__cap_${_captureCounter++}`;
   const c = new DOMCapture(el, fps);
   c.start();
-  _captures.set(key, c);
+  _captures.add(c);
   return c.canvas();
 }
 
+// Manual "destroy-all" helper (tests / app.js); reset teardown is the group's own.
 export function cleanupCaptures() {
-  for (const c of _captures.values()) c.stop();
-  _captures.clear();
+  _captures.teardownAll();
 }
-
-// Register teardown with the reset registry (ADR 008).
-onReset(cleanupCaptures);
